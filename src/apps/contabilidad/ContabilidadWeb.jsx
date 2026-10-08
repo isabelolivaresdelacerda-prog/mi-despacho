@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { raizGuardada, buscarContabilidad, permiso as permisoRaiz } from "../../lib/carpetas.js";
 import {
   soportado, cargarTodo, CARPETAS, listar, abrir, subir,
-  guardarEdicion, guardarLectura, guardarVinculo, marcarSinTexto, eur, fechaOrden, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
+  guardarEdicion, guardarLectura, guardarVinculo, claveMovDatos, marcarSinTexto, eur, fechaOrden, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
 } from "./datos.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
 import EnviarGestoria from "./EnviarGestoria.jsx";
@@ -217,6 +217,7 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
   const ter = emitidas ? "cliente" : "proveedor";
   const [edit, setEdit] = useState(null);
   const [leyendo, setLeyendo] = useState("");
+  const [elegir, setElegir] = useState(null); // factura a la que se busca el pago en el extracto
   const [filtro, setFiltro] = useState("");
   const [todas, setTodas] = useState(false);
   const lista = useMemo(() => fuente.filter((f) => todas || enRango(f.fecha, r) || fechaOrden(f.fecha).startsWith("9999")).filter((f) => !filtro || JSON.stringify([f[ter], f.numero, f.archivo]).toLowerCase().includes(filtro.toLowerCase()))
@@ -247,6 +248,20 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
         <nav className="sub-tabs"><button className={!emitidas ? "on" : ""} onClick={() => setEmitidas(false)}>Recibidas ({d.facturas.length})</button><button className={emitidas ? "on" : ""} onClick={() => setEmitidas(true)}>Emitidas ({(d.emitidas || []).length})</button></nav>
         <label className="btn ghost">Subir facturas<input type="file" multiple hidden accept=".pdf,image/*" onChange={async (e) => { const f = [...e.target.files]; e.target.value = ""; if (!f.length) return; await subir(raiz, emitidas ? "facturas_emitidas" : "facturas", f); aviso(`Guardadas en «${emitidas ? "facturas_emitidas" : "facturas"}»`); recargar(); }} /></label>
         <input className="buscar" placeholder={emitidas ? "Buscar cliente, número…" : "Buscar proveedor, número…"} value={filtro} onChange={(e) => setFiltro(e.target.value)} />
+        <button className="btn ghost" type="button" disabled={!!leyendo} title="Libro de facturas del periodo, numerado, y un PDF con todas las facturas en ese orden y selladas con su número" onClick={async () => {
+          setLeyendo("libro");
+          try {
+            const { numerarLibro, libroCSV, libroPDF } = await import("./libroPDF.js");
+            const libro = numerarLibro(fuente.filter((f) => enRango(f.fecha, r)), emitidas ? "cliente" : "proveedor");
+            if (!libro.length) { aviso("No hay facturas en este periodo"); return; }
+            const tipo = emitidas ? "emitidas" : "recibidas", eti = r.etiqueta || "";
+            descargarTexto(libroCSV(libro, emitidas), `Libro facturas ${tipo} ${eti}.csv`);
+            const { bytes, avisos } = await libroPDF(libro, { titulo: `Libro de facturas ${tipo} · ${eti}`, empresa: propia?.nombre, emitidas, onPaso: (t) => setLeyendo(t) });
+            const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })), a = document.createElement("a");
+            a.href = url; a.download = `Facturas ${tipo} ${eti} (numeradas).pdf`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+            aviso(`Libro y PDF de ${libro.length} facturas descargados${avisos.length ? ` · ${avisos.length} no se pudieron añadir` : ""}`);
+          } catch (e) { aviso("No se ha podido hacer el PDF: " + (e.message || e)); } finally { setLeyendo(""); }
+        }}>Libro + PDF de facturas</button>
         <button className="btn ghost" type="button" disabled={!!leyendo} title="Renombra las facturas leídas con tu formato: AAMMDD - PROVEEDOR NºFACTURA IMPORTE" onClick={async () => { setLeyendo("nombres"); const { renombrarFacturas } = await import("./tareasIA.js"); const err = []; const n = await renombrarFacturas(raiz, emitidas, err); setLeyendo(""); aviso(`${n} facturas renombradas${err.length ? ` · ${err.length} avisos: ${err[0]}` : ""}`); recargar(); }}>Poner nombre a las facturas</button>
         {sinLeer.length > 0 && <button className="btn" type="button" disabled={!!leyendo} onClick={leerPendientes}>{leyendo ? `Leyendo ${leyendo}…` : `Leer ${sinLeer.length} facturas nuevas`}</button>}
         {escaneadas.length > 0 && <span className="pend pequeño">{escaneadas.length} escaneada{escaneadas.length > 1 ? "s" : ""}: rellénala{escaneadas.length > 1 ? "s" : ""} con «Corregir»</span>}
@@ -263,7 +278,7 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
               <td>{f[ter] || <em className="muted">{f.archivo}</em>}{f.analizado_ia && !f._editada && <span className="etq" title="Datos propuestos por IA, sin revisar">IA</span>}{f._papelesCambiados && !f._editada && <span className="etq aviso" title="La IA puso a tu empresa como emisora: se han cambiado los papeles. Revísala.">emisor corregido</span>}{f._proveedorPropio && <span className="etq aviso" title="Sale tu propia empresa como proveedor: corrígela">¿tu empresa como proveedor?</span>}{f._sinTexto && <span className="etq aviso" title="Ni con OCR se ha podido leer: rellénala a mano">ilegible · rellenar</span>}{f.noFactura && <span className="etq" title={f.notaNoFactura || "No es una factura (carta de pago, presupuesto…): no entra en los libros"}>no es factura</span>}{f._duplicadoDe && <span className="etq aviso" title={`Es la misma factura que «${f._duplicadoDe}». No entra en los libros; puedes borrar esta copia.`}>duplicada</span>}</td>
               <td>{f.numero}</td><td className="num">{eur(f.base)}</td><td className="num">{eur(f.iva_importe)}</td><td className="num">{f.retencion_importe ? eur(f.retencion_importe) : ""}</td>
               <td className="num"><strong>{eur(f.total)}</strong></td><td title={TITULOS_PGC[f.cuenta_pgc]}>{f.cuenta_pgc}</td>
-              <td>{!f.total ? "" : !noPagada(f, d) ? <span className="ok" title={(f._pago || f._cobro)?.texto}>{emitidas ? "Cobrada" : "Pagada"}{(f._pago || f._cobro)?.fecha ? " " + (f._pago || f._cobro).fecha : ""}</span> : <span className="pend">Pendiente</span>}</td>
+              <td>{!f.total ? "" : !noPagada(f, d) ? <span className="ok" title={(f._pago || f._cobro)?.texto}>{emitidas ? "Cobrada" : "Pagada"}{(f._pago || f._cobro)?.fecha ? " " + (f._pago || f._cobro).fecha : ""}</span> : <button type="button" className="pend enlace" title="Elegir el pago en el extracto del banco" onClick={() => setElegir(f)}>Pendiente · elegir pago</button>}</td>
               <td className="acciones">
                 <button className="enlace" type="button" onClick={() => abrir(f._arch)}>Ver</button>
                 <button className="enlace" type="button" onClick={() => setEdit({ ...f })}>Corregir</button>
@@ -271,6 +286,10 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
             </tr>))}</tbody>
         </table>
       </div>
+      {elegir && <ElegirPago f={elegir} d={d} emitidas={emitidas} onCerrar={() => setElegir(null)} onElegir={async (m) => {
+        await guardarVinculo(raiz, elegir.archivo, m ? { descripcion: m.concepto, fecha: m.fecha, importe: m.importe, clave_banco: claveMovDatos(m), archivo_banco: "" } : null);
+        setElegir(null); aviso(m ? "Pago casado con el movimiento del banco" : "Quitado el pago elegido"); recargar();
+      }} />}
       {edit && (
         <div className="mc-fondo" role="dialog" aria-modal="true">
           <div className="mc-dialogo ancho con-doc">
@@ -338,3 +357,30 @@ function Documentos({ raiz, aviso, recargar }) {
   );
 }
 
+
+// Elegir en el extracto el movimiento que paga (o cobra) una factura: primero los del mismo importe, luego los cercanos en fecha
+function ElegirPago({ f, d, emitidas, onCerrar, onElegir }) {
+  const [buscar, setBuscar] = useState("");
+  const [todos, setTodos] = useState(false);
+  const signo = emitidas ? 1 : -1, f0 = Date.parse(fechaOrden(f.fecha)) || Date.now();
+  const lista = (d.movimientos || []).filter((m) => Math.sign(m.importe) === signo && (!m._factura || m._factura === f.archivo) && !m._emitida)
+    .map((m) => ({ m, igual: Math.abs(Math.abs(m.importe) - (f.total || 0)) < 0.011, dias: Math.abs(((Date.parse(fechaOrden(m.fecha)) || 0) - f0) / 86400000) }))
+    .filter((x) => todos || x.igual || x.dias <= 120)
+    .filter((x) => !buscar || (x.m.concepto + " " + x.m.importe).toLowerCase().includes(buscar.toLowerCase()))
+    .sort((a, b) => (b.igual - a.igual) || (a.dias - b.dias)).slice(0, 80);
+  return (
+    <div className="mc-fondo" role="dialog" aria-modal="true" aria-labelledby="ep-t">
+      <div className="mc-dialogo ancho">
+        <header><h2 id="ep-t">¿Con qué movimiento del banco se {emitidas ? "cobró" : "pagó"}?</h2><button className="mc-x" onClick={onCerrar} aria-label="Cerrar">×</button></header>
+        <div className="mc-cuerpo">
+          <p className="mc-nota"><strong>{f[emitidas ? "cliente" : "proveedor"] || f.archivo}</strong> {f.numero} · {f.fecha} · {eur(f.total)}</p>
+          <div className="acciones"><input placeholder="Buscar en el concepto o el importe…" value={buscar} onChange={(e) => setBuscar(e.target.value)} /> <label className="pequeño"><input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} /> ver todo el extracto</label></div>
+          {!lista.length ? <p className="muted">No hay movimientos que encajen. Marca «ver todo el extracto» o sincroniza el banco.</p> : (
+            <table className="tabla pequeña"><thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th><th /></tr></thead>
+              <tbody>{lista.map(({ m, igual }) => <tr key={m._id} className={igual ? "sel" : ""}><td>{m.fecha}</td><td>{m.concepto}</td><td className="num">{eur(m.importe)}</td><td><button className="btn" type="button" onClick={() => onElegir(m)}>{igual ? "Es este" : "Elegir"}</button></td></tr>)}</tbody></table>)}
+        </div>
+        <footer>{f._pago?.elegido && <button className="mc-btn sec" onClick={() => onElegir(null)}>Quitar el pago elegido</button>}<button className="mc-btn sec" onClick={onCerrar}>Cerrar</button></footer>
+      </div>
+    </div>
+  );
+}

@@ -166,7 +166,12 @@ export async function cargarTodo(raiz) {
   const usados = new Set();
   for (const f of facturas.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)))) {
     const v = vincular[f.archivo];
-    if (v) { f._pago = { fecha: v.fecha, texto: v.descripcion, manual: true }; continue; }
+    // Pago elegido a mano en el extracto: se casa con ese movimiento del banco (no es un pago «por otra vía»)
+    if (v?.clave_banco) {
+      const m = movimientos.find((x) => !usados.has(x._id) && claveMovDatos(x) === v.clave_banco) || movimientos.find((x) => !usados.has(x._id) && x.fecha === v.fecha && Math.abs(Math.abs(x.importe) - Math.abs(num(v.importe))) < 0.011);
+      if (m) { usados.add(m._id); m._factura = f.archivo; f._pago = { fecha: m.fecha, texto: m.concepto, elegido: true }; continue; }
+    }
+    if (v && !v.clave_banco) { f._pago = { fecha: v.fecha, texto: v.descripcion, manual: true }; continue; }
     if (!f.total) continue;
     const m = mejorMovimiento(movimientos, usados, f.total, -1, f.fecha, f.proveedor);
     if (m) { usados.add(m._id); m._factura = f.archivo; f._pago = { fecha: m.fecha, texto: m.concepto }; }
