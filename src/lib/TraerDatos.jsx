@@ -34,7 +34,7 @@ export default function TraerDatos() {
     <div className="traer-datos" role="dialog" aria-label="Traer datos de la dirección antigua">
       <p><strong>Mi Despacho ha cambiado de dirección.</strong> Tus ajustes (logo, colores, plantillas, calendario, carpeta de la empresa) siguen en la dirección antigua de este navegador. Tráelos con un clic; tus documentos no se mueven.</p>
       {estado ? <p className="ok">{estado}</p> : <div className="acciones">
-        <button className="btn" type="button" onClick={() => { window.open(ANTIGUA + "/migrar.html", "md-migrar", "width=480,height=360"); setEstado("Abriendo la dirección antigua…"); }}>Traer mis datos</button>
+        <button className="btn" type="button" onClick={() => { window.open(ANTIGUA + "/migrar.html?a=" + encodeURIComponent(location.origin), "md-migrar", "width=480,height=360"); setEstado("Abriendo la dirección antigua…"); }}>Traer mis datos</button>
         <button className="btn ghost" type="button" onClick={() => { try { localStorage.setItem(HECHO, "no"); } catch { /* nada */ } setVer(false); }}>No hace falta</button>
       </div>}
     </div>

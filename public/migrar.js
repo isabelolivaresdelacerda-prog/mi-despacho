@@ -1,7 +1,9 @@
 // Se abre en la dirección antigua (mi-despacho-nine.vercel.app) y envía los datos guardados en este navegador
 // a la dirección nueva (midespacho.vercel.app), que es quien la ha abierto. No envía la sesión ni claves de acceso.
 (async function () {
-  const DESTINO = "https://midespacho.vercel.app";
+  const PERMITIDOS = ["https://midespacho.vercel.app", "https://midespacho.beatrizinversiones.com"];
+  const pedido = new URLSearchParams(location.search).get("a");
+  const DESTINO = PERMITIDOS.includes(pedido) ? pedido : PERMITIDOS[0];
   const msg = (t) => { document.getElementById("estado").textContent = t; };
   if (!window.opener) { msg("Abre esta página desde Mi Despacho (midespacho.vercel.app)."); return; }
   const ls = {};
