@@ -82,6 +82,21 @@ export function GuardarEnNube({ abierto, blob, nombre, config, onCerrar, irAAjus
   );
 }
 
+// --- Aviso compacto para las apps: si la IA del ordenador está apagada, botón para encenderla ---
+export function AvisoIA() {
+  const [e, setE] = useState(null);
+  const mirar = () => estadoLocal().then(setE);
+  useEffect(() => { mirar(); const t = setInterval(mirar, 15000); return () => clearInterval(t); }, []);
+  if (!e || e.ok) return null;
+  return (
+    <div className="aviso-ia" role="status">
+      <span><strong>{e.motivo === "cargando" ? "La IA de tu ordenador se está encendiendo…" : "La IA de tu ordenador está apagada"}</strong> — sin ella no se leen las facturas ni los documentos nuevos.</span>
+      {e.motivo !== "cargando" && <a className="btn" href="midespacho-ia://encender" onClick={() => setTimeout(mirar, 15000)}>Encender la IA</a>}
+      <a className="btn ghost" href="#/ia">Ayuda / usar claves gratis</a>
+    </div>
+  );
+}
+
 // --- Estado de la IA en el ordenador -------------------------------
 export function EstadoIALocal({ compacto }) {
   const [estado, setEstado] = useState(null);

@@ -19,7 +19,7 @@ import { revisarCarpeta } from "./inventario.js";
 import { planPorDefecto, opcionesFiscales, esESFL } from "../../lib/entidad.js";
 import { noPagada } from "./periodo.js";
 import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.js";
-import { EstadoIALocal, useAviso } from "../../comunes.jsx";
+import { AvisoIA, EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
 const PESTANAS = [["resumen", "Resumen"], ["bandeja", "Bandeja de entrada"], ["facturas", "Facturas"], ["banco", "Banco y cierre"], ["impuestos", "Impuestos"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Exportar A3 / Sage"]];
@@ -184,6 +184,7 @@ function Cabecera({ carpeta, acciones }) {
         <p className="muted">{carpeta ? <>Trabajando sobre la carpeta <strong>{carpeta}</strong>. Los documentos se quedan en tu OneDrive / Drive.</> : "La app está en Mi Despacho; tus documentos, en tu OneDrive o Google Drive."}</p>
       </div>
       {acciones && <div className="acciones">{acciones}</div>}
+      <div style={{ flexBasis: "100%" }}><AvisoIA /></div>
     </header>
   );
 }

@@ -92,9 +92,20 @@ export function FormIA() {
         <label className="opcion"><input type="radio" name="modo-ia" checked={modo === "nube"} onChange={() => cambiarModo("nube")} /> <span>En mi ordenador y, si no está, en la nube con mis claves.</span></label>
       </fieldset>
       <EstadoIALocal compacto />
-      {modo === "nube" && (<>
+      {(() => { const n = Object.values(claves).filter(Boolean).length; return (
+        <p className={n ? "muted" : "pend"}>{n ? `Tienes ${n} clave${n > 1 ? "s" : ""} de IA en la nube guardada${n > 1 ? "s" : ""} en este navegador.` : "No tienes ninguna clave de IA en la nube en esta dirección. Por seguridad las claves no se copian de la dirección antigua ni se guardan en tu cuenta: vuelve a pegarlas abajo (son gratis)."}</p>); })()}
+      {modo !== "nube" && <p className="muted pequeño">Las claves solo se usan si eliges «En mi ordenador y, si no está, en la nube». Puedes dejarlas puestas igualmente.</p>}
+      {(<>
         <p className="nota"><strong>Ojo con los datos personales:</strong> en la nube el texto sale de tu ordenador, y en los planes gratuitos el proveedor puede usarlo para mejorar sus productos. No lo uses con contratos con datos reales de clientes.</p>
         <p className="muted">Orden en la nube: Gemma 4 → Gemini Flash → gpt-oss → Llama → OpenRouter y, solo si se agotan todas, Claude (de pago, siempre te pregunta antes). Tus claves se guardan solo en este navegador.</p>
+        <details className="pasos-clave" open={!Object.values(claves).some(Boolean)}><summary><strong>Cómo conseguir una clave gratis (2 minutos)</strong></summary>
+          <ol>
+            <li>Pulsa <strong>«Conseguir clave»</strong> en Google (la primera de la lista). Se abre la web de Google AI Studio: entra con tu cuenta de Gmail.</li>
+            <li>Pulsa <strong>«Create API key»</strong> (Crear clave de API) y acepta.</li>
+            <li>Pulsa el botón de copiar que aparece junto a la clave (empieza por <code>AIza</code>).</li>
+            <li>Vuelve aquí, pégala en su casilla y pulsa <strong>«Guardar claves»</strong>. Con esa basta; Groq y OpenRouter son de reserva, por si Google se agota ese día.</li>
+          </ol>
+        </details>
         {PROVEEDORES.map((p) => (
           <label key={p.id}>
             <span className="lbl-clave">{p.nombre} <span className={"etiqueta" + (p.gratis ? "" : " pago")}>{p.gratis ? "gratis" : "de pago"}</span> <a href={p.conseguir} target="_blank" rel="noopener">Conseguir clave</a></span>

@@ -6,7 +6,10 @@ import { leerJSON, escribirJSON, num, TIPOS_VINCULO, leerVinculados, guardarVinc
 import { preguntarIA } from "../../ia-navegador.js";
 
 const ARCHIVO = "inventario_documentos.json";
-const SALTAR = /^(programa|para la gestoria|contabilidad\b|contabilidad -|\.|~\$|desktop\.ini|thumbs\.db)/i;
+const SALTAR = /^(programa|para la gestoria|contabilidad\b|contabilidad -|app|node_modules|\.|~\$|desktop\.ini|thumbs\.db|_antiguo)/i;
+// Versiones del mismo documento (copia OCR, firmado, «(2)», «_Copiar»…): se tratan como uno solo
+const raizNombre = (n) => plano(n).replace(/\.[^.]+$/, "").replace(/(_ocr|_copiar|_con firma digital|[ _-]*firmado( por ambas partes)?|\s*\(\d+\)|\s*copia)+$/g, "").replace(/^[a-z]{0,4}\d{6}\s*-\s*/, "").trim();
+const prioridad = (n) => (/firmad|firma digital/i.test(n) ? 3 : 0) + (/_ocr/i.test(n) ? -1 : 0) + (/\(\d+\)|copiar/i.test(n) ? -2 : 0);
 const DOCS = /\.(pdf|docx?|odt|jpe?g|png)$/i;
 const plano = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -33,8 +36,7 @@ export function clasificar(nombre, ruta = []) {
   ];
   for (const [re, tipo] of R) if (re.test(t)) return { tipo, contable: true };
   if (/estatutos|acta|titular real|\bcif\b|\bnif\b|poder|certificad|nota simple|libro|registro|modelo|statut|logo|imagen/.test(t)) return { tipo: "informativo", contable: false };
-  if (/003 financ/.test(r)) return { tipo: "prestamo_recibido", contable: true };
-  if (/002 acqui/.test(r)) return { tipo: "compraventa", contable: true };
+  if (/(^|\/)(old|antiguo|borradores?|imagenes|notas simples|doc socios|imagen corporativa)(\/|$)/.test(r) || /\.(jpe?g|png)$/.test(t)) return { tipo: "informativo", contable: false };
   return { tipo: "desconocido", contable: false };
 }
 
@@ -45,10 +47,11 @@ TEXTO:
 `;
 
 async function analizar(doc, propia) {
-  if (!/\.pdf$/i.test(doc.nombre)) return null;
+  if (!/\.(pdf|jpe?g|png)$/i.test(doc.nombre)) return null;
   try {
-    const { textoPDF } = await import("./leer.js");
-    const texto = await textoPDF(await doc.h.getFile(), 6);
+    const { textoPDF, textoImagen } = await import("./leer.js");
+    const f = await doc.h.getFile();
+    const texto = /\.pdf$/i.test(doc.nombre) ? await textoPDF(f, 6) : await textoImagen(f);
     if (texto.length < 40) return { sinTexto: true };
     const r = await preguntarIA(PROMPT(propia) + texto.slice(0, 9000), { maxTokens: 450, json: true });
     if (r.estado !== "ok") return { sinIA: true };
@@ -86,22 +89,41 @@ export async function revisarCarpeta({ empresa, raiz, propia, onPaso }) {
     nuevos.splice(nuevos.indexOf(d), 1);
     desaparecidos.splice(desaparecidos.indexOf(viejo), 1);
   }
+  // Limpieza de revisiones antiguas: los vínculos hechos solo por el nombre (sin que la IA leyera el documento) se quitan
+  // y esos documentos, junto con los «sin clasificar», se vuelven a leer ahora (con OCR y la IA).
+  const autoNombre = (v) => v.propuestoIA && !v.revisado && /por el nombre|sin texto|sin IA/i.test(v.ia || "");
+  const quitar = new Set(vinc.filter(autoNombre).map((v) => [...v.ruta, v.archivo].join("/")));
+  if (quitar.size) { for (let j = vinc.length - 1; j >= 0; j--) if (autoNombre(vinc[j])) vinc.splice(j, 1); cambiosVinc = true; }
   const yaVinc = new Set(vinc.map((v) => [...v.ruta, v.archivo].join("/")));
+  const yaEnCola = new Set(nuevos.map((d) => d.k));
+  for (const d of docs) {
+    const k = [...d.ruta, d.nombre].join("/"), prev = inv.docs[k];
+    if (yaEnCola.has(k) || !prev) continue;
+    if (quitar.has(k) || prev.estado === "sin clasificar" || prev.estado === "pendiente de IA" || /app\/|node_modules/.test(k)) { nuevos.push({ ...d, k, cambiado: true }); yaEnCola.add(k); }
+  }
+  for (const k of Object.keys(inv.docs)) if (/^(app|node_modules)\//.test(k)) delete inv.docs[k];
+  // Grupos de versiones: solo se lee y vincula la mejor (la firmada; si no, la original)
+  const grupos = {};
+  for (const d of docs) { const g = [...d.ruta, raizNombre(d.nombre)].join("/"); (grupos[g] ||= []).push(d); }
+  const principal = new Set(Object.values(grupos).map((l) => l.sort((a, b) => prioridad(b.nombre) - prioridad(a.nombre) || a.nombre.length - b.nombre.length)[0]).map((d) => [...d.ruta, d.nombre].join("/")));
   let n = 0, i = 0;
   for (const d of nuevos) {
     i++;
     const c = clasificar(d.nombre, d.ruta);
+    if (!principal.has(d.k)) { inv.docs[d.k] = { ruta: d.ruta, nombre: d.nombre, size: d.size, mtime: d.mtime, visto, tipo: c.tipo, resumen: "", estado: "versión de otro documento" }; continue; }
     let a = null;
-    if (c.contable || c.tipo === "desconocido") { onPaso?.(`Leyendo ${i} de ${nuevos.length}: ${d.nombre}`); a = await analizar(d, propia); }
-    const tipo = a?.tipo && a.tipo !== "sin_efecto_contable" && TIPOS_VINCULO[a.tipo] ? a.tipo : a?.tipo === "sin_efecto_contable" ? null : c.contable ? c.tipo : null;
-    const reg = { ruta: d.ruta, nombre: d.nombre, size: d.size, mtime: d.mtime, visto, tipo: tipo || c.tipo, resumen: a?.resumen || "", estado: "revisado" };
+    if (c.tipo !== "informativo") { onPaso?.(`Leyendo ${i} de ${nuevos.length}: ${d.nombre}`); a = await analizar(d, propia); }
+    // Solo se vincula lo que la IA ha LEÍDO y tiene efecto contable con importe; por el nombre nunca
+    const leido = a && !a.sinIA && !a.sinTexto && a.tipo;
+    const tipo = leido && a.tipo !== "sin_efecto_contable" && TIPOS_VINCULO[a.tipo] && num(a.importe) > 0 ? a.tipo : null;
+    const reg = { ruta: d.ruta, nombre: d.nombre, size: d.size, mtime: d.mtime, visto, tipo: tipo || (leido ? a.tipo : c.tipo), resumen: a?.resumen || "", estado: "revisado" };
     if (tipo && !yaVinc.has(d.k)) {
       const importe = num(a?.importe);
       const t = TIPOS_VINCULO[tipo];
       vinc.push({ id: crypto.randomUUID(), ruta: d.ruta, archivo: d.nombre, tipo, fecha: a?.fecha || "", importe: importe || "", periodicidad: a?.periodicidad || "mensual", inicio: a?.inicio || (t.periodico ? a?.fecha || "" : ""), fin: a?.fin || "", tercero: a?.tercero || "", cuenta: "", notas: a?.resumen || "",
         propuestoIA: true, revisado: false, ia: a?.ia || (a?.sinIA ? "sin IA (por el nombre)" : a?.sinTexto ? "sin texto (escaneado)" : "por el nombre") });
       reg.estado = "vinculado"; n++;
-    } else if (!tipo) reg.estado = c.tipo === "informativo" || a?.tipo === "sin_efecto_contable" || !/\.pdf$/i.test(d.nombre) ? "sin efecto contable" : "sin clasificar";
+    } else if (!tipo) reg.estado = c.tipo === "informativo" || leido || !/\.(pdf|jpe?g|png)$/i.test(d.nombre) ? "sin efecto contable" : a?.sinIA ? "pendiente de IA" : "sin clasificar";
     inv.docs[d.k] = reg;
   }
   // Los que ya no están (movidos o borrados)
