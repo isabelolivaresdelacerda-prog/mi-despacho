@@ -195,3 +195,9 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .menu-item.salir { background: none; border: 0; text-align: left; font: inherit; font-size: 13px; color: var(--suave); cursor: pointer; width: 100%; }
 .arbol { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
 @media (max-width: 700px) { .tabla { display: block; overflow-x: auto; } }
+
+/* Con logo: solo el logo, grande */
+.marca.solo-logo { flex: 1; min-width: 0; }
+.logo-lateral { display: block; width: 100%; max-width: 210px; max-height: 90px; height: auto; object-fit: contain; object-position: left center; }
+.vista-previa img.logo-lateral { height: auto; max-height: 90px; max-width: 240px; }
+.logo.grande { height: 96px; max-width: 280px; }

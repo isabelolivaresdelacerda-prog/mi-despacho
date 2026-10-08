@@ -25,8 +25,8 @@ export default function Bienvenida({ config, guardar }) {
             </fieldset>
             <FormDespacho datos={datos} cambiar={cambiar} />
             <div className="vista-previa">
-              {datos.logo ? <img src={datos.logo} alt="" /> : <span className="logo-letra">{(datos.nombre || "D").trim()[0]}</span>}
-              <strong>{datos.nombre || "Mi Despacho"}</strong>
+              {datos.logo ? <img className="logo-lateral" src={datos.logo} alt="" /> : <><span className="logo-letra">{(datos.nombre || "D").trim()[0]}</span>
+              <strong>{datos.nombre || "Mi Despacho"}</strong></>}
             </div>
             <div className="acciones">
               <button className="btn" type="button" onClick={() => setPaso(2)}>Siguiente</button>
