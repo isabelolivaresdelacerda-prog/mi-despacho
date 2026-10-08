@@ -68,8 +68,8 @@ export function FormNube({ datos, cambiar }) {
       </fieldset>
       <p className="muted">{ayuda}</p>
       <p className="nota"><strong>Al compartir, elige «Solo las personas añadidas»</strong> (o «Restringido») y añade a quien deba verla: tu equipo, tu gestoría o tu cliente. No uses «Cualquiera con el enlace»: tus contratos quedarían a la vista de quien consiga el enlace.</p>
-      <label>Carpeta de contratos<input value={datos.carpetas.contratos} onChange={(e) => carpeta("contratos", e.target.value)} placeholder={nube === "google" ? "https://drive.google.com/drive/folders/…" : "https://onedrive.live.com/… o código <iframe>"} /></label>
-      <label>Carpeta de contabilidad<input value={datos.carpetas.contabilidad} onChange={(e) => carpeta("contabilidad", e.target.value)} placeholder="Enlace a la carpeta (opcional)" /></label>
+      <label>Carpeta de la empresa (la que tiene 001 corporate, 002…)<input value={datos.carpetas.contratos} onChange={(e) => carpeta("contratos", e.target.value)} placeholder={nube === "google" ? "https://drive.google.com/drive/folders/…" : "https://onedrive.live.com/… o código <iframe>"} /></label>
+      <label>Carpeta de contabilidad (004 ADMINISTRACIÓN › contabilidad)<input value={datos.carpetas.contabilidad} onChange={(e) => carpeta("contabilidad", e.target.value)} placeholder="Enlace a la carpeta (opcional)" /></label>
       <p className="nota">
         {puedeGuardarDirecto(nube)
           ? `Al crear un contrato, la app te preguntará si quieres guardarlo en tu ${NUBES[nube].nombre} y lo subirá ella sola.`

@@ -5,7 +5,7 @@ import Bienvenida from "./Bienvenida.jsx";
 import Ajustes from "./Ajustes.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
-import Explorador from "./lib/Explorador.jsx";
+import VistaCarpeta from "./lib/VistaCarpeta.jsx";
 import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
@@ -112,13 +112,13 @@ export default function App() {
     case "contratos/crear/encargo-tratamiento":
       vista = <div className="app"><ContratoEncargo /></div>; break;
     case "contratos/carpeta":
-      vista = <Explorador titulo="Carpeta de la empresa" eyebrow="Contratos" />; break;
+      vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} />; break;
     case "carpetas":
       vista = <div className="app"><header className="app-cab"><div><div className="eyebrow">Mi empresa</div><h1>Carpetas de la empresa</h1></div></header><CarpetasEmpresa config={config} guardar={guardar} /></div>; break;
     case "contabilidad":
       vista = <ContabilidadWeb config={config} />; break;
     case "contabilidad/carpeta":
-      vista = <Explorador titulo="Carpeta de contabilidad" eyebrow="Contabilidad" contabilidad />; break;
+      vista = <VistaCarpeta titulo="Carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} contabilidad />; break;
     case "usuarios":
       vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
     case "ajustes":
@@ -135,7 +135,7 @@ export default function App() {
     <div className="marco" style={tema}>
       <aside className={"lateral" + (menuAbierto ? " abierto" : "")}>
         <div className="lateral-cab">
-          <a href="#/inicio" className={"marca" + (config.logo ? " solo-logo" : "")} aria-label={config.nombre || "Mi Despacho"}>{config.logo ? <img className="logo-lateral" src={config.logo} alt={config.nombre || "Logo"} /> : <><Logo config={config} /><span>{config.nombre || "Mi Despacho"}</span></>}</a>
+          <a href="#/inicio" className={"marca" + (config.logo ? " con-logo" : "")}>{config.logo ? <><img className="logo-apilado" src={config.logo} alt="" /><span>{config.nombre || "Mi Despacho"}</span></> : <><Logo config={config} /><span>{config.nombre || "Mi Despacho"}</span></>}</a>
           <button className="btn-menu" type="button" aria-label="Menú" aria-expanded={menuAbierto} onClick={() => setMenuAbierto(!menuAbierto)}>☰</button>
         </div>
         <nav className="menu">

@@ -219,3 +219,9 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .marca-est.no { color: var(--aviso); border-color: var(--aviso); }
 .migas { font-size: 14px; margin-bottom: 10px; }
 .carpeta-item { font-weight: 500; }
+
+/* Logo encima del nombre, con el mismo ancho que el nombre */
+.marca.con-logo { display: inline-flex; flex-direction: column; align-items: stretch; gap: 6px; width: fit-content; max-width: 100%; }
+.marca.con-logo > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.logo-apilado { display: block; width: 0; min-width: 100%; height: auto; max-height: 140px; object-fit: contain; }
+.vista-previa .marca.con-logo { font-size: 20px; }

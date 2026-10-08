@@ -25,7 +25,7 @@ export default function Bienvenida({ config, guardar }) {
             </fieldset>
             <FormDespacho datos={datos} cambiar={cambiar} />
             <div className="vista-previa">
-              {datos.logo ? <img className="logo-lateral" src={datos.logo} alt="" /> : <><span className="logo-letra">{(datos.nombre || "D").trim()[0]}</span>
+              {datos.logo ? <span className="marca con-logo"><img className="logo-apilado" src={datos.logo} alt="" /><span>{datos.nombre || "Mi Despacho"}</span></span> : <><span className="logo-letra">{(datos.nombre || "D").trim()[0]}</span>
               <strong>{datos.nombre || "Mi Despacho"}</strong></>}
             </div>
             <div className="acciones">
