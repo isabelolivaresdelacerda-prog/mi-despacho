@@ -1,0 +1,20 @@
+.mc-fondo { position: fixed; inset: 0; background: rgba(15, 20, 30, .45); display: grid; place-items: center; padding: 16px; z-index: 1100; }
+.mc-dialogo { background: var(--papel, #fff); color: var(--tinta, #222); border-radius: 14px; width: min(600px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,.25); font-family: var(--sans, system-ui, sans-serif); }
+.mc-dialogo header, .mc-dialogo footer { display: flex; align-items: center; gap: 10px; padding: 14px 20px; }
+.mc-dialogo header { justify-content: space-between; border-bottom: 1px solid var(--linea, #ddd); }
+.mc-dialogo header h2 { margin: 0; font-size: 1.05rem; }
+.mc-dialogo footer { justify-content: flex-end; border-top: 1px solid var(--linea, #ddd); }
+.mc-cuerpo { padding: 16px 20px; overflow: auto; }
+.mc-x { background: none; border: 0; font-size: 1.6rem; cursor: pointer; color: var(--suave, #666); }
+.mc-campo { display: flex; flex-direction: column; gap: 4px; font-size: .84rem; color: var(--suave, #666); margin-bottom: 10px; }
+.mc-campo input, .mc-campo select, .mc-campo textarea { font: inherit; font-size: .92rem; color: var(--tinta, #222); background: var(--superficie, #fff); border: 1px solid var(--linea, #ddd); border-radius: 8px; padding: 8px 10px; }
+.mc-vista { border: 1px solid var(--linea, #ddd); border-radius: 10px; padding: 12px 14px; background: var(--superficie, #fafafa); }
+.mc-asunto { font-weight: 600; margin: 0 0 8px; }
+.mc-vista pre { white-space: pre-wrap; font: inherit; font-size: .9rem; margin: 0; }
+.mc-adj { font-size: .82rem; color: var(--suave, #666); margin: 10px 0 0; }
+.mc-nota { font-size: .8rem; color: var(--suave, #666); }
+.mc-ok { font-size: .85rem; color: #1d7a46; }
+.mc-btn { background: var(--brand, #7A1F2B); color: var(--sobre-brand, #fff); border: 1px solid var(--brand, #7A1F2B); border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; }
+.mc-btn.sec { background: transparent; color: var(--tinta, #222); border-color: var(--linea, #ddd); }
+.mc-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.mc-editor h3 { margin: 0 0 6px; }

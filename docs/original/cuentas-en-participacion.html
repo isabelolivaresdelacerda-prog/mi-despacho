@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>Contrato de Cuentas en Participación</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F3EEE6; --surface:#FBF8F3; --paper:#FFFDF9; --ink:#2A1E1E; --muted:#6E5F5A; --line:#E2D8CC;
+  --accent:#7A1F2B; --accent-soft:#EFE3D6; --on-accent:#FFF8F2; --warn:#7A1F2B; --focus:#7A1F2B;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --sans:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark; --ground:#1C1616; --surface:#251D1D; --paper:#2A2121; --ink:#F0E8E0; --muted:#B3A69E; --line:#3B2F2E;
+  --accent:#D98A93; --accent-soft:#3A2A24; --on-accent:#1C1616; --warn:#E3AE4F; --focus:#D98A93;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#1C1616; --surface:#251D1D; --paper:#2A2121; --ink:#F0E8E0; --muted:#B3A69E; --line:#3B2F2E;
+  --accent:#D98A93; --accent-soft:#3A2A24; --on-accent:#1C1616; --warn:#E3AE4F; --focus:#D98A93;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font:15px/1.55 var(--sans);padding-inline:16px;padding-block:24px 56px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0;text-wrap:balance}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;border-bottom:1px solid var(--line);padding-bottom:16px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+h1{font-size:clamp(26px,4vw,36px);line-height:1.1;color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;margin:6px 0 0;max-width:62ch}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);border-radius:8px;padding:9px 14px;cursor:pointer;font:inherit;font-weight:500}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.layout{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+form{display:flex;flex-direction:column;gap:14px}
+fieldset{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:14px;margin:0;display:flex;flex-direction:column;gap:10px}
+legend{font-family:var(--serif);font-weight:600;font-size:17px;padding:0 6px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--ground);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+textarea{resize:vertical;min-height:60px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.row{grid-template-columns:1fr}}
+.note{font-size:12px;color:var(--warn);background:var(--accent-soft);border-radius:6px;padding:6px 8px}
+.doc{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:clamp(18px,4vw,44px);font-family:var(--serif);font-size:16px;line-height:1.6;position:sticky;top:calc(12px + env(safe-area-inset-top,0px));max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:900px){.doc{position:static;max-height:none}}
+.doc h2{color:var(--accent);text-align:center;font-size:20px;margin-bottom:18px;letter-spacing:.02em}
+.doc h3{font-size:16px;margin:18px 0 6px;text-align:center;letter-spacing:.06em}
+.doc p{margin:0 0 10px;text-align:justify}
+.doc .c{font-weight:600}
+.doc .sig{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:40px;text-align:center;font-size:14px}
+.doc mark{background:var(--accent-soft);color:inherit;padding:0 2px;border-radius:3px}
+.tag{font-size:12px;color:var(--muted)}
+.ia{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.ia-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px}
+.ia h2{font-size:22px}
+.ia-out{white-space:pre-wrap;font-size:15px;line-height:1.6;background:var(--ground);border-radius:8px;padding:14px;max-width:80ch}
+.ia-out.err{color:var(--warn)}
+.cfg{display:flex;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:8px;padding:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px}
+@media (max-width:640px){.row3{grid-template-columns:1fr}}
+label.chk{flex-direction:row;align-items:center;gap:8px}
+label.chk input{width:auto}
+.aviso{background:var(--accent-soft);border-radius:10px;padding:12px 16px;font-size:14px}
+.aviso summary{cursor:pointer;font-family:var(--serif);font-weight:600;font-size:17px}
+.aviso p{margin:8px 0 0;max-width:90ch}
+.aviso .warn{color:var(--warn)}
+.disclaimer{font-size:13px;color:var(--muted);margin:0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--accent);color:var(--on-accent);padding:8px 14px;border-radius:8px;font-size:14px;z-index:9}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">El Despacho · mini app</div>
+      <h1>Contrato de Cuentas en Participación</h1>
+      <p class="sub">Rellena los datos y el borrador se escribe solo a la derecha (arts. 239 a 243 del Código de Comercio). Descárgalo en Word para terminarlo. Los datos de ejemplo son inventados.</p>
+    </div>
+    <div class="actions">
+      <button class="btn" type="button" id="dl">Descargar Word</button>
+      <button class="btn ghost" type="button" id="cp">Copiar texto</button>
+      <button class="btn ghost" type="button" id="clr">Vaciar</button>
+    </div>
+  </header>
+
+  <details class="aviso" id="aviso" open>
+    <summary>Dónde se guardan tus documentos</summary>
+    <p>Esta app no guarda tus datos en ningún servidor nuestro. Los contratos se guardan en tu ordenador o en tu Google Drive o OneDrive.</p>
+    <p><strong>Te recomendamos</strong> crear una cuenta de OneDrive o de Google solo para tu documentación legal, a nombre de tu empresa (por ejemplo, contratos@tuempresa.com), con verificación en dos pasos y con acceso para más de una persona. Así, si alguien deja la empresa, la documentación no se va con él.</p>
+    <p class="warn"><strong>Importante:</strong> si pierdes el acceso a esa cuenta, perderás los documentos. Nosotros no tenemos copia y no podemos recuperarlos.</p>
+  </details>
+
+  <div class="layout">
+    <form id="f" autocomplete="off">
+      <fieldset><legend>Lugar y fecha</legend>
+        <div class="row">
+          <label>Ciudad<input id="ciudad" value="Madrid"></label>
+          <label>Fecha<input id="fecha" type="date" value="2026-10-01"></label>
+        </div>
+      </fieldset>
+
+      <fieldset><legend>Gestor</legend>
+        <label>Nombre o razón social<input id="g_nombre" value="Promociones Alameda, S.L."></label>
+        <div class="row">
+          <label>NIF<input id="g_nif" value="B00000000"></label>
+          <label>Domicilio<input id="g_dom" value="calle Ejemplo 1, 28001 Madrid"></label>
+        </div>
+        <div class="row">
+          <label>Representante (si es sociedad)<input id="g_rep" value="Ana Pérez Gómez"></label>
+          <label>Cargo o poder<input id="g_cargo" value="administradora única"></label>
+        </div>
+      </fieldset>
+
+      <fieldset><legend>Partícipe</legend>
+        <label>Nombre o razón social<input id="p_nombre" value="Luis Martín Ruiz"></label>
+        <div class="row">
+          <label>NIF<input id="p_nif" value="00000000T"></label>
+          <label>Domicilio<input id="p_dom" value="avenida Ejemplo 2, 28002 Madrid"></label>
+        </div>
+        <div class="row">
+          <label>Representante (si es sociedad)<input id="p_rep" value=""></label>
+          <label>Cargo o poder<input id="p_cargo" value=""></label>
+        </div>
+      </fieldset>
+
+      <fieldset><legend>Negocio y aportación</legend>
+        <label>Negocio del gestor en el que se participa<textarea id="negocio">la promoción de viviendas en la parcela situada en calle Ejemplo 10 de Madrid</textarea></label>
+        <div class="row">
+          <label>Aportación (€)<input id="importe" type="number" min="0" step="0.01" value="150000"></label>
+          <label>Fecha de desembolso<input id="f_aport" type="date" value="2026-10-15"></label>
+        </div>
+        <label>Cuenta del gestor (IBAN)<input id="iban" value="ES00 0000 0000 0000 0000 0000"></label>
+      </fieldset>
+
+      <fieldset><legend>Resultados</legend>
+        <div class="row">
+          <label>% de beneficios del partícipe<input id="pct" type="number" min="0" max="100" step="0.01" value="20"></label>
+          <label>Pérdidas<select id="perdidas">
+            <option value="limite">Hasta el límite de su aportación</option>
+            <option value="no">No participa en pérdidas</option>
+          </select></label>
+        </div>
+        <p class="note" id="leonino" hidden>Si el partícipe no asume pérdidas, el contrato se parece a un préstamo y puede discutirse su calificación como cuentas en participación. Revísalo con cuidado.</p>
+        <div class="row">
+          <label>Información al partícipe<select id="info">
+            <option>trimestral</option><option>semestral</option><option>anual</option>
+          </select></label>
+          <label>Plazo de liquidación (días)<input id="dias" type="number" min="1" value="60"></label>
+        </div>
+      </fieldset>
+
+      <fieldset><legend>Duración y jurisdicción</legend>
+        <label>Duración<select id="dur">
+          <option value="negocio">Hasta que termine el negocio</option>
+          <option value="fecha">Hasta una fecha concreta</option>
+        </select></label>
+        <label id="lfin" hidden>Fecha de terminación<input id="f_fin" type="date" value="2028-12-31"></label>
+        <label>Tribunales de<input id="trib" value="Madrid"></label>
+      </fieldset>
+    </form>
+
+    <article class="doc" id="doc" aria-live="polite"></article>
+  </div>
+
+  <section class="ia" id="ia" hidden>
+    <div class="ia-head">
+      <div>
+        <h2>Revisar con IA</h2>
+        <p class="sub" id="iaSub">La IA lee el borrador y el contexto que añadas, y señala riesgos y huecos.</p>
+      </div>
+      <div class="actions">
+        <button class="btn" type="button" id="iaGo">Revisar el contrato</button>
+        <button class="btn ghost" type="button" id="iaStop" hidden>Parar</button>
+      </div>
+    </div>
+    <div class="cfg" id="iaCfg" hidden>
+      <div class="row3">
+        <label>IA<select id="prov">
+          <option value="anthropic">Claude (Anthropic)</option>
+          <option value="openai">ChatGPT (OpenAI)</option>
+          <option value="gemini">Gemini (Google)</option>
+        </select></label>
+        <label>Modelo<input id="model" spellcheck="false"></label>
+        <label>Tu clave de API<input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí tu clave"></label>
+      </div>
+      <label class="chk"><input type="checkbox" id="remember"> Recordar la clave en este navegador</label>
+      <p class="tag">Tu clave va directamente de tu navegador a la IA que elijas. No pasa por ningún servidor nuestro ni la vemos.</p>
+    </div>
+    <label>Contexto del caso (opcional)<textarea id="iaCtx" placeholder="Por ejemplo: el partícipe es una sociedad extranjera; el negocio puede alargarse más de lo previsto; el gestor cobra honorarios de gestión…"></textarea></label>
+    <div class="ia-out" id="iaOut" hidden></div>
+  </section>
+
+  <p class="disclaimer">Borrador orientativo. Revísalo y adáptalo a cada operación antes de firmar.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const fmtFecha=v=>{ if(!v) return "[●]"; const [y,m,d]=v.split("-").map(Number); return d+" de "+MESES[m-1]+" de "+y; };
+  const fmtEur=v=>{ const n=parseFloat(v); if(isNaN(n)) return "[●]"; return n.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" euros"; };
+  const val=id=>($(id).value||"").trim();
+  const or=v=>v||"[●]";
+
+  function parte(pre, rol){
+    const n=val(pre+"_nombre"), nif=val(pre+"_nif"), dom=val(pre+"_dom"), rep=val(pre+"_rep"), cargo=val(pre+"_cargo");
+    let s = or(n)+", con NIF "+or(nif)+" y domicilio en "+or(dom);
+    if(rep) s += ", representada por "+rep+(cargo?", en su condición de "+cargo:"");
+    return s+" (en adelante, el «"+rol+"»).";
+  }
+
+  function build(){
+    const B=[];
+    const h=t=>B.push({t:"h",text:t}), p=(t,lead)=>B.push({t:"p",text:t,lead});
+    const perd = val("perdidas")==="no"
+      ? "El Partícipe no participará en las pérdidas del negocio."
+      : "El Partícipe participará en las pérdidas del negocio en la misma proporción, hasta el límite del importe de su aportación. En ningún caso estará obligado a realizar aportaciones adicionales.";
+    const dur = val("dur")==="fecha"
+      ? "El presente contrato estará en vigor desde su firma hasta el "+fmtFecha(val("f_fin"))+", salvo que el negocio termine antes."
+      : "El presente contrato estará en vigor desde su firma hasta la terminación del negocio descrito en la cláusula primera.";
+
+    B.push({t:"title",text:"CONTRATO DE CUENTAS EN PARTICIPACIÓN"});
+    p("En "+or(val("ciudad"))+", a "+fmtFecha(val("fecha"))+".");
+    h("REUNIDOS");
+    p("De una parte, "+parte("g","Gestor"));
+    p("De otra parte, "+parte("p","Partícipe"));
+    p("Ambas partes se reconocen capacidad legal suficiente para otorgar el presente contrato y, a tal efecto,");
+    h("EXPONEN");
+    p("I. Que el Gestor desarrolla en nombre propio "+or(val("negocio"))+" (en adelante, el «Negocio»).");
+    p("II. Que el Partícipe desea participar en los resultados del Negocio mediante la aportación de capital, sin intervenir en su gestión.");
+    p("III. Que, a tal fin, las partes acuerdan celebrar un contrato de cuentas en participación conforme a los artículos 239 a 243 del Código de Comercio, que se regirá por las siguientes");
+    h("CLÁUSULAS");
+    p("Por el presente contrato el Partícipe aporta capital al Negocio del Gestor y adquiere el derecho a participar en sus resultados prósperos o adversos en la proporción pactada.","Primera. Objeto.");
+    p("El Partícipe aporta la cantidad de "+fmtEur(val("importe"))+", que ingresará mediante transferencia a la cuenta del Gestor "+or(val("iban"))+" no más tarde del "+fmtFecha(val("f_aport"))+". El justificante bancario servirá de carta de pago. Desde su entrega, la aportación pasa a ser propiedad del Gestor, que la destinará exclusivamente al Negocio.","Segunda. Aportación.");
+    p("El Gestor dirigirá y administrará el Negocio en su propio nombre y bajo su exclusiva responsabilidad, con plena autonomía. El Partícipe no intervendrá en la gestión. Entre las partes no existe sociedad ni razón comercial común (art. 241 del Código de Comercio).","Tercera. Gestión.");
+    p("Los terceros que contraten con el Gestor solo tendrán acción contra este, y no contra el Partícipe (art. 242 del Código de Comercio).","Cuarta. Responsabilidad frente a terceros.");
+    p("El Partícipe tendrá derecho al "+or(val("pct"))+" % de los beneficios netos del Negocio. "+perd,"Quinta. Participación en resultados.");
+    p("El Gestor informará al Partícipe con periodicidad "+or(val("info"))+" sobre la marcha del Negocio y pondrá a su disposición la documentación que lo justifique. Al terminar el Negocio, rendirá una cuenta final justificada de su resultado (art. 243 del Código de Comercio).","Sexta. Información y rendición de cuentas.");
+    p(dur+" Cualquiera de las partes podrá resolverlo si la otra incumple gravemente sus obligaciones y no lo subsana en los treinta días siguientes a ser requerida por escrito.","Séptima. Duración.");
+    p("Terminado el contrato, el Gestor practicará la liquidación y, en el plazo de "+or(val("dias"))+" días desde la rendición de la cuenta final, abonará al Partícipe su aportación incrementada con la parte de beneficios o, en su caso, minorada con la parte de pérdidas que le corresponda.","Octava. Liquidación.");
+    p("Cada parte cumplirá las obligaciones fiscales que le correspondan. El Gestor practicará las retenciones o ingresos a cuenta que procedan sobre las cantidades que abone al Partícipe.","Novena. Fiscalidad.");
+    p("El Partícipe declara que los fondos aportados tienen origen lícito y se compromete a facilitar al Gestor la documentación que este le solicite para cumplir la normativa de prevención del blanqueo de capitales.","Décima. Prevención del blanqueo de capitales.");
+    p("Ninguna de las partes podrá ceder su posición en este contrato sin el consentimiento previo y por escrito de la otra.","Undécima. Cesión.");
+    p("Las partes guardarán confidencialidad sobre el contenido de este contrato y sobre la información del Negocio, salvo obligación legal o requerimiento de autoridad.","Duodécima. Confidencialidad.");
+    p("Este contrato se rige por la ley española. Para cualquier controversia, las partes se someten a los juzgados y tribunales de "+or(val("trib"))+".","Decimotercera. Ley aplicable y jurisdicción.");
+    p("Y en prueba de conformidad, las partes firman el presente contrato por duplicado y a un solo efecto en el lugar y fecha indicados en el encabezamiento.");
+    B.push({t:"sig",a:"El Gestor\n"+or(val("g_nombre"))+(val("g_rep")?"\np.p. "+val("g_rep"):""),b:"El Partícipe\n"+or(val("p_nombre"))+(val("p_rep")?"\np.p. "+val("p_rep"):"")});
+    return B;
+  }
+
+  function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+  const hl=s=>esc(s).replace(/\[●\]/g,"<mark>[●]</mark>");
+
+  function render(){
+    $("leonino").hidden = val("perdidas")!=="no";
+    $("lfin").hidden = val("dur")!=="fecha";
+    const html=build().map(b=>{
+      if(b.t==="title") return "<h2>"+esc(b.text)+"</h2>";
+      if(b.t==="h") return "<h3>"+esc(b.text)+"</h3>";
+      if(b.t==="sig") return '<div class="sig"><div>'+hl(b.a).replace(/\n/g,"<br>")+'</div><div>'+hl(b.b).replace(/\n/g,"<br>")+"</div></div>";
+      return "<p>"+(b.lead?'<span class="c">'+esc(b.lead)+"</span> ":"")+hl(b.text)+"</p>";
+    }).join("");
+    $("doc").innerHTML=html;
+  }
+
+  function plain(){
+    return build().map(b=>{
+      if(b.t==="sig") return "\n\n"+b.a+"\n\n\n"+b.b;
+      if(b.t==="h"||b.t==="title") return "\n"+b.text+"\n";
+      return (b.lead?b.lead+" ":"")+b.text;
+    }).join("\n\n").trim();
+  }
+
+  const x=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const run=(t,bold)=>'<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>'+(bold?"<w:b/>":"")+'<w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">'+x(t)+"</w:t></w:r>";
+  const para=(runs,opt={})=>'<w:p><w:pPr><w:spacing w:after="160" w:line="300" w:lineRule="auto"/><w:jc w:val="'+(opt.jc||"both")+'"/></w:pPr>'+runs+"</w:p>";
+  async function docx(){
+    const body=[];
+    build().forEach(b=>{
+      if(b.t==="title") body.push(para(run(b.text,true),{jc:"center"}));
+      else if(b.t==="h") body.push(para(run(b.text,true),{jc:"center"}));
+      else if(b.t==="sig"){
+        body.push(para("",{}));
+        [b.a,b.b].forEach(s=>{ body.push(para("",{})); s.split("\n").forEach((l,i)=>body.push(para(run(l,i===0),{jc:"left"}))); });
+      } else body.push(para((b.lead?run(b.lead+" ",true):"")+run(b.text),{}));
+    });
+    const doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+body.join("")+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1701" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>';
+    const zip=new JSZip();
+    zip.file("[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+    zip.file("_rels/.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+    zip.file("word/document.xml",doc);
+    return zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  }
+
+  function toast(m){const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2400);}
+
+  const IN_CLAUDE = typeof window.claude !== "undefined";
+
+  let downloads=null;
+  if(IN_CLAUDE){ (async()=>{ try{ downloads=await window.claude.use("downloads"); }catch(e){ downloads=null; } if(!downloads) $("dl").hidden=true; })(); }
+
+  $("dl").onclick=async()=>{
+    if(typeof JSZip==="undefined"){ toast("La descarga no está disponible. Usa «Copiar texto»."); return; }
+    const name="Contrato cuentas en participacion - "+(val("p_nombre")||"participe")+".docx";
+    try{
+      const blob=await docx();
+      if(IN_CLAUDE){
+        if(!downloads){ toast("La descarga no está disponible aquí. Usa «Copiar texto»."); return; }
+        await downloads.save({filename:name,data:blob});
+      }else{
+        const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+      }
+      toast("Contrato descargado");
+    }catch(e){
+      if(e&&e.code==="declined") return;
+      toast("No se pudo descargar. Prueba con «Copiar texto».");
+    }
+  };
+  $("cp").onclick=()=>{
+    try{ navigator.clipboard.writeText(plain()).then(()=>toast("Texto copiado"),()=>toast("No se pudo copiar")); }catch(e){ toast("No se pudo copiar"); }
+  };
+  $("clr").onclick=()=>{
+    document.querySelectorAll("#f input, #f textarea").forEach(i=>{ if(i.id!=="ciudad"&&i.id!=="trib") i.value=""; });
+    render();
+  };
+  const IA_ERR={
+    not_granted:"No has dado permiso para usar Claude en esta app.",
+    sampling_disabled:"Claude no está disponible en esta cuenta.",
+    rate_limited:"Has llegado al límite de uso por ahora. Inténtalo más tarde.",
+    session_expired:"Tu sesión de Claude ha caducado. Vuelve a iniciar sesión.",
+    prompt_too_large:"El texto es demasiado largo para revisarlo de una vez.",
+    refused:"Claude no ha podido revisar este texto.",
+  };
+  let sample=null, ctl=null;
+  const DEF_MODEL={anthropic:"claude-sonnet-5",openai:"gpt-4.1-mini",gemini:"gemini-2.5-flash"};
+  const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+  if(IN_CLAUDE){
+    (async()=>{ try{ sample=await window.claude.use("sample"); }catch(e){ sample=null; }
+      if(sample){ $("ia").hidden=false; $("iaSub").textContent="La IA lee el borrador y el contexto que añadas, y señala riesgos y huecos. Usa tu suscripción de Claude, sin claves ni coste extra; la primera vez te pedirá permiso."; }
+    })();
+  }else{
+    $("ia").hidden=false; $("iaCfg").hidden=false;
+    $("iaSub").textContent="La IA lee el borrador y el contexto que añadas, y señala riesgos y huecos. Elige tu IA y usa tu propia clave de API.";
+    const p=ls.get("cep_prov")||"anthropic"; $("prov").value=p;
+    $("model").value=ls.get("cep_model_"+p)||DEF_MODEL[p];
+    const k=ls.get("cep_key_"+p); if(k){ $("key").value=k; $("remember").checked=true; }
+    $("prov").onchange=()=>{ const v=$("prov").value; ls.set("cep_prov",v); $("model").value=ls.get("cep_model_"+v)||DEF_MODEL[v]; const kk=ls.get("cep_key_"+v); $("key").value=kk||""; $("remember").checked=!!kk; };
+    $("remember").onchange=()=>{ if(!$("remember").checked) ls.del("cep_key_"+$("prov").value); };
+  }
+
+  async function callApi(prompt, signal){
+    const prov=$("prov").value, key=$("key").value.trim(), model=$("model").value.trim()||DEF_MODEL[prov];
+    if(!key) throw {code:"no_key"};
+    ls.set("cep_prov",prov); ls.set("cep_model_"+prov,model);
+    if($("remember").checked) ls.set("cep_key_"+prov,key);
+    let r, j;
+    if(prov==="anthropic"){
+      r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model,max_tokens:2500,messages:[{role:"user",content:prompt}]})});
+      j=await r.json(); if(!r.ok) throw {code:"api",message:j?.error?.message};
+      return (j.content||[]).map(c=>c.text||"").join("");
+    }
+    if(prov==="openai"){
+      r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",signal,headers:{"content-type":"application/json","authorization":"Bearer "+key},body:JSON.stringify({model,messages:[{role:"user",content:prompt}]})});
+      j=await r.json(); if(!r.ok) throw {code:"api",message:j?.error?.message};
+      return j.choices?.[0]?.message?.content||"";
+    }
+    r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",signal,headers:{"content-type":"application/json","x-goog-api-key":key},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+    j=await r.json(); if(!r.ok) throw {code:"api",message:j?.error?.message};
+    return (j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+  }
+
+  $("iaStop").onclick=()=>ctl?.abort();
+  $("iaGo").onclick=async()=>{
+    if(IN_CLAUDE && !sample) return;
+    const out=$("iaOut"); out.hidden=false; out.classList.remove("err"); out.textContent="Pensando…";
+    $("iaGo").disabled=true; $("iaStop").hidden=false;
+    ctl=new AbortController();
+    const prompt=[
+      "Actúa como especialista en derecho mercantil español. Revisa este borrador de contrato de cuentas en participación (arts. 239 a 243 del Código de Comercio).",
+      "Señala, en español y sin tecnicismos innecesarios, un máximo de 8 puntos ordenados de más a menos importante. Para cada uno: el riesgo o hueco en una frase y una propuesta concreta de redacción o de cambio.",
+      "Fíjate en: coherencia de datos e importes, reparto de pérdidas y riesgo de que se califique como préstamo, retribución y gastos del gestor, derecho de información, qué pasa si el negocio no termina o se retrasa, fiscalidad y retenciones, prevención del blanqueo, y datos marcados [●] pendientes.",
+      "No inventes artículos, sentencias ni cifras. Si citas una norma y no estás seguro, dilo. Termina con una línea recordando que es una revisión orientativa.",
+      "Formato: texto plano con números (1., 2., …), sin tablas.",
+      val("iaCtx")?"\nCONTEXTO DEL CASO:\n"+val("iaCtx"):"",
+      "\nBORRADOR:\n"+plain()
+    ].join("\n");
+    try{
+      if(IN_CLAUDE){
+        await sample(prompt,{signal:ctl.signal,onText:({text})=>{ out.textContent=text; }});
+      }else{
+        const t=await callApi(prompt,ctl.signal);
+        out.textContent=t||"La IA no ha devuelto texto. Inténtalo de nuevo.";
+      }
+    }catch(e){
+      if(e&&e.name==="AbortError"){ out.textContent="Revisión detenida."; }
+      else if(e&&e.code==="no_key"){ out.textContent="Pega tu clave de API para usar la revisión."; out.classList.add("err"); }
+      else if(e&&e.code==="api"){ out.textContent="La IA ha devuelto un error: "+(e.message||"revisa la clave y el nombre del modelo."); out.classList.add("err"); }
+      else if(!IN_CLAUDE){ out.textContent="No se pudo conectar con la IA. Revisa tu conexión y la clave."; out.classList.add("err"); }
+      else if(e&&e.code==="cancelled"){ out.textContent=e.text||"Revisión detenida."; }
+      else{
+        out.textContent=(e&&e.text?e.text+"\n\n":"")+(IA_ERR[e&&e.code]||"No se pudo completar la revisión. Inténtalo de nuevo.");
+        out.classList.add("err");
+        if(e&&(e.code==="not_granted"||e.code==="sampling_disabled")) $("iaGo").disabled=true;
+      }
+    }finally{
+      if(!(out.classList.contains("err")&&$("iaGo").disabled)) $("iaGo").disabled=false;
+      $("iaStop").hidden=true;
+    }
+  };
+
+  try{ if(localStorage.getItem("cep_aviso")==="0") $("aviso").open=false; }catch(e){}
+  $("aviso").addEventListener("toggle",()=>{ try{ localStorage.setItem("cep_aviso",$("aviso").open?"1":"0"); }catch(e){} });
+
+  $("f").addEventListener("input",render);
+  $("f").addEventListener("change",render);
+  $("f").addEventListener("submit",e=>e.preventDefault());
+  render();
+})();
+</script>
+
+</body></html>
