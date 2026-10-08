@@ -25,12 +25,16 @@
       db.close();
     }
   } catch (e) { /* sin carpetas guardadas */ }
+  // 0) Copia de seguridad en archivo (siempre disponible)
+  document.getElementById("bajar").onclick = () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ tipo: "md-migracion", ls })], { type: "application/json" }));
+    const a = document.createElement("a"); a.href = url; a.download = "mis-ajustes-mi-despacho.json"; a.click();
+  };
   // 1) Si la ventana de Mi Despacho sigue enlazada, se le mandan los datos directamente
   if (window.opener) {
     const enviar = (conCarpetas) => window.opener.postMessage({ tipo: "md-migracion", ls, idb: conCarpetas ? idb : [] }, DESTINO);
     try { enviar(true); msg("Datos enviados a la dirección nueva. Ya puedes cerrar esta ventana."); }
     catch (e) { enviar(false); msg("Datos enviados (la carpeta de la empresa tendrás que elegirla otra vez). Ya puedes cerrar esta ventana."); }
-    setTimeout(() => window.close(), 2500);
     return;
   }
   // 2) Si no, se llevan en la propia dirección (comprimidos) a la página nueva, que los guarda
