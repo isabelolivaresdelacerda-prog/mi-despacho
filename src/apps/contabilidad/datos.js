@@ -194,6 +194,16 @@ export async function cargarTodo(raiz) {
     const j = justif.find((x) => !usadosJ.has(x.nombre) && ((x.importe && Math.abs(x.importe - imp) < 0.011 && dias(x.fecha) <= 5) || x.enNombre.some((v) => Math.abs(v - imp) < 0.011)));
     if (j) { usadosJ.add(j.nombre); m._justificante = { nombre: j.nombre }; }
   }
+  // Compras con tarjeta, comisiones, recibos e impuestos no tienen documento individual: su justificante es el extracto
+  // mensual del banco que los recoge (el primero con fecha igual o posterior al movimiento, como mucho 40 días después).
+  const extractosDoc = archivosB.filter(esDoc).map((a) => { const c = cacheB[a.nombre]?.datos || {}; return { nombre: a.nombre, fecha: c.fecha || "", tipo: c.tipo || (/extracto/i.test(a.nombre) ? "extracto" : "") }; })
+    .filter((x) => x.tipo === "extracto" && x.fecha).sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
+  for (const m of movimientos) {
+    if (m._justificante || !/OP\.?TARJ|COMIS|RECIBO|HACIENDA|TRIBUTO|LIQUIDACION/i.test(m.concepto || "")) continue;
+    const fm = fechaOrden(m.fecha);
+    const e = extractosDoc.find((x) => fechaOrden(x.fecha) >= fm && (Date.parse(fechaOrden(x.fecha)) - Date.parse(fm)) / 86400000 <= 40);
+    if (e) m._justificante = { nombre: e.nombre, extracto: true };
+  }
   return { facturas, emitidas, movimientos, justificantes: justif, empresa, capital, cacheF, editsF, vincular, justManual, docsBanco: Object.values(cacheB) };
 }
 // Facturas en las que la IA ha confundido emisor y receptor: si el «proveedor» de una factura recibida es la propia empresa
