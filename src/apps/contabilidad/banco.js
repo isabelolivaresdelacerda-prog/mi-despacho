@@ -68,6 +68,7 @@ export async function sincronizarBanco(raiz) {
   const antiguos = (previo.movimientos || []).filter((m) => fechaOrden(m.fecha) < desde);
   const movimientos = [...antiguos, ...nuevos].sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
   await escribirJSON(raiz, "extracto_api.json", { actualizado: new Date().toLocaleString("es-ES"), movimientos });
+  try { await excelTodoElAnio(raiz, movimientos); } catch { /* el Excel es solo para consultar; si está abierto no se puede escribir */ }
   return { nuevos: nuevos.length, total: movimientos.length };
 }
 
@@ -115,4 +116,16 @@ export function juntarMovimientos(api, extractos) {
     if (vistos[k] > (cuenta[k] || 0)) extra.push(m);
   }
   return [...api, ...extra].sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
+}
+
+// Excel de consulta en «extractos» con TODOS los movimientos guardados (no solo los 90 días que da la conexión)
+async function excelTodoElAnio(raiz, movimientos) {
+  const XLSX = await import("xlsx");
+  let saldo = 0;
+  const filas = [["Fecha", "Concepto", "Importe", "Saldo", "Tercero", "Origen"], ...movimientos.map((m) => { saldo = Math.round((saldo + num(m.importe)) * 100) / 100; return [m.fecha, m.concepto, num(m.importe), saldo, m.tercero || "", m._origen === "api" ? "conexión banco" : "extracto Excel"]; })];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), "Movimientos");
+  const anio = (movimientos.at(-1)?.fecha || "").slice(-4) || new Date().getFullYear();
+  const dir = await sub(raiz, "extractos", true);
+  const w = await (await dir.getFileHandle(`extracto sincronizado ${anio} (todo el año).xlsx`, { create: true })).createWritable();
+  await w.write(new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }))); await w.close();
 }
