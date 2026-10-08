@@ -65,7 +65,7 @@ echo   Cuando abajo ponga "server is listening", ya puedes usarla.
 echo   NO cierres esta ventana mientras la uses.
 echo   Al cerrarla, la IA se apaga y libera toda la memoria.
 echo ============================================================
-"$servidor" -hf $modelo --host 127.0.0.1 --port 8080 -c 16384
+"$servidor" -hf $modelo --host 127.0.0.1 --port 8080 -c 8192 --device none --no-mmproj
 pause
 "@
 [IO.File]::WriteAllText($encender, ($contenido -replace "`r?`n", "`r`n"), (New-Object Text.UTF8Encoding($false)))
