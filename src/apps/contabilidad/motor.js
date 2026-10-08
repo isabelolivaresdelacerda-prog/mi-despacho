@@ -11,7 +11,7 @@ export const CUENTAS = {
   "170": "Deudas a largo plazo con entidades de crédito", "171": "Deudas a largo plazo", "180": "Fianzas recibidas a largo plazo", "181": "Anticipos recibidos por ventas a largo plazo",
   "210": "Terrenos y bienes naturales", "211": "Construcciones", "300": "Mercaderías / existencias", "407": "Anticipos a proveedores",
   "400": "Proveedores", "410": "Acreedores por prestaciones de servicios", "430": "Clientes", "438": "Anticipos de clientes",
-  "472": "H.P. IVA soportado", "473": "H.P. retenciones y pagos a cuenta", "4751": "H.P. acreedora por retenciones practicadas", "477": "H.P. IVA repercutido",
+  "472": "H.P. IVA soportado", "473": "H.P. retenciones y pagos a cuenta", "4751": "H.P. acreedora por retenciones practicadas", "477": "H.P. IVA repercutido", "4700": "H.P. deudora por IVA", "4750": "H.P. acreedora por IVA", "4752": "H.P. acreedora por impuesto sobre sociedades", "4759": "Otros tributos pendientes de pago (Comunidad Autónoma, ayuntamiento)",
   "520": "Deudas a corto plazo con entidades de crédito", "551": "Cuenta corriente con socios y administradores", "555": "Partidas pendientes de aplicación", "572": "Bancos",
   "600": "Compras de mercaderías", "621": "Arrendamientos y cánones", "622": "Reparaciones y conservación", "640": "Sueldos y salarios", "642": "Seguridad Social a cargo de la empresa",
   "662": "Intereses de deudas", "669": "Otros gastos financieros", "681": "Amortización del inmovilizado material", "630": "Impuesto sobre beneficios",
@@ -19,21 +19,61 @@ export const CUENTAS = {
 };
 export const titulo = (c) => tituloCuenta(c, PLAN) || CUENTAS[c] || CUENTAS[String(c).slice(0, 4)] || CUENTAS[String(c).slice(0, 3)] || "";
 const r2 = (x) => Math.round(num(x) * 100) / 100;
+const fechaMas = (iso, d) => { const t = new Date(iso + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); };
 const claveMov = (m) => `${m.fecha}|${r2(m.importe)}|${(m.concepto || "").slice(0, 60)}`;
 export { claveMov };
 
-// Subcuentas por tercero (8 dígitos al exportar): 41000001, 41000002…
+// Subcuentas por tercero (8 dígitos): 41000001 David Alcón, 41000002 Notaría… Se reconoce al tercero por su NIF
+// o por su nombre sin tildes ni signos, así el pago sin factura y la factura que llega después van a la misma subcuenta.
+const FORMAS = /\b(S\s?L\s?U?|S\s?L\s?P|S\s?A\s?U?|S\s?C(OOP)?|C\s?B|LTD|LIMITED|LLC|INC|CORP(ORATION)?|GMBH|B\s?V|S\s?A\s?S|SARL|SRL|SPA|AG|PLC|CO|COMPANY|SOCIEDAD|LIMITADA|ANONIMA|WWW|COM|NET|ORG|ES|EU|IE|IRELAND|EUROPE|ESPANA|SPAIN|IBERIA)\b/g;
+export const claveTercero = (t) => {
+  const k = String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").replace(FORMAS, " ").replace(/\s+/g, "").slice(0, 30);
+  return k || "VARIOS";
+};
+// Nombre probable del tercero en el concepto del banco: "S/ORD.TRANSFERENCIA pago topografico SEPA 618289694330 david alcon martin" → "David Alcon Martin"
+export function adivinarTercero(concepto) {
+  let t = String(concepto || "");
+  const largos = [...t.matchAll(/\d{6,}/g)];
+  if (largos.length) { const u = largos[largos.length - 1]; const resto = t.slice(u.index + u[0].length).trim(); if (resto.replace(/[^a-z]/gi, "").length > 3) t = resto; }
+  t = t.replace(/\b(s\/ord|ord|transf\w*|sepa|pago|recibo|adeudo|cargo|abono|bizum|a favor de|de|n[ºo]\.?|ref\w*|concepto|traspaso|emitida|recibida|inmediata|ordinaria)\b\.?/gi, " ").replace(/[\d/.:_-]+/g, " ").replace(/\s+/g, " ").trim();
+  return t.toLowerCase().replace(/(^|\s)\S/g, (x) => x.toUpperCase()).slice(0, 60);
+}
+// Palabras que no sirven para reconocer a una entidad
+const GENERICAS = new Set(["SERVICIOS", "SERVICIO", "GESTION", "GESTORIA", "ABOGADOS", "ASESORES", "CONSULTING", "CONSULTORES", "GRUPO", "INVERSIONES", "HOLDING", "COMERCIAL", "INTERNACIONAL", "SOLUCIONES", "TECNOLOGIA", "PROMOCIONES", "INMOBILIARIA", "CONSTRUCCIONES", "NOTARIA", "REGISTRO", "BANCO", "SEGUROS", "DAVID", "MARIA", "JOSE", "JUAN", "ANTONIO", "MANUEL", "CARLOS", "JAVIER", "LUIS", "ISABEL", "PAGO", "FACTURA", "TRANSFERENCIA"]);
+const plano = (t) => " " + String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim() + " ";
+// ¿A qué entidad conocida (proveedor o cliente con facturas) pertenece este movimiento?
+export function entidadDe(concepto, terceros) {
+  const c = plano(concepto), cj = c.replace(/ /g, "");
+  let mejor = null;
+  for (const t of terceros) {
+    const k = claveTercero(t);
+    if (k.length >= 5 && cj.includes(k)) return t;
+    const pal = plano(t).trim().split(" ").filter((w) => w.length >= 4 && !GENERICAS.has(w) && !/^\d+$/.test(w));
+    if (pal.length && pal.every((w) => c.includes(" " + w + " "))) mejor = mejor || t;
+    else if (!mejor && pal[0] && pal[0].length >= 5 && c.includes(" " + pal[0] + " ")) mejor = t;
+  }
+  return mejor;
+}
+
 function subcuentas() {
   const mapa = new Map(), cont = {};
-  return (base, tercero) => {
-    const k = base + "|" + String(tercero || "VARIOS").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 24);
-    if (!mapa.has(k)) { cont[base] = (cont[base] || 0) + 1; mapa.set(k, base + String(cont[base]).padStart(8 - base.length, "0")); }
-    return mapa.get(k);
+  return (base, nombre, nif) => {
+    const kn = nif ? base + "|NIF" + String(nif).toUpperCase().replace(/[^A-Z0-9]/g, "") : null;
+    const ct = claveTercero(nombre || nif);
+    const kt = base + "|" + ct;
+    let c = (kn && mapa.get(kn)) || mapa.get(kt);
+    // Variantes del mismo nombre ("WIX" y "WIXCOM", "NOTARIA GARCIA" y "NOTARIA GARCIA LOPEZ")
+    if (!c && ct.length >= 3 && ct !== "VARIOS") for (const [k, v] of mapa) { const o = k.split("|")[1]; if (k.startsWith(base + "|") && !o.startsWith("NIF") && o.length >= 3 && (o.startsWith(ct) || ct.startsWith(o))) { c = v; break; } }
+    if (!c) { cont[base] = (cont[base] || 0) + 1; c = base + String(cont[base]).padStart(8 - base.length, "0"); }
+    if (kn) mapa.set(kn, c);
+    if (nombre) mapa.set(kt, c);
+    return c;
   };
 }
 
-// datos = { facturas, movimientos }, vinculados = [...], manuales = [...asientos], asignaciones = { claveMov: {cuenta, concepto} }
-export function generarDiario({ facturas, movimientos }, vinculados = [], manuales = [], asignaciones = {}) {
+// datos = { facturas, emitidas, movimientos }, vinculados = [...], manuales = [...asientos], asignaciones = { claveMov: {cuenta, concepto} },
+// impuestos = modelos presentados [{ modelo, etiqueta, fechaFin, plazo, importe, ivaRep, ivaSop }]
+export function generarDiario({ facturas, emitidas = [], movimientos }, vinculados = [], manuales = [], asignaciones = {}, impuestos = []) {
   const sub = subcuentas();
   const A = [];
   const asiento = (fecha, concepto, lineas, origen, doc, mov = null) => {
@@ -42,22 +82,82 @@ export function generarDiario({ facturas, movimientos }, vinculados = [], manual
   };
   const usados = new Set();
 
+  // Cuenta de gasto elegida al aplicar un pago a un tercero: se usa en su factura si la factura no la trae clara
+  const cuentaTercero = {};
+  for (const a of Object.values(asignaciones)) if (a?.tercero && a.cuenta) cuentaTercero[claveTercero(a.tercero)] = a.cuenta;
+  // Entidades conocidas: proveedores y clientes con facturas, y terceros ya asignados a mano
+  const proveedores = [...new Set(facturas.map((f) => f.proveedor).filter(Boolean))];
+  const clientes = [...new Set(emitidas.map((f) => f.cliente).filter(Boolean))];
+  const provisionistas = [...proveedores, ...Object.values(asignaciones).map((a) => a?.tercero).filter(Boolean)];
+  const pendFactura = new Map(); // archivo → subcuenta, para saber qué facturas quedan por pagar (por saldo)
   // 1) Facturas recibidas y su pago
-  for (const f of facturas) {
+  for (let f of facturas) {
+    if ((!f.cuenta_pgc || f.cuenta_pgc === "629") && !f._editada && cuentaTercero[claveTercero(f.proveedor)]) f = { ...f, cuenta_pgc: cuentaTercero[claveTercero(f.proveedor)] };
     if (!f.total) continue;
-    const cta = sub("410", f.proveedor || f.nif_proveedor);
+    const cta = sub("410", f.proveedor, f.nif_proveedor);
     const c = `${f.proveedor || "Proveedor"} ${f.numero || ""}`.trim();
     asiento(f.fecha, `Factura ${c}`, [
       { cuenta: f.cuenta_pgc || "629", debe: f.base },
       { cuenta: "472", debe: f.iva_importe },
       { cuenta: "4751", haber: f.retencion_importe },
-      { cuenta: cta, titulo: f.proveedor, haber: f.total },
+      { cuenta: cta, titulo: f.proveedor, nif: f.nif_proveedor, haber: f.total },
     ], "factura", f.archivo);
+    pendFactura.set(f.archivo, cta);
     if (f._pago) {
       const m = movimientos.find((x) => x._factura === f.archivo);
       if (m) usados.add(m._id);
-      asiento(f._pago.fecha || f.fecha, `Pago ${c}`, [{ cuenta: cta, titulo: f.proveedor, debe: f.total }, { cuenta: f._pago.manual ? "551" : "572", haber: f.total }], "pago", f.archivo, m ? m._id : null);
+      // Pagada por otro (p. ej. Solve con la provisión de fondos): se descuenta de la subcuenta de quien pagó
+      const pagador = f._pago.manual ? entidadDe(f._pago.texto, provisionistas) : null;
+      const contra = f._pago.manual ? (pagador ? sub("410", pagador) : "551") : "572";
+      asiento(f._pago.fecha || f.fecha, `Pago ${c}${pagador ? ` (por ${pagador})` : ""}`, [{ cuenta: cta, titulo: f.proveedor, debe: f.total }, { cuenta: contra, titulo: pagador || undefined, haber: f.total }], "pago", f.archivo, m ? m._id : null);
     }
+  }
+
+  // 1b) Facturas emitidas y su cobro
+  for (const f of emitidas) {
+    if (!f.total) continue;
+    const cta = sub("430", f.cliente, f.nif_cliente);
+    const c = `${f.cliente || "Cliente"} ${f.numero || ""}`.trim();
+    asiento(f.fecha, `Factura emitida ${c}`, [
+      { cuenta: cta, titulo: f.cliente, nif: f.nif_cliente, debe: f.total },
+      { cuenta: "473", debe: f.retencion_importe },
+      { cuenta: f.cuenta_pgc || "705", haber: f.base },
+      { cuenta: "477", haber: f.iva_importe },
+    ], "emitida", f.archivo);
+    pendFactura.set(f.archivo, cta);
+    if (f._cobro) {
+      const m = movimientos.find((x) => x._emitida === f.archivo);
+      if (m) usados.add(m._id);
+      asiento(f._cobro.fecha || f.fecha, `Cobro ${c}`, [{ cuenta: "572", debe: f.total }, { cuenta: cta, titulo: f.cliente, nif: f.nif_cliente, haber: f.total }], "cobro", f.archivo, m ? m._id : null);
+    }
+  }
+
+  // 1c) Impuestos presentados: liquidación del IVA y su pago en el banco
+  const CTA_IMP = { "303": "4750", "111": "4751", "115": "4751", "202": "473", "200": "4752" };
+  for (const t of impuestos) {
+    if (t.modelo === "otro") {
+      // ITP/AJD, IBI, plusvalía, IAE, tasas…: gasto (631) o mayor valor del bien comprado; pagado por banco, por un tercero o pendiente
+      const imp = r2(t.importe); if (!imp) continue;
+      let contra = "4759", mv = null;
+      if (t.pagadoPor) contra = sub("410", t.pagadoPor);
+      else {
+        mv = t.mov ? movimientos.find((x) => !usados.has(x._id) && claveMov(x) === t.mov) : movimientos.find((x) => !usados.has(x._id) && !x._factura && x.importe < 0 && Math.abs(Math.abs(x.importe) - imp) < 0.011 && Math.abs(Date.parse(fechaOrden(x.fecha)) - Date.parse(fechaOrden(t.fecha))) <= 40 * 86400000);
+        if (mv) { usados.add(mv._id); contra = "572"; }
+      }
+      asiento(mv?.fecha || t.fecha, t.etiqueta, [{ cuenta: t.cuenta || "631", debe: imp }, { cuenta: contra, titulo: t.pagadoPor || undefined, haber: imp }], "tributo", t.justificante || "", mv ? mv._id : null);
+      continue;
+    }
+    if (t.modelo === "303" && (t.ivaRep || t.ivaSop)) {
+      const res = r2(t.ivaRep - t.ivaSop);
+      asiento(t.fechaFin, `Liquidación del IVA ${t.etiqueta} (303)`, [{ cuenta: "477", debe: t.ivaRep }, { cuenta: "472", haber: t.ivaSop }, res >= 0 ? { cuenta: "4750", haber: res } : { cuenta: "4700", debe: -res }], "regularizacion", t.justificante || "");
+    }
+    const imp = r2(t.importe);
+    if (imp <= 0 || !CTA_IMP[t.modelo]) continue;
+    const desde = fechaOrden(t.fechaFin), hasta = t.plazo ? fechaMas(t.plazo, 10) : "9999";
+    const m = t.mov ? movimientos.find((x) => !usados.has(x._id) && claveMov(x) === t.mov) : movimientos.find((x) => !usados.has(x._id) && !x._factura && !x._emitida && x.importe < 0 && Math.abs(Math.abs(x.importe) - imp) < 0.011 && fechaOrden(x.fecha) >= desde && fechaOrden(x.fecha) <= hasta);
+    if (!m) continue;
+    usados.add(m._id);
+    asiento(m.fecha, `Pago modelo ${t.modelo} ${t.etiqueta}`, [{ cuenta: CTA_IMP[t.modelo], debe: imp }, { cuenta: "572", haber: imp }], "impuesto", t.justificante || "", m._id);
   }
 
   // 2) Escrituras y contratos vinculados
@@ -82,11 +182,29 @@ export function generarDiario({ facturas, movimientos }, vinculados = [], manual
   // 3) Movimientos del banco sin documento: asignados a mano o a «partidas pendientes de aplicación» (555)
   const pendientes = [];
   for (const m of movimientos) {
-    if (usados.has(m._id) || m._factura) continue;
-    const a = asignaciones[claveMov(m)];
+    if (usados.has(m._id) || m._factura || m._emitida) continue;
+    const ent = adivinarTercero(m.concepto);
+    const a = asignaciones[claveMov(m)] || asignaciones["@" + claveTercero(ent)] || (() => { const e = entidadDe(m.concepto, provisionistas.filter((x) => asignaciones["@" + claveTercero(x)])); return e ? { ...asignaciones["@" + claveTercero(e)], tercero: asignaciones["@" + claveTercero(e)].tercero || e } : null; })();
+    const imp = Math.abs(m.importe);
+    if (!a) {
+      // Entidad con facturas (Solve, Wix…): el pago o cobro va a su subcuenta y se cuadra por saldo
+      const prov = m.importe < 0 ? entidadDe(m.concepto, proveedores) || entidadDe(m.concepto, clientes) : entidadDe(m.concepto, clientes) || entidadDe(m.concepto, proveedores);
+      if (prov) {
+        const base = proveedores.includes(prov) ? "410" : "430";
+        const cta = sub(base, prov);
+        asiento(m.fecha, `${m.importe < 0 ? "Pago a" : "Cobro de"} ${prov}`, m.importe >= 0 ? [{ cuenta: "572", debe: imp }, { cuenta: cta, titulo: prov, haber: imp }] : [{ cuenta: cta, titulo: prov, debe: imp }, { cuenta: "572", haber: imp }], "banco-entidad", "", m._id);
+        continue;
+      }
+    }
+    if (a?.tercero && a.esperaFactura) {
+      // Pago (o cobro) a un tercero a la espera de su factura: va a su subcuenta de acreedor (410) o de cliente (430)
+      const cta = sub(m.importe < 0 ? "410" : "430", a.tercero);
+      const c = `${m.importe < 0 ? "Pago a" : "Cobro de"} ${a.tercero} (a falta de factura)`;
+      asiento(m.fecha, c, m.importe >= 0 ? [{ cuenta: "572", debe: imp }, { cuenta: cta, titulo: a.tercero, haber: imp }] : [{ cuenta: cta, titulo: a.tercero, debe: imp }, { cuenta: "572", haber: imp }], "banco-tercero", "", m._id);
+      continue;
+    }
     const cuenta = a?.cuenta || "555";
     if (!a) pendientes.push(m);
-    const imp = Math.abs(m.importe);
     asiento(m.fecha, a?.concepto || m.concepto, m.importe >= 0 ? [{ cuenta: "572", debe: imp }, { cuenta, haber: imp }] : [{ cuenta, debe: imp }, { cuenta: "572", haber: imp }], a ? "banco" : "banco-pendiente", "", m._id);
   }
 
@@ -95,7 +213,22 @@ export function generarDiario({ facturas, movimientos }, vinculados = [], manual
 
   A.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
   A.forEach((a, i) => { a.num = i + 1; a.cuadra = Math.abs(a.lineas.reduce((s, l) => s + l.debe - l.haber, 0)) < 0.01; });
-  return { asientos: A, pendientes };
+  return { asientos: A, pendientes, sinPagar: sinPagarPorSaldo(A, pendFactura, [...facturas, ...emitidas]) };
+}
+
+// Qué facturas siguen sin pagar (o sin cobrar) según el saldo de la subcuenta de cada tercero:
+// los pagos se aplican a las facturas más antiguas, aunque una transferencia pague varias o sea una provisión.
+function sinPagarPorSaldo(A, pendFactura, todas) {
+  const saldo = {};
+  for (const a of A) for (const l of a.lineas) if (/^4[13]0\d{5}$/.test(l.cuenta)) saldo[l.cuenta] = (saldo[l.cuenta] || 0) + l.debe - l.haber;
+  const porCta = {};
+  for (const f of todas) { const c = pendFactura.get(f.archivo); if (c) (porCta[c] ||= []).push(f); }
+  const out = new Set();
+  for (const [c, fs] of Object.entries(porCta)) {
+    let falta = c.startsWith("430") ? r2(saldo[c] || 0) : r2(-(saldo[c] || 0)); // lo que aún se debe (o nos deben)
+    for (const f of [...fs].sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha)))) { if (falta <= 0.01) break; out.add(f.archivo); falta = r2(falta - f.total); }
+  }
+  return out;
 }
 
 export function filtrarPeriodo(asientos, desde, hasta) {
@@ -184,5 +317,8 @@ export function exportarApuntes(asientos, formato = "a3") {
 }
 export function exportarPlanCuentas(asientos) {
   const m = mayores(asientos);
-  return "﻿" + [["Cuenta", "Título"], ...m.map((c) => [pad8(c.cuenta), c.titulo])].map((r) => r.join(";")).join("\r\n");
+  const nifs = {};
+  for (const a of asientos) for (const l of a.lineas) if (l.nif) nifs[l.cuenta] = l.nif;
+  const q = (s) => { const t = String(s ?? ""); return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  return "﻿" + [["Cuenta", "Título", "NIF"], ...m.map((c) => [pad8(c.cuenta), c.titulo, nifs[c.cuenta] || ""])].map((r) => r.map(q).join(";")).join("\r\n");
 }

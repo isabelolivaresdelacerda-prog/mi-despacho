@@ -77,3 +77,24 @@ a.mc-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .tarjeta.cierre.bien { border-color: color-mix(in srgb, #1d7a46 40%, var(--linea)); }
 .tarjeta.cierre.mal { border-color: color-mix(in srgb, var(--aviso) 50%, var(--linea)); }
 label.check { flex-direction: row; align-items: center; gap: 6px; font-size: 14px; }
+
+/* Cifras pulsables y desglose */
+.kpi-btn { text-align: left; font: inherit; color: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.kpi-btn:hover { border-color: var(--brand); box-shadow: 0 2px 10px color-mix(in srgb, var(--brand) 15%, transparent); }
+.kpi-anio { margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--linea); }
+.kpi-ver { font-style: normal; font-size: 12px; color: var(--brand); margin-top: 6px; opacity: .7; }
+.kpi-btn:hover .kpi-ver { opacity: 1; }
+.tabla td.celda { padding: 0; }
+.tabla td.celda button { width: 100%; text-align: right; background: none; border: 0; font: inherit; color: inherit; padding: 8px 10px; cursor: pointer; }
+.tabla td.celda button:hover { background: var(--brand-suave); color: var(--brand); text-decoration: underline; }
+.mc-dialogo.ancho { width: min(1000px, 96vw); max-width: none; }
+.dg-resumen { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px 0 10px; }
+.tabla.dg tr.con-aviso td { background: color-mix(in srgb, var(--aviso) 6%, transparent); }
+.aviso-btn { display: inline-block; margin: 2px 4px 2px 0; background: color-mix(in srgb, var(--aviso) 12%, var(--superficie)); border: 1px solid color-mix(in srgb, var(--aviso) 35%, transparent); color: var(--tinta); border-radius: 999px; padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.aviso-btn:hover { border-color: var(--aviso); }
+.as-opciones button.on { border-color: var(--brand); background: var(--brand-suave); }
+.fila-opciones { flex-direction: row; flex-wrap: wrap; margin-bottom: 12px; }
+.fila-opciones button { flex: 1; min-width: 200px; }
+.tarjeta.detectado, table.detectado { background: color-mix(in srgb, var(--brand) 5%, var(--superficie)); }
+.sel-periodo .hoy { margin-left: 8px; font-size: 13px; }
+.impuestos-anio .error, span.error { color: var(--error); font-size: 13px; font-weight: 600; }

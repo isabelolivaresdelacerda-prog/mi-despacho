@@ -112,25 +112,36 @@ export function asignarCuenta(texto) {
 }
 
 // ---- carga completa ----
+function prepararFactura(a, base, ed, cuentaDefecto, tercero) {
+  const d = { archivo: a.nombre, ...(base || {}), ...ed };
+  ["base", "iva_pct", "iva_importe", "retencion_pct", "retencion_importe", "total"].forEach((k) => (d[k] = num(d[k])));
+  if (!d.total && (d.base || d.iva_importe)) d.total = +(d.base + d.iva_importe - d.retencion_importe).toFixed(2);
+  if (!d.base && d.total) d.base = +(d.total - d.iva_importe + d.retencion_importe).toFixed(2);
+  d.cuenta_pgc = d.cuenta_pgc || cuentaDefecto(d);
+  d._leida = !!base || !!(ed.total || ed[tercero]);
+  d._editada = Object.keys(ed).length > 0;
+  d._arch = a;
+  return d;
+}
+const esDoc = (a) => /\.(pdf|jpe?g|png)$/i.test(a.nombre);
+
+// Importe que aparece en el nombre de un archivo: "transferencia 1.234,56.pdf", "adeudo 106.00 €.pdf"
+export function importeEnNombre(nombre) {
+  return [...String(nombre).matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})(?!\d)/g)].map((m) => num(m[1].includes(",") ? m[1] : m[1].replace(".", ",")));
+}
+
 export async function cargarTodo(raiz) {
-  const [cacheF, editsF, cacheIA, cacheB, extractoApi, vincular, empresa, capital] = await Promise.all([
-    leerJSON(raiz, "cache_facturas.json", {}), leerJSON(raiz, "edits_facturas.json", {}),
+  const [cacheF, editsF, editsE, cacheIA, cacheB, extractoApi, vincular, empresa, capital, justManual] = await Promise.all([
+    leerJSON(raiz, "cache_facturas.json", {}), leerJSON(raiz, "edits_facturas.json", {}), leerJSON(raiz, "edits_emitidas.json", {}),
     leerJSON(raiz, "cache_ia_documentos.json", {}), leerJSON(raiz, "cache_banco.json", {}),
     leerJSON(raiz, "extracto_api.json", { movimientos: [] }), leerJSON(raiz, "vincular.json", {}),
-    leerJSON(raiz, "empresa.json", {}), leerJSON(raiz, "capital_social.json", null),
+    leerJSON(raiz, "empresa.json", {}), leerJSON(raiz, "capital_social.json", null), leerJSON(raiz, "justificantes_banco.json", {}),
   ]);
-  const archivosF = await listar(raiz, "facturas");
-  const facturas = archivosF.filter((a) => /\.(pdf|jpe?g|png)$/i.test(a.nombre)).map((a) => {
-    const base = cacheF["facturas/" + a.nombre]?.datos || cacheIA["factura:" + a.nombre]?.datos || null;
-    const ed = editsF[a.nombre] || {};
-    const d = { archivo: a.nombre, ...(base || {}), ...ed };
-    ["base", "iva_pct", "iva_importe", "retencion_pct", "retencion_importe", "total"].forEach((k) => (d[k] = num(d[k])));
-    if (!d.total && (d.base || d.iva_importe)) d.total = +(d.base + d.iva_importe - d.retencion_importe).toFixed(2);
-    if (!d.base && d.total) d.base = +(d.total - d.iva_importe + d.retencion_importe).toFixed(2);
-    d.cuenta_pgc = d.cuenta_pgc || asignarCuenta((d.proveedor || "") + " " + a.nombre);
-    d._leida = !!base || !!(ed.total || ed.proveedor);
-    d._editada = Object.keys(ed).length > 0;
-    d._arch = a;
+  const [archivosF, archivosE, archivosB] = await Promise.all([listar(raiz, "facturas"), listar(raiz, "facturas_emitidas"), listar(raiz, "documentos_banco")]);
+  const facturas = archivosF.filter(esDoc).map((a) => prepararFactura(a, cacheF["facturas/" + a.nombre]?.datos || cacheIA["factura:" + a.nombre]?.datos || null, editsF[a.nombre] || {}, (d) => asignarCuenta((d.proveedor || "") + " " + a.nombre), "proveedor"));
+  const emitidas = archivosE.filter(esDoc).map((a) => {
+    const d = prepararFactura(a, cacheF["facturas_emitidas/" + a.nombre]?.datos || null, editsE[a.nombre] || {}, () => "705", "cliente");
+    d.emitida = true;
     return d;
   });
   const movimientos = (extractoApi.movimientos || []).map((m, i) => ({ ...m, importe: num(m.importe), _id: i }));
@@ -143,18 +154,44 @@ export async function cargarTodo(raiz) {
     const m = movimientos.find((x) => !usados.has(x._id) && x.importe < 0 && Math.abs(Math.abs(x.importe) - f.total) < 0.011 && fechaOrden(x.fecha) >= fechaOrden(f.fecha));
     if (m) { usados.add(m._id); m._factura = f.archivo; f._pago = { fecha: m.fecha, texto: m.concepto }; }
   }
-  return { facturas, movimientos, empresa, capital, cacheF, editsF, vincular, docsBanco: Object.values(cacheB) };
+  // Cobros de las facturas emitidas
+  for (const f of emitidas.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)))) {
+    if (!f.total) continue;
+    const m = movimientos.find((x) => !usados.has(x._id) && x.importe > 0 && Math.abs(x.importe - f.total) < 0.011 && fechaOrden(x.fecha) >= fechaOrden(f.fecha));
+    if (m) { usados.add(m._id); m._emitida = f.archivo; f._cobro = { fecha: m.fecha, texto: m.concepto }; }
+  }
+  // Justificantes individuales del banco (adeudos, transferencias, recibos) en «documentos_banco»
+  const datosB = (a) => { const c = cacheB[a.nombre] || cacheB["documentos_banco/" + a.nombre]; const x = c?.datos || c || {}; return { fecha: x.fecha || "", importe: Math.abs(num(x.importe ?? x.total ?? 0)) }; };
+  const justif = archivosB.filter(esDoc).map((a) => ({ nombre: a.nombre, arch: a, ...datosB(a), enNombre: importeEnNombre(a.nombre) }));
+  const usadosJ = new Set(Object.values(justManual));
+  for (const m of movimientos) {
+    const man = justManual[claveMovDatos(m)];
+    if (man) { m._justificante = man === "__no__" ? { no: true } : { nombre: man, manual: true }; continue; }
+    const imp = Math.abs(m.importe);
+    const dias = (f) => (f ? Math.abs((Date.parse(fechaOrden(f)) - Date.parse(fechaOrden(m.fecha))) / 86400000) : 0);
+    const j = justif.find((x) => !usadosJ.has(x.nombre) && ((x.importe && Math.abs(x.importe - imp) < 0.011 && dias(x.fecha) <= 5) || x.enNombre.some((v) => Math.abs(v - imp) < 0.011)));
+    if (j) { usadosJ.add(j.nombre); m._justificante = { nombre: j.nombre }; }
+  }
+  return { facturas, emitidas, movimientos, justificantes: justif, empresa, capital, cacheF, editsF, vincular, justManual, docsBanco: Object.values(cacheB) };
+}
+// Misma clave que el motor (fecha|importe|concepto) para guardar asociaciones a mano
+export const claveMovDatos = (m) => `${m.fecha}|${Math.round(num(m.importe) * 100) / 100}|${(m.concepto || "").slice(0, 60)}`;
+export async function guardarJustificante(raiz, m, nombre) {
+  const x = await leerJSON(raiz, "justificantes_banco.json", {});
+  if (nombre) x[claveMovDatos(m)] = nombre; else delete x[claveMovDatos(m)];
+  await escribirJSON(raiz, "justificantes_banco.json", x);
 }
 
 // Guarda una corrección manual (compatible con la app de escritorio)
-export async function guardarEdicion(raiz, archivo, cambios) {
-  const e = await leerJSON(raiz, "edits_facturas.json", {});
+export async function guardarEdicion(raiz, archivo, cambios, emitida = false) {
+  const n = emitida ? "edits_emitidas.json" : "edits_facturas.json";
+  const e = await leerJSON(raiz, n, {});
   e[archivo] = { ...(e[archivo] || {}), ...cambios };
-  await escribirJSON(raiz, "edits_facturas.json", e);
+  await escribirJSON(raiz, n, e);
 }
-export async function guardarLectura(raiz, archivo, mtime, datos) {
+export async function guardarLectura(raiz, archivo, mtime, datos, emitida = false) {
   const c = await leerJSON(raiz, "cache_facturas.json", {});
-  c["facturas/" + archivo] = { _mtime: mtime / 1000, _parser_version: "web-v1", _procesado: new Date().toLocaleString("es-ES"), datos };
+  c[(emitida ? "facturas_emitidas/" : "facturas/") + archivo] = { _mtime: mtime / 1000, _parser_version: "web-v1", _procesado: new Date().toLocaleString("es-ES"), datos };
   await escribirJSON(raiz, "cache_facturas.json", c);
 }
 export async function guardarVinculo(raiz, archivo, v) {
@@ -169,6 +206,11 @@ export function libroFacturasCSV(facturas) {
   return csv([["Fecha", "Número", "Proveedor", "NIF", "Base", "% IVA", "Cuota IVA", "% Retención", "Retención", "Total", "Cuenta PGC", "Pagada", "Archivo"],
     ...facturas.map((f) => [f.fecha, f.numero, f.proveedor, f.nif_proveedor || f.nif_emisor, f.base, f.iva_pct, f.iva_importe, f.retencion_pct, f.retencion_importe, f.total, f.cuenta_pgc, f._pago ? "Sí" : "No", f.archivo])]);
 }
+export function libroEmitidasCSV(facturas) {
+  return csv([["Fecha", "Número", "Cliente", "NIF", "Base", "% IVA", "Cuota IVA", "% Retención", "Retención", "Total", "Cuenta PGC", "Cobrada", "Archivo"],
+    ...facturas.map((f) => [f.fecha, f.numero, f.cliente, f.nif_cliente, f.base, f.iva_pct, f.iva_importe, f.retencion_pct, f.retencion_importe, f.total, f.cuenta_pgc, f._cobro ? "Sí" : "No", f.archivo])]);
+}
+export { csv };
 export function diarioCSV(facturas, vinculados = []) {
   // Asiento por factura: gasto + IVA soportado al debe; retención y acreedor al haber
   const filas = [["Asiento", "Fecha", "Cuenta", "Concepto", "Debe", "Haber", "Documento"]];

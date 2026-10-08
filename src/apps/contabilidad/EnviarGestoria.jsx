@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { estadoEncargo, marcarFirmadoFuera } from "../../lib/encargoEstado.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
-import { trimestre, eur, libroFacturasCSV, diarioCSV, leerJSON, escribirJSON, leerVinculados, TIPOS_VINCULO } from "./datos.js";
+import { leerJSON, escribirJSON, leerVinculados } from "./datos.js";
+import { paquete } from "./paquete.js";
+import { enRango, noPagada } from "./periodo.js";
 
 async function escribirArchivo(raiz, ruta, nombre, texto) {
   let d = raiz;
@@ -12,38 +14,24 @@ async function escribirArchivo(raiz, ruta, nombre, texto) {
   await w.write(texto); await w.close();
 }
 
-export default function EnviarGestoria({ raiz, empresa, datos, config, onCerrar, aviso }) {
+export default function EnviarGestoria({ raiz, empresa, datos, diario, extra, r, config, onCerrar, aviso }) {
   const [enc, setEnc] = useState(estadoEncargo);
   const [seguir, setSeguir] = useState(false);
   const [fuera, setFuera] = useState({ abierto: false, gestoria: enc.gestoria || "", fecha: "" });
-  const periodos = useMemo(() => [...new Set(datos.facturas.map((f) => trimestre(f.fecha)).filter(Boolean).map((p) => `${p.anio}-${p.t}`))].sort().reverse(), [datos]);
-  const [periodo, setPeriodo] = useState(periodos[0] || "todo");
   const [hecho, setHecho] = useState(null);
   const [correo, setCorreo] = useState(false);
+  const [formato, setFormato] = useState(config?.formatoGestoria || "a3");
   const firmado = enc.estado === "firmado";
-
-  const fact = datos.facturas.filter((f) => { const p = trimestre(f.fecha); return periodo === "todo" || (p && `${p.anio}-${p.t}` === periodo); });
-  const etiqueta = periodo === "todo" ? "completo" : `${periodo.replace("-", " ")}T`;
+  const fact = datos.facturas.filter((f) => enRango(f.fecha, r));
+  const etiqueta = r.corta;
   const sinRevisar = fact.filter((f) => !f._leida || (f.analizado_ia && !f._editada));
-  const pendientes = fact.filter((f) => f.total && !f._pago);
+  const pendientes = fact.filter((f) => f.total && noPagada(f, datos));
 
   const enviar = async () => {
     const ruta = ["para la gestoria", etiqueta];
-    const resumen = [
-      `PAQUETE PARA LA GESTORÍA – ${config?.empresa?.razon_social || config?.nombre || ""} – ${etiqueta}`,
-      `Preparado: ${new Date().toLocaleString("es-ES")}`, "",
-      `Facturas recibidas del periodo: ${fact.length} (total ${eur(fact.reduce((s, f) => s + f.total, 0))})`,
-      `Pendientes de pago: ${pendientes.length}`, ...pendientes.map((f) => `  - ${f.fecha} ${f.proveedor} ${f.numero} ${eur(f.total)}`),
-      `Sin revisar por una persona: ${sinRevisar.length}`, ...sinRevisar.map((f) => `  - ${f.archivo}`), "",
-      "Los documentos originales están en las carpetas «facturas», «documentos_banco» y «extractos» de esta misma carpeta compartida.",
-      "Los datos marcados como leídos por IA son propuestas revisables (supervisión humana).",
-      "Escrituras, contratos y préstamos con efecto contable: carpeta «para la gestoria › escrituras y contratos» (copia; el original está en la carpeta de la empresa).",
-    ].join("\r\n");
-    await escribirArchivo(raiz, ruta, `Libro facturas recibidas ${etiqueta}.csv`, libroFacturasCSV(fact));
-    const vinc = await leerVinculados(raiz);
-    const enPeriodo = vinc.filter((v) => TIPOS_VINCULO[v.tipo]?.periodico || periodo === "todo" || (trimestre(v.fecha) && `${trimestre(v.fecha).anio}-${trimestre(v.fecha).t}` === periodo));
-    await escribirArchivo(raiz, ruta, `Libro diario ${etiqueta}.csv`, diarioCSV(fact, enPeriodo.filter((v) => !TIPOS_VINCULO[v.tipo]?.periodico)));
+    for (const a of paquete({ d: datos, diario, extra, r, formato, config })) await escribirArchivo(raiz, ruta, a.nombre, a.texto);
     // Copia de las escrituras y contratos vinculados que la gestoría aún no tiene (los originales siguen en su carpeta)
+    const vinc = await leerVinculados(raiz);
     const previos = await leerJSON(raiz, "envios_gestoria.json", []);
     const yaCopiados = new Set(previos.flatMap((e) => e.vinculados_copiados || []));
     const copiados = [];
@@ -56,10 +44,8 @@ export default function EnviarGestoria({ raiz, empresa, datos, config, onCerrar,
         copiados.push(v.id);
       } catch { /* si se ha movido el original, se avisa en el resumen */ }
     }
-    await escribirArchivo(raiz, ruta, `Resumen ${etiqueta}.txt`, "﻿" + resumen);
-    const reg = previos;
-    reg.push({ vinculados_copiados: copiados, periodo: etiqueta, fecha: new Date().toISOString(), facturas: fact.length, sin_revisar: sinRevisar.length, contrato_encargo: enc.estado, sin_contrato_aceptado: !firmado });
-    await escribirJSON(raiz, "envios_gestoria.json", reg);
+    previos.push({ vinculados_copiados: copiados, periodo: etiqueta, formato, fecha: new Date().toISOString(), facturas: fact.length, sin_revisar: sinRevisar.length, contrato_encargo: enc.estado, sin_contrato_aceptado: !firmado });
+    await escribirJSON(raiz, "envios_gestoria.json", previos);
     setHecho(ruta.join(" › "));
     aviso?.("Paquete guardado en la carpeta compartida");
   };
@@ -94,13 +80,9 @@ export default function EnviarGestoria({ raiz, empresa, datos, config, onCerrar,
 
           {(firmado || seguir) && (
             <>
-              <label className="mc-campo"><span>Periodo</span>
-                <select value={periodo} onChange={(e) => { setPeriodo(e.target.value); setHecho(null); }}>
-                  {periodos.map((p) => <option key={p} value={p}>{p.replace("-", " · ")}º trimestre</option>)}
-                  <option value="todo">Todo</option>
-                </select>
-              </label>
-              <p className="mc-nota">{fact.length} facturas · {pendientes.length} pendientes de pago{sinRevisar.length ? ` · ${sinRevisar.length} sin revisar` : ""}. Se guardarán el libro de facturas, el libro diario y un resumen en <strong>para la gestoria › {etiqueta}</strong>, dentro de la carpeta compartida: la gestoría lo verá al momento.</p>
+              <p><strong>Periodo: {r.etiqueta}</strong> <span className="muted pequeño">(se cambia arriba, en el selector de periodo)</span></p>
+              <label className="mc-campo"><span>Programa de la gestoría</span><select value={formato} onChange={(e) => setFormato(e.target.value)}><option value="a3">A3</option><option value="sage">Sage / ContaPlus</option></select></label>
+              <p className="mc-nota">{fact.length} facturas · {pendientes.length} pendientes de pago{sinRevisar.length ? ` · ${sinRevisar.length} sin revisar` : ""}. Se guardarán el diario para {formato === "sage" ? "Sage" : "A3"}, el plan de subcuentas, los libros de facturas, los impuestos, el extracto conciliado y lo pendiente en <strong>para la gestoria › {etiqueta}</strong>, dentro de la carpeta compartida: la gestoría lo verá al momento.</p>
               {hecho && <p className="mc-ok">Hecho: guardado en {hecho}. Ahora puedes avisar a la gestoría por correo.</p>}
             </>
           )}
