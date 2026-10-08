@@ -130,6 +130,7 @@ export default function Ajustes({ config, guardar }) {
         </div>
       </header>
 
+      <a className="tarjeta enlace-tarjeta" href="#/seguridad"><strong>🔒 Seguridad, datos e IA</strong><span className="muted">Cómo se protegen los datos, qué normas se cumplen (RGPD, Reglamento de IA) y qué tiene que hacer cada parte. Para imprimir o enviar a cumplimiento normativo.</span></a>
       <div className="tarjetas">
         <section className="tarjeta">
           <h2>Imagen del despacho</h2>

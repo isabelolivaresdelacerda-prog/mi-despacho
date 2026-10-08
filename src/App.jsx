@@ -7,6 +7,8 @@ import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
 import Calendario, { ProximosAvisos } from "./apps/calendario/Calendario.jsx";
+import Seguridad from "./Seguridad.jsx";
+import GuiaAsociaciones from "./apps/guias/GuiaAsociaciones.jsx";
 import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
@@ -150,6 +152,10 @@ export default function App() {
       vista = <div className="app"><ContratoEncargo /></div>; break;
     case "contratos/carpeta":
       vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} />; break;
+    case "seguridad":
+      vista = <Seguridad config={config} />; break;
+    case "guias/asociaciones":
+      vista = <GuiaAsociaciones />; break;
     case "calendario":
       vista = <Calendario config={config} guardar={guardar} />; break;
     case "carpetas":
@@ -193,6 +199,7 @@ export default function App() {
           ))}
           <div className="menu-pie">
             {yo.rol === "admin" && <Item r="usuarios">👤 Usuarios {pendientes > 0 && <span className="insignia" title="Solicitudes de acceso pendientes">{pendientes}</span>}</Item>}
+            <Item r="guias/asociaciones">📖 Guía: asociaciones</Item>
             <Item r="carpetas">📁 Carpetas de la empresa</Item>
             <Item r="ajustes">⚙ Ajustes</Item>
             {(empresas.length > 1 || yo.rol === "admin") && <button className="menu-item salir" type="button" onClick={() => { fijarEspacio(null); setEmpresa(null); }}>🏢 Cambiar de empresa ({empresa.nombre})</button>}
