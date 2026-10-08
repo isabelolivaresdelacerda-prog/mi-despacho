@@ -1,9 +1,10 @@
 // Pantalla de acceso: entrar (clave + doble factor), crear mi clave (con el código de la administradora) o pedir acceso.
-import { useEffect, useState } from "react";
+import { enviarCodigo, useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { entrar, crearClave, pedirAcceso, estadoMFA, iniciarAltaMFA, verificarMFA, salir } from "./lib/cuentas.js";
+import { entrar, crearClave, enviarCodigo, pedirAcceso, estadoMFA, iniciarAltaMFA, verificarMFA, salir } from "./lib/cuentas.js";
 
 export default function Acceso({ onDentro }) {
+  const [enviado, setEnviado] = useState("");
   const [modo, setModo] = useState("entrar"); // entrar | clave | pedir | mfa | mfa-alta
   const [f, setF] = useState({ email: "", clave: "", clave2: "", codigo: "", nombre: "", otp: "" });
   const [msg, setMsg] = useState(null);
@@ -52,7 +53,7 @@ export default function Acceso({ onDentro }) {
         <h1>{titulos[modo]}</h1>
         <p className="muted">
           {modo === "entrar" && "Entra con tu correo y tu clave."}
-          {modo === "clave" && "La primera vez, o si has olvidado tu clave: escribe el código que te ha dado la administradora y elige tu clave."}
+          {modo === "clave" && "La primera vez, o si has olvidado tu clave: escribe tu correo, pulsa «Enviarme el código», y con el código que te llegue elige tu clave."}
           {modo === "pedir" && "Déjanos tu nombre y tu correo. La administradora revisará tu solicitud."}
           {modo === "mfa" && "Abre la app de autenticación de tu móvil y escribe el código de 6 cifras de Mi Despacho."}
           {modo === "mfa-alta" && "Para proteger los datos, Mi Despacho pide un segundo paso al entrar. Solo se configura una vez."}
@@ -68,7 +69,11 @@ export default function Acceso({ onDentro }) {
         <form onSubmit={enviar} className="formulario">
           {modo === "pedir" && <label>Nombre y apellidos<input required minLength={2} maxLength={120} autoComplete="name" {...c("nombre")} /></label>}
           {!esMfa && <label>Correo<input type="email" required autoComplete="username" {...c("email")} /></label>}
-          {modo === "clave" && <label>Código de la administradora<input required autoComplete="one-time-code" maxLength={8} style={{ textTransform: "uppercase", letterSpacing: ".15em" }} {...c("codigo")} /></label>}
+          {modo === "clave" && <div className="enviar-codigo">
+            <button className="btn ghost" type="button" disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email) || enviado === "enviando"} onClick={async () => { setEnviado("enviando"); await enviarCodigo(f.email.trim().toLowerCase()); setEnviado("ok"); }}>{enviado === "enviando" ? "Enviando…" : enviado === "ok" ? "Volver a enviar el código" : "Enviarme el código por correo"}</button>
+            {enviado === "ok" && <p className="muted pequeño">Si tu correo está autorizado, te llegará en un minuto (mira también en correo no deseado). Caduca en 24 horas.</p>}
+          </div>}
+          {modo === "clave" && <label>Código recibido<input required autoComplete="one-time-code" maxLength={8} style={{ textTransform: "uppercase", letterSpacing: ".15em" }} {...c("codigo")} /></label>}
           {(modo === "entrar" || modo === "clave") && <label>{modo === "clave" ? "Nueva clave" : "Clave"}<input type="password" required autoComplete={modo === "clave" ? "new-password" : "current-password"} minLength={modo === "clave" ? 12 : 1} {...c("clave")} /></label>}
           {modo === "clave" && <>
             <label>Repite la clave<input type="password" required autoComplete="new-password" {...c("clave2")} /></label>

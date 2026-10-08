@@ -54,6 +54,10 @@ export async function miFicha() {
   return data;
 }
 
+// Pide que se envíe por correo el código para crear la clave (solo llega si el correo está autorizado)
+export async function enviarCodigo(email) {
+  await fetch(`${SUPABASE_URL}/functions/v1/enviar-codigo`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY }, body: JSON.stringify({ email }) }).catch(() => {});
+}
 export async function crearClave(email, codigo, clave) {
   // (tras crear la clave, la persona entra y configura su doble factor)
   const r = await fetch(`${SUPABASE_URL}/functions/v1/crear-clave`, {
