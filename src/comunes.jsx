@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NUBES, puedeGuardarDirecto, guardarEnNube, descargar, enlaceAbrir } from "./nube.js";
-import { preguntarIA, tieneAlgunaGratis, leerClaves, guardarClaves, estadoLocal, leerModo } from "./ia-navegador.js";
+import { preguntarIA, tieneAlgunaGratis, leerClaves, guardarClaves, estadoLocal, leerModo, guardarModo } from "./ia-navegador.js";
 
 // --- Aviso flotante ----------------------------------------------
 export function useAviso() {
@@ -85,14 +85,23 @@ export function GuardarEnNube({ abierto, blob, nombre, config, onCerrar, irAAjus
 // --- Aviso compacto para las apps: si la IA del ordenador está apagada, botón para encenderla ---
 export function AvisoIA() {
   const [e, setE] = useState(null);
+  const [clave, setClave] = useState(null);
+  const [hecho, setHecho] = useState(false);
   const mirar = () => estadoLocal().then(setE);
   useEffect(() => { mirar(); const t = setInterval(mirar, 15000); return () => clearInterval(t); }, []);
   if (!e || e.ok) return null;
+  const tieneNube = leerModo() === "nube" && tieneAlgunaGratis();
+  if (tieneNube && !clave) return null; // con claves en la nube la app sigue funcionando aunque el ordenador esté apagado
   return (
     <div className="aviso-ia" role="status">
       <span><strong>{e.motivo === "cargando" ? "La IA de tu ordenador se está encendiendo…" : "La IA de tu ordenador está apagada"}</strong> — sin ella no se leen las facturas ni los documentos nuevos.</span>
       {e.motivo !== "cargando" && <a className="btn" href="midespacho-ia://encender" onClick={() => setTimeout(mirar, 15000)}>Encender la IA</a>}
-      <a className="btn ghost" href="#/ia">Ayuda / usar claves gratis</a>
+      {clave === null ? <button className="btn ghost" type="button" onClick={() => setClave("")}>Usar una clave gratis de Google</button> : hecho ? <span className="ok-texto">✓ Clave guardada (cifrada en tu cuenta)</span> : (
+        <span className="aviso-ia-clave">
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">1. Conseguir la clave (Gmail → «Create API key»)</a>
+          <input type="password" value={clave} placeholder="2. Pega aquí la clave (AIza…)" onChange={(x) => setClave(x.target.value.trim())} autoComplete="off" spellCheck={false} />
+          <button className="btn" type="button" disabled={!/^AIza/.test(clave)} onClick={() => { guardarClaves({ ...leerClaves(), gemini: clave }); guardarModo("nube"); setHecho(true); }}>3. Guardar</button>
+        </span>)}
     </div>
   );
 }

@@ -43,3 +43,29 @@ export async function sincronizarAjustes(email, empresaId) {
     return "iguales";
   } catch { return "error"; }
 }
+
+// Claves de IA: se guardan en la cuenta CIFRADAS (clave maestra en el Vault de Supabase) y solo las lee la propia usuaria
+// con la sesión en dos pasos. Así se piden una vez y valen en cualquier ordenador y dirección.
+export async function subirClavesIA(claves, modo) {
+  try {
+    const datos = { ...claves };
+    if (modo) datos.modo = modo;
+    const { error } = await sb.rpc("guardar_claves_ia", { p_claves: datos });
+    return !error;
+  } catch { return false; }
+}
+export async function traerClavesIA() {
+  try {
+    const { data, error } = await sb.rpc("mis_claves_ia");
+    if (error || !data) return false;
+    const { leerClaves, guardarClaves, guardarModo } = await import("../ia-navegador.js");
+    const { modo, ...nube } = data;
+    const local = leerClaves();
+    const juntas = { ...local, ...Object.fromEntries(Object.entries(nube).filter(([, v]) => v)) };
+    guardarClaves(juntas, { sinSubir: true });
+    if (modo) guardarModo(modo, { sinSubir: true });
+    // Si en este navegador había claves que la cuenta no tiene (p. ej. en la dirección antigua), se suben
+    if (Object.keys(local).some((k) => local[k] && !nube[k])) await subirClavesIA(juntas, modo);
+    return true;
+  } catch { return false; }
+}

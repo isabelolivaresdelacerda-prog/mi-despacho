@@ -17,7 +17,7 @@ import Acceso from "./Acceso.jsx";
 import Usuarios from "./Usuarios.jsx";
 import { sb, miFicha, salir as salirCuenta, admin, misEmpresas, empresaPorDominio } from "./lib/cuentas.js";
 import { AccesosEmpresa, VincularEmpresa } from "./lib/Enlaces.jsx";
-import { sincronizarAjustes, subirAjustes } from "./lib/ajustesNube.js";
+import { sincronizarAjustes, subirAjustes, traerClavesIA } from "./lib/ajustesNube.js";
 const DIRECCION_ANTIGUA = "mi-despacho-nine.vercel.app", DIRECCION_NUEVA = "https://midespacho.vercel.app";
 import { fijarEspacio, hayDatosAntiguos, moverDatosAntiguos, borrarDatosAntiguos } from "./lib/espacio.js";
 import { recortarLogo } from "./lib/logo.js";
@@ -97,9 +97,10 @@ export default function App() {
     setSincronizando(true);
     // En la dirección antigua están los ajustes de verdad: se suben siempre a la cuenta y se lleva a la nueva
     if (location.hostname === DIRECCION_ANTIGUA) {
+      await traerClavesIA(); // sube las claves de IA que hubiera en la dirección antigua
       const ok = await subirAjustes(yo.email, e.id);
       if (ok) { location.replace(DIRECCION_NUEVA + "/#/inicio"); return; }
-    } else await sincronizarAjustes(yo.email, e.id);
+    } else { await sincronizarAjustes(yo.email, e.id); await traerClavesIA(); }
     setSincronizando(false);
     const c = leerConfig();
     setConfig(c.nombre ? c : { ...c, nombre: e.nombre, tipo: e.tipo === "gestoria" ? "gestoria" : "empresa", empresa: { ...(c.empresa || {}), razon_social: e.nombre, cif: e.cif || "" } });
@@ -313,13 +314,24 @@ function IaMenu() {
 // Página para conectar la IA: estado, botón que pide a Chrome el permiso de red local y ajustes de la IA
 function PaginaIA() {
   const [r, setR] = useState(null);
+  const [seg, setSeg] = useState(0);
   const conectar = async () => {
-    setR({ estado: "probando" });
-    const m = await import("./ia-navegador.js");
-    const e = await m.estadoLocal();
-    if (!e.ok) return setR({ estado: "no", e });
-    const p = await m.preguntarIA("Responde solo: OK", { maxTokens: 10 });
-    setR({ estado: p.estado === "ok" ? "ok" : "no", e, p });
+    setR({ estado: "probando" }); setSeg(0);
+    const t0 = Date.now(), reloj = setInterval(() => setSeg(Math.round((Date.now() - t0) / 1000)), 1000);
+    try {
+      const m = await import("./ia-navegador.js");
+      const e = await m.estadoLocal();
+      if (!e.ok) return setR({ estado: "no", e });
+      const ocupada = await m.ocupadaLocal();
+      if (ocupada) setR({ estado: "probando", ocupada: true });
+      // Prueba directa y corta (máx. 60 s) para no quedarse colgada
+      const resp = await fetch("http://localhost:8080/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(60000),
+        body: JSON.stringify({ messages: [{ role: "user", content: "Responde solo: OK" }], max_tokens: 10, chat_template_kwargs: { enable_thinking: false } }) });
+      const ok = resp.ok && (await resp.json()).choices?.[0]?.message?.content;
+      setR({ estado: ok ? "ok" : "no", e, seg: Math.round((Date.now() - t0) / 1000) });
+    } catch (err) {
+      setR({ estado: "no", e: { motivo: err?.name === "TimeoutError" ? "lenta" : "bloqueada" } });
+    } finally { clearInterval(reloj); }
   };
   return (
     <div className="app">
@@ -332,10 +344,11 @@ function PaginaIA() {
       <section className="tarjeta">
         <h2>2. Deja que esta web hable con ella</h2>
         <p>Esta dirección ({location.host}) es nueva para Chrome, así que hay que darle permiso una vez. Pulsa el botón y, si Chrome pregunta <em>«Buscar dispositivos de tu red local»</em> o <em>«Acceder a la red local»</em>, pulsa <strong>Permitir</strong>.</p>
-        <p><button className="btn" type="button" onClick={conectar} disabled={r?.estado === "probando"}>{r?.estado === "probando" ? "Probando…" : "Conectar y probar la IA"}</button></p>
-        {r?.estado === "ok" && <p className="ok-texto">✓ Conectada: {r.e.modelo} ha respondido. Ya puedes usarla en contabilidad y documentos.</p>}
+        <p><button className="btn" type="button" onClick={conectar} disabled={r?.estado === "probando"}>{r?.estado === "probando" ? `Probando… ${seg} s` : "Conectar y probar la IA"}</button></p>
+        {r?.estado === "probando" && r.ocupada && <p className="muted">La IA está ocupada leyendo documentos de la app (lo hace de uno en uno); la prueba va detrás. Espera un poco.</p>}
+        {r?.estado === "ok" && <p className="ok-texto">✓ Conectada: {r.e.modelo} ha respondido en {r.seg} s. Ya puedes usarla en contabilidad y documentos.</p>}
         {r?.estado === "no" && <div className="ia-local falta">
-          <p><strong>No responde.</strong> {r.e?.motivo === "cargando" ? "Se está encendiendo: espera unos segundos y vuelve a probar." : "Comprueba que la ventana «IA local de Mi Despacho» está abierta y diga que está lista."}</p>
+          <p><strong>No responde.</strong> {r.e?.motivo === "cargando" ? "Se está encendiendo: espera unos segundos y vuelve a probar." : r.e?.motivo === "lenta" ? "Está encendida pero no ha contestado en 60 s: seguramente está ocupada leyendo documentos. Espera a que termine y vuelve a probar." : r.e?.motivo === "bloqueada" ? "Chrome no deja a esta web hablar con tu ordenador (permiso de red local)." : "Comprueba que la ventana «IA local de Mi Despacho» está abierta y diga que está lista."}</p>
           <p>Si está abierta y aun así no conecta, es el permiso de Chrome: pulsa el icono a la izquierda de la dirección (🔒 o ⚙) → <em>Configuración del sitio</em> → <em>Acceso a la red local</em> → <strong>Permitir</strong>, y recarga la página.</p>
         </div>}
       </section>

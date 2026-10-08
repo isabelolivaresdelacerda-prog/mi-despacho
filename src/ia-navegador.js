@@ -47,11 +47,16 @@ const MODELO_CLAUDE = "claude-haiku-5-5";
 export function leerClaves() {
   try { return JSON.parse(localStorage.getItem(ALMACEN)) || {}; } catch { return {}; }
 }
-export function guardarClaves(claves) {
-  try { localStorage.setItem(ALMACEN, JSON.stringify(claves)); return true; } catch { return false; }
+// Se guardan en este navegador y, cifradas, en tu cuenta (para no tener que volver a ponerlas en otro ordenador)
+export function guardarClaves(claves, { sinSubir = false } = {}) {
+  try { localStorage.setItem(ALMACEN, JSON.stringify(claves)); } catch { return false; }
+  if (!sinSubir) import("./lib/ajustesNube.js").then((m) => m.subirClavesIA(claves, leerModo())).catch(() => {});
+  return true;
 }
 export function borrarClaves() {
+  const vacias = Object.fromEntries(PROVEEDORES.map((p) => [p.id, ""]));
   try { localStorage.removeItem(ALMACEN); } catch {}
+  import("./lib/ajustesNube.js").then((m) => m.subirClavesIA(vacias)).catch(() => {});
 }
 export function tieneAlgunaGratis() {
   const c = leerClaves();
@@ -61,8 +66,9 @@ export function tieneAlgunaGratis() {
 export function leerModo() {
   try { return localStorage.getItem(ALMACEN_MODO) === "nube" ? "nube" : "local"; } catch { return "local"; }
 }
-export function guardarModo(m) {
+export function guardarModo(m, { sinSubir = false } = {}) {
   try { localStorage.setItem(ALMACEN_MODO, m === "nube" ? "nube" : "local"); } catch {}
+  if (!sinSubir) import("./lib/ajustesNube.js").then((x) => x.subirClavesIA({}, m === "nube" ? "nube" : "local")).catch(() => {});
 }
 
 // --- IA en el ordenador (llama.cpp) ---
@@ -87,11 +93,18 @@ async function preguntarLocal(modelo, sistema, msgs, maxTokens, json = false) {
     // Sin «pensar» en voz alta (más rápido) y, si se pide JSON, la respuesta sale solo como JSON válido
     body: JSON.stringify({ model: modelo, messages: mensajesPara({ sinSistema: true }, sistema, msgs), max_tokens: maxTokens, stream: false, temperature: 0.1,
       chat_template_kwargs: { enable_thinking: false }, ...(json ? { response_format: { type: "json_object" } } : {}) }),
+    // Nunca esperar para siempre: si en 3 minutos no contesta (ordenador muy ocupado), se da por fallida
+    signal: AbortSignal.timeout(180000),
   });
   if (!r.ok) throw new Error("error " + r.status);
   const texto = (await r.json()).choices?.[0]?.message?.content;
   if (!texto) throw new Error("respuesta vacia");
   return texto;
+}
+
+// ¿Está la IA del ordenador ocupada con otra lectura? (llama.cpp atiende una petición cada vez)
+export async function ocupadaLocal() {
+  try { const r = await fetch(LOCAL + "/slots", { signal: AbortSignal.timeout(3000) }); if (!r.ok) return null; const s = await r.json(); return Array.isArray(s) ? s.some((x) => x.is_processing) : null; } catch { return null; }
 }
 
 // --- Internas ---

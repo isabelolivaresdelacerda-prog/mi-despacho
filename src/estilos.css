@@ -389,3 +389,5 @@ label small { font-size: 12px; }
 .ce-check input { width: auto; flex: none; margin-top: 3px; }
 .fila-checks { display: grid; gap: 6px; margin: 10px 0; font-size: 13.5px; }
 .fila-checks label { display: flex; gap: 8px; align-items: flex-start; }
+.aviso-ia-clave { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex-basis: 100%; }
+.aviso-ia-clave input { flex: 1 1 220px; }

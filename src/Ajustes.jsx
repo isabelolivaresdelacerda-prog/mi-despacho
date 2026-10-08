@@ -93,11 +93,11 @@ export function FormIA() {
       </fieldset>
       <EstadoIALocal compacto />
       {(() => { const n = Object.values(claves).filter(Boolean).length; return (
-        <p className={n ? "muted" : "pend"}>{n ? `Tienes ${n} clave${n > 1 ? "s" : ""} de IA en la nube guardada${n > 1 ? "s" : ""} en este navegador.` : "No tienes ninguna clave de IA en la nube en esta dirección. Por seguridad las claves no se copian de la dirección antigua ni se guardan en tu cuenta: vuelve a pegarlas abajo (son gratis)."}</p>); })()}
+        <p className={n ? "muted" : "pend"}>{n ? `Tienes ${n} clave${n > 1 ? "s" : ""} de IA en la nube guardada${n > 1 ? "s" : ""} (cifradas en tu cuenta).` : "No tienes ninguna clave de IA en la nube en esta dirección. Pega abajo al menos la de Google (es gratis): se guardará cifrada en tu cuenta y no tendrás que volver a ponerla."}</p>); })()}
       {modo !== "nube" && <p className="muted pequeño">Las claves solo se usan si eliges «En mi ordenador y, si no está, en la nube». Puedes dejarlas puestas igualmente.</p>}
       {(<>
         <p className="nota"><strong>Ojo con los datos personales:</strong> en la nube el texto sale de tu ordenador, y en los planes gratuitos el proveedor puede usarlo para mejorar sus productos. No lo uses con contratos con datos reales de clientes.</p>
-        <p className="muted">Orden en la nube: Google (Gemma 4, Gemini) → Groq → Cerebras → Mistral → GitHub → OpenRouter y, solo si se agotan todas, Claude (de pago, siempre te pregunta antes). Tus claves se guardan solo en este navegador.</p>
+        <p className="muted">Orden en la nube: Google (Gemma 4, Gemini) → Groq → Cerebras → Mistral → GitHub → OpenRouter y, solo si se agotan todas, Claude (de pago, siempre te pregunta antes). Tus claves se guardan cifradas en tu cuenta: solo tú puedes leerlas, con tu entrada en dos pasos.</p>
         <details className="pasos-clave" open={!Object.values(claves).some(Boolean)}><summary><strong>Cómo conseguir una clave gratis (2 minutos)</strong></summary>
           <ol>
             <li>Pulsa <strong>«Conseguir clave»</strong> en Google (la primera de la lista). Se abre la web de Google AI Studio: entra con tu cuenta de Gmail.</li>
@@ -117,7 +117,7 @@ export function FormIA() {
           </label>
         ))}
         <div className="acciones">
-          <button className="btn" type="button" onClick={() => { guardarClaves(claves); aviso("Claves guardadas en este navegador"); }}>Guardar claves</button>
+          <button className="btn" type="button" onClick={() => { guardarClaves(claves); aviso("Claves guardadas (cifradas en tu cuenta: valen en cualquier ordenador)"); }}>Guardar claves</button>
           <button className="btn ghost" type="button" onClick={() => { borrarClaves(); setClaves({}); aviso("Claves borradas"); }}>Borrar mis claves</button>
         </div>
       </>)}
