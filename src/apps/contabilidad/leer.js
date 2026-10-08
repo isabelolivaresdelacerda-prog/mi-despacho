@@ -47,8 +47,8 @@ async function ocrPDF(doc, paginas) {
 export async function textoImagen(file) { const w = await trabajadorOCR(); return (await w.recognize(file)).data.text; }
 
 const PROMPT = `Eres un extractor de facturas españolas. Lee el texto de la factura y responde SOLO con un JSON con esta estructura exacta:
-{"numero":"","fecha":"dd/mm/aaaa","proveedor":"","nif_proveedor":"","iban_proveedor":"","cliente":"","nif_cliente":"","base":0.0,"iva_pct":0.0,"iva_importe":0.0,"retencion_pct":0.0,"retencion_importe":0.0,"total":0.0,"concepto":""}
-Reglas: el proveedor es quien EMITE la factura (si no pone su nombre, deja proveedor vacío pero copia su IBAN de cobro en iban_proveedor); el texto puede venir de un OCR con errores; importes como número con punto decimal; si no aparece un dato, déjalo vacío o a 0. No inventes nada.
+{"numero":"","fecha":"dd/mm/aaaa","proveedor":"","nif_proveedor":"","iban_proveedor":"","cliente":"","nif_cliente":"","base":0.0,"iva_pct":0.0,"iva_importe":0.0,"retencion_pct":0.0,"retencion_importe":0.0,"gastos_suplidos":0.0,"total":0.0,"moneda":"EUR","isp":false,"concepto":""}
+Reglas: el proveedor es quien EMITE la factura (si no pone su nombre, deja proveedor vacío pero copia su IBAN de cobro en iban_proveedor); el texto puede venir de un OCR con errores; gastos_suplidos = importes «no sujetos» o suplidos que suman al total sin IVA; isp = true si la factura es de un proveedor extranjero sin IVA español o dice «reverse charge» / «inversión del sujeto pasivo»; moneda = la de la factura (EUR, USD…); importes como número con punto decimal; si no aparece un dato, déjalo vacío o a 0. No inventes nada.
 
 TEXTO:
 `;

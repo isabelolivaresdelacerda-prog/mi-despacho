@@ -96,9 +96,16 @@ export function generarDiario({ facturas, emitidas = [], movimientos }, vinculad
     if (!f.total) continue;
     const cta = sub("410", f.proveedor, f.nif_proveedor);
     const c = `${f.proveedor || "Proveedor"} ${f.numero || ""}`.trim();
+    // Suplidos (no sujetos: papel timbrado, Registro, tasas…): van al gasto y al total, sin IVA. Así el asiento siempre cuadra.
+    const suplidos = r2(f.total - (f.base + f.iva_importe - f.retencion_importe));
+    // Inversión del sujeto pasivo (proveedor extranjero sin IVA español: Anthropic, Base44, Hostinger…): autorrepercusión 472/477
+    const isp = f.isp ? r2(num(f.isp_importe) || f.base * (num(f.isp_pct) || 21) / 100) : 0;
     asiento(f.fecha, `Factura ${c}`, [
       { cuenta: f.cuenta_pgc || "629", debe: f.base },
+      { cuenta: f.cuenta_pgc || "629", titulo: "Suplidos", debe: suplidos > 0.009 ? suplidos : 0 },
       { cuenta: "472", debe: f.iva_importe },
+      { cuenta: "472", titulo: "IVA soportado (inversión del sujeto pasivo)", debe: isp },
+      { cuenta: "477", titulo: "IVA repercutido (inversión del sujeto pasivo)", haber: isp },
       { cuenta: "4751", haber: f.retencion_importe },
       { cuenta: cta, titulo: f.proveedor, nif: f.nif_proveedor, haber: f.total },
     ], "factura", f.archivo);

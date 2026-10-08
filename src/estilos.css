@@ -387,3 +387,5 @@ label small { font-size: 12px; }
 /* Casilla con texto (antes en encargo/contrato.css; la usa también «Enviar a la gestoría») */
 .ce-check { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.4; color: var(--tinta); }
 .ce-check input { width: auto; flex: none; margin-top: 3px; }
+.fila-checks { display: grid; gap: 6px; margin: 10px 0; font-size: 13.5px; }
+.fila-checks label { display: flex; gap: 8px; align-items: flex-start; }
