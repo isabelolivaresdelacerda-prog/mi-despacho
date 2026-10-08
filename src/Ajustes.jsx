@@ -1,5 +1,4 @@
 import DatosEmpresa from "./lib/DatosEmpresa.jsx";
-import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import { useState } from "react";
 import { PROVEEDORES, leerClaves, guardarClaves, borrarClaves, leerModo, guardarModo } from "./ia-navegador.js";
@@ -153,7 +152,6 @@ export default function Ajustes({ config, guardar }) {
           <button className="btn" type="button" onClick={() => { guardar(datos); aviso("Guardado"); }}>Guardar</button>
         </section>
 
-        <CarpetasEmpresa config={datos} guardar={(c) => { setDatos(c); guardar({ ...config, sector: c.sector }); }} />
 
         <section className="tarjeta"><PlantillasCorreo /></section>
 

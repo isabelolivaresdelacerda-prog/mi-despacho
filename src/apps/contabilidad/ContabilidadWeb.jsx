@@ -1,7 +1,8 @@
 // Mi contabilidad: la app vive en Mi Despacho y los documentos se quedan en la carpeta de la empresa (OneDrive / Drive).
 import { useEffect, useMemo, useState } from "react";
+import { raizGuardada, buscarContabilidad, permiso as permisoRaiz } from "../../lib/carpetas.js";
 import {
-  soportado, carpetaGuardada, elegirCarpeta, olvidarCarpeta, permiso, cargarTodo, CARPETAS, listar, abrir, subir,
+  soportado, cargarTodo, CARPETAS, listar, abrir, subir,
   guardarEdicion, guardarLectura, guardarVinculo, eur, fechaOrden, trimestre, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
 } from "./datos.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
@@ -27,46 +28,53 @@ export default function ContabilidadWeb({ config }) {
     setCargando(false);
   };
 
-  useEffect(() => {
-    (async () => {
-      const h = await carpetaGuardada();
-      if (!h) return;
-      setRaiz(h);
-      if (await permiso(h, false)) cargar(h); else setNecesitaPermiso(true);
-    })();
-  }, []);
+  const [empresa, setEmpresa] = useState(undefined); // carpeta raíz de la empresa
+  const [sinConta, setSinConta] = useState(false);
+  const localizar = async (r, pedir = false) => {
+    if (!(await permisoRaiz(r, pedir))) { setNecesitaPermiso(true); return; }
+    setNecesitaPermiso(false);
+    const h = await buscarContabilidad(r);
+    if (!h) { setSinConta(true); return; }
+    setSinConta(false); setRaiz(h); cargar(h);
+  };
+  useEffect(() => { (async () => { const r = await raizGuardada(); setEmpresa(r || null); if (r) localizar(r); })(); }, []);
 
   if (!soportado()) return (
     <div className="app"><Cabecera />
       <div className="vacio"><p><strong>Abre Mi Despacho con Chrome o Edge en tu ordenador.</strong></p>
-        <p>La contabilidad trabaja directamente sobre la carpeta de tu empresa (la que se sincroniza con OneDrive o Google Drive), y eso solo lo permiten estos navegadores.</p></div>
+        <p>La contabilidad trabaja directamente sobre la carpeta de tu empresa en OneDrive o Google Drive, y eso solo lo permiten estos navegadores.</p></div>
     </div>
   );
-
-  if (!raiz) return (
+  if (empresa === undefined) return <div className="app"><Cabecera /></div>;
+  if (!empresa) return (
     <div className="app"><Cabecera />
       <div className="vacio">
-        <p><strong>Elige la carpeta de contabilidad de tu empresa.</strong></p>
-        <p>Es la carpeta de tu OneDrive o Google Drive donde están las subcarpetas <code>facturas</code>, <code>documentos_banco</code>, <code>extractos</code>… Por ejemplo: <em>004 ADMINISTRACIÓN › contabilidad - beatriz</em>.</p>
-        <p className="muted">Tus documentos no salen de tu ordenador: Mi Despacho los lee ahí mismo. Si la gestoría tiene la carpeta compartida, ve lo mismo que tú.</p>
-        <button className="btn" type="button" onClick={async () => { try { const h = await elegirCarpeta(); setRaiz(h); cargar(h); } catch { /* cancelado */ } }}>Elegir carpeta</button>
+        <p><strong>Primero elige la carpeta de tu empresa.</strong></p>
+        <p>Es la carpeta de tu OneDrive con el nombre de la empresa (por ejemplo, <em>beatriz</em>). La contabilidad está dentro, en <em>004 ADMINISTRACIÓN › contabilidad</em>.</p>
+        <a className="btn" href="#/carpetas">Configurar carpetas</a>
       </div>
     </div>
   );
-
   if (necesitaPermiso) return (
-    <div className="app"><Cabecera carpeta={raiz.name} />
-      <div className="vacio"><p>Para seguir, permite a Mi Despacho abrir la carpeta <strong>{raiz.name}</strong>.</p>
-        <button className="btn" type="button" onClick={async () => { if (await permiso(raiz)) { setNecesitaPermiso(false); cargar(raiz); } }}>Permitir</button></div>
+    <div className="app"><Cabecera carpeta={empresa.name} />
+      <div className="vacio"><p>Para seguir, permite a Mi Despacho abrir la carpeta <strong>{empresa.name}</strong>.</p>
+        <button className="btn" type="button" onClick={() => localizar(empresa, true)}>Permitir</button></div>
     </div>
   );
+  if (sinConta) return (
+    <div className="app"><Cabecera carpeta={empresa.name} />
+      <div className="vacio"><p>No hay carpeta de contabilidad en <strong>{empresa.name} › 004 ADMINISTRACIÓN</strong>.</p>
+        <button className="btn" type="button" onClick={async () => { const h = await buscarContabilidad(empresa, true, (config?.nombre || "").split(/[ ,]/)[0].toLowerCase()); setSinConta(false); setRaiz(h); cargar(h); }}>Crear la carpeta de contabilidad</button></div>
+    </div>
+  );
+  if (!raiz) return <div className="app"><Cabecera carpeta={empresa.name} /></div>;
 
   return (
     <div className="app">
-      <Cabecera carpeta={raiz.name} acciones={<>
+      <Cabecera carpeta={`${empresa.name} › 004 ADMINISTRACIÓN › ${raiz.name}`} acciones={<>
         <button className="btn" type="button" disabled={!datos} onClick={() => setEnviar(true)}>Enviar a la gestoría</button>
         <button className="btn ghost" type="button" onClick={() => cargar()}>{cargando ? "Leyendo…" : "Actualizar"}</button>
-        <button className="btn ghost" type="button" onClick={async () => { await olvidarCarpeta(); setRaiz(null); setDatos(null); }}>Cambiar carpeta</button>
+        <a className="btn ghost" href="#/carpetas">Carpetas</a>
       </>} />
       <nav className="cont-tabs" role="tablist">
         {PESTANAS.map(([k, t]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t}</button>)}

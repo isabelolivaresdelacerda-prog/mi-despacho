@@ -206,3 +206,16 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .rejilla-2 .ancho { grid-column: 1 / -1; }
 .ce-sub { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--suave); margin: 4px 0 0; }
 @media (max-width: 600px) { .rejilla-2 { grid-template-columns: 1fr; } }
+
+.asistente .pasos { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 14px; }
+.asistente .pasos > li { padding-left: 4px; }
+.asistente .pasos > li.hecho::marker { color: #1d7a46; font-weight: 700; }
+.asistente .pasos .acciones, .asistente .pasos select, .asistente .pasos .fila { margin-top: 8px; }
+.estructura { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.estructura li { display: flex; gap: 10px; align-items: flex-start; }
+.estructura .subs { font-size: 12px; margin-top: 2px; }
+.marca-est { flex: none; min-width: 38px; text-align: center; font-size: 12px; border-radius: 6px; padding: 1px 4px; background: var(--superficie); border: 1px solid var(--linea); }
+.marca-est.si { color: #1d7a46; border-color: #1d7a46; }
+.marca-est.no { color: var(--aviso); border-color: var(--aviso); }
+.migas { font-size: 14px; margin-bottom: 10px; }
+.carpeta-item { font-weight: 500; }

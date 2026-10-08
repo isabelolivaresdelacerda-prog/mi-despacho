@@ -4,6 +4,7 @@ import { GuardarEnNube, RevisionIA, useAviso } from "../comunes.jsx";
 import NegocioCampos from "./cuentas/NegocioCampos.jsx";
 import { NEGOCIO_VACIO, describirNegocio, estimacionesNegocio, perimetroNegocio, anexoNegocio } from "./cuentas/negocio.js";
 import { DialogoCorreo } from "../lib/CorreoUI.jsx";
+import { guardar as guardarEnCarpeta, raizGuardada, DESTINO } from "../lib/carpetas.js";
 
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const fmtFecha = (v) => { if (!v) return "[●]"; const [y, m, d] = v.split("-").map(Number); return d + " de " + MESES[m - 1] + " de " + y; };
@@ -164,7 +165,11 @@ export default function ContratoCEP({ config, irAAjustes }) {
     const nombre = "Contrato cuentas en participacion - " + ((d.p_nombre || "participe").trim()) + ".docx";
     try {
       const blob = await bloquesADocx(bloques);
-      setDoc({ blob, nombre }); // abre automáticamente "¿Quieres guardarlo en tu Drive?"
+      if (await raizGuardada()) {
+        const r = await guardarEnCarpeta(blob, nombre, DESTINO.cuentas_participacion);
+        if (r.modo === "carpeta") { aviso("Guardado en " + r.ruta); return; }
+      }
+      setDoc({ blob, nombre }); // sin carpeta de empresa: "¿Quieres guardarlo en tu Drive?"
     } catch {
       aviso("No se pudo crear el Word. Prueba con «Copiar texto».");
     }

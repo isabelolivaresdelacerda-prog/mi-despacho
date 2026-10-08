@@ -5,7 +5,8 @@ import Bienvenida from "./Bienvenida.jsx";
 import Ajustes from "./Ajustes.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
-import Carpeta from "./apps/Carpeta.jsx";
+import Explorador from "./lib/Explorador.jsx";
+import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
 import Usuarios from "./Usuarios.jsx";
@@ -17,14 +18,14 @@ const MENU = [
     app: "contabilidad", titulo: "Contabilidad", icono: "€",
     hijos: [
       { ruta: "contabilidad", titulo: "Mi contabilidad" },
-      { ruta: "contabilidad/carpeta", titulo: "Mi carpeta" },
+      { ruta: "contabilidad/carpeta", titulo: "Carpeta de contabilidad" },
     ],
   },
   {
     app: "contratos", titulo: "Contratos", icono: "§",
     hijos: [
       { grupo: "Crear", hijos: [{ ruta: "contratos/crear/cuentas-participacion", titulo: "Contrato de cuentas en participación" }, { ruta: "contratos/crear/encargo-tratamiento", titulo: "Contrato de encargo del tratamiento (RGPD)" }] },
-      { ruta: "contratos/carpeta", titulo: "Mi carpeta de contratos" },
+      { ruta: "contratos/carpeta", titulo: "Carpeta de la empresa" },
     ],
   },
 ];
@@ -111,11 +112,13 @@ export default function App() {
     case "contratos/crear/encargo-tratamiento":
       vista = <div className="app"><ContratoEncargo /></div>; break;
     case "contratos/carpeta":
-      vista = <Carpeta titulo="Mi carpeta de contratos" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} irAAjustes={irAAjustes} />; break;
+      vista = <Explorador titulo="Carpeta de la empresa" eyebrow="Contratos" />; break;
+    case "carpetas":
+      vista = <div className="app"><header className="app-cab"><div><div className="eyebrow">Mi empresa</div><h1>Carpetas de la empresa</h1></div></header><CarpetasEmpresa config={config} guardar={guardar} /></div>; break;
     case "contabilidad":
       vista = <ContabilidadWeb config={config} />; break;
     case "contabilidad/carpeta":
-      vista = <Carpeta titulo="Mi carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} irAAjustes={irAAjustes} />; break;
+      vista = <Explorador titulo="Carpeta de contabilidad" eyebrow="Contabilidad" contabilidad />; break;
     case "usuarios":
       vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
     case "ajustes":
@@ -150,6 +153,7 @@ export default function App() {
           ))}
           <div className="menu-pie">
             {yo.rol === "admin" && <Item r="usuarios">👤 Usuarios {pendientes > 0 && <span className="insignia" title="Solicitudes de acceso pendientes">{pendientes}</span>}</Item>}
+            <Item r="carpetas">📁 Carpetas de la empresa</Item>
             <Item r="ajustes">⚙ Ajustes</Item>
             <button className="menu-item salir" type="button" onClick={salir}>Salir ({yo.email})</button>
             <div className="nube-actual">Documentos en {NUBES[config.nube].nombre}</div>

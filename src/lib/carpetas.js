@@ -77,12 +77,16 @@ export async function crearEstructura(sector) {
   if (!raiz || !(await permiso(raiz))) throw new Error("Elige primero la carpeta de la empresa.");
   let creadas = 0;
   const asegurar = async (dir, nombre) => {
-    try { return await dir.getDirectoryHandle(nombre); }
-    catch { creadas++; return await dir.getDirectoryHandle(nombre, { create: true }); }
+    const h = await subcarpeta(dir, nombre, false);
+    if (h) return h;
+    creadas++; return await dir.getDirectoryHandle(nombre, { create: true });
   };
   for (const c of SECTORES[sector].estructura) {
     const d = await asegurar(raiz, c.carpeta);
-    for (const s of c.sub) await asegurar(d, s);
+    for (const s of c.sub) {
+      if (s === "contabilidad" && (await buscarContabilidad(raiz))) continue; // ya existe "contabilidad - …"
+      await asegurar(d, s);
+    }
   }
   return creadas;
 }
@@ -92,8 +96,7 @@ export async function crearProyecto(sector, nombre) {
   const raiz = await raizGuardada();
   if (!raiz || !(await permiso(raiz))) throw new Error("Elige primero la carpeta de la empresa.");
   const cfg = SECTORES[sector].proyectos;
-  let dir = raiz;
-  for (const p of cfg.padre.split("/")) dir = await dir.getDirectoryHandle(p, { create: true });
+  const dir = await abrirRuta(raiz, cfg.padre.split("/"), true);
   const limpio = nombre.replace(/[\\/:*?"<>|]/g, "").trim();
   const pd = await dir.getDirectoryHandle(limpio, { create: true });
   for (const s of cfg.sub) await pd.getDirectoryHandle(s, { create: true });
@@ -132,9 +135,9 @@ export async function olvidarRaiz() {
   try { await idb("readwrite", s => s.delete(KEY)); } catch { /* nada */ }
 }
 
-async function permiso(h) {
+export async function permiso(h, pedir = true) {
   if ((await h.queryPermission({ mode: "readwrite" })) === "granted") return true;
-  return (await h.requestPermission({ mode: "readwrite" })) === "granted";
+  return pedir && (await h.requestPermission({ mode: "readwrite" })) === "granted";
 }
 
 function descargar(blob, nombre) {
@@ -151,8 +154,7 @@ export async function guardar(blob, nombre, ruta) {
   let raiz = await raizGuardada();
   if (!raiz) { descargar(blob, nombre); return { modo: "descarga" }; }
   if (!(await permiso(raiz))) { descargar(blob, nombre); return { modo: "descarga" }; }
-  let dir = raiz;
-  for (const parte of ruta) dir = await dir.getDirectoryHandle(parte, { create: true });
+  const dir = await abrirRuta(raiz, ruta, true);
   const [base, ext] = nombre.match(/^(.*?)(\.[^.]+)?$/).slice(1);
   let final = nombre;
   for (let i = 2; i < 100; i++) {
@@ -163,3 +165,42 @@ export async function guardar(blob, nombre, ruta) {
   await w.write(blob); await w.close();
   return { modo: "carpeta", ruta: [raiz.name, ...ruta, final].join(" › ") };
 }
+
+// ---- Búsqueda tolerante: "004 ADMINISTRACIÓN" encuentra "004 administracion", con o sin tildes ----
+const norm = (x) => String(x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+export async function subcarpeta(dir, nombre, crear = false) {
+  try { return await dir.getDirectoryHandle(nombre); } catch { /* sigue */ }
+  for await (const [n, h] of dir.entries()) if (h.kind === "directory" && norm(n) === norm(nombre)) return h;
+  return crear ? await dir.getDirectoryHandle(nombre, { create: true }) : null;
+}
+export async function abrirRuta(raiz, partes, crear = false) {
+  let d = raiz;
+  for (const p of partes) { d = await subcarpeta(d, p, crear); if (!d) return null; }
+  return d;
+}
+
+// Carpeta de contabilidad: dentro de 004 ADMINISTRACIÓN, la que empiece por "contabilidad" (p. ej. "contabilidad - beatriz")
+export async function buscarContabilidad(raiz, crear = false, empresa = "") {
+  const adm = await abrirRuta(raiz, ["004 ADMINISTRACIÓN"], crear);
+  if (!adm) return null;
+  for await (const [n, h] of adm.entries()) if (h.kind === "directory" && norm(n).startsWith("contabilidad")) return h;
+  return crear ? await adm.getDirectoryHandle(empresa ? `contabilidad - ${empresa}` : "contabilidad", { create: true }) : null;
+}
+
+// Qué se guarda en cada carpeta (para explicarlo en pantalla)
+export const QUE_VA = {
+  "001 corporate": "La vida de la sociedad: escrituras, estatutos, actas de junta y certificaciones, libro de socios, imagen corporativa y contratos con partícipes.",
+  "002 ACQUISITION": "Compra de activos: arras, compraventas, notas simples, memorandos y cuadros de fuentes y usos.",
+  "002 PRODUCCIONES": "Cada producción (concierto, gira, musical) en su carpeta: presupuesto, contratos con artistas y salas, permisos.",
+  "002 PRODUCCION": "Fabricación: fichas técnicas, órdenes de fabricación y control de calidad.",
+  "002 CLIENTES": "Propuestas, contratos y entregables de cada cliente.",
+  "003 FINANCING": "Financiación: préstamos, inversores, subvenciones, patrocinios.",
+  "004 ADMINISTRACIÓN": "Banco, contabilidad (facturas, extractos, justificantes), contratos con gestoría y proveedores de servicios y, en su caso, laboral.",
+  "005 TECHNICAL": "Documentación técnica: proyectos, licencias, certificaciones, informes técnicos.",
+  "006 MANAGEMENT": "Gestión del día a día: presupuestos, seguimiento, informes a socios.",
+  "006 COMERCIAL": "Clientes, distribuidores, pedidos y marketing.",
+  "007 NUEVAS INVERSIONES": "Una carpeta por cada oportunidad o inversión nueva que se estudia.",
+  "007 DERECHOS": "Propiedad intelectual: derechos de autor, licencias, masters y marcas.",
+  "007 COMPRAS": "Proveedores, materias primas y logística.",
+  "007 PROYECTOS": "Una carpeta por proyecto.",
+};
