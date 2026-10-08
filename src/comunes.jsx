@@ -103,7 +103,7 @@ export function EstadoIALocal({ compacto }) {
     <div className="ia-local falta">
       <p><strong>La IA de tu ordenador está apagada o no está instalada.</strong></p>
       {!compacto && <p>Para que tus contratos no salgan de tu ordenador, la IA trabaja en él. No hace falta ninguna clave. Solo usa memoria mientras la tienes encendida: al cerrar su ventana, la memoria queda libre del todo.</p>}
-      <p><strong>Si ya la tienes instalada:</strong> abre en tu escritorio <em>«IA local de Mi Despacho»</em>, espera a que diga que está lista y pulsa <button className="enlace" type="button" onClick={comprobar}>Comprobar de nuevo</button>.</p>
+      <p><strong>Si ya la tienes instalada:</strong> <a className="btn" href="midespacho-ia://encender" onClick={() => setTimeout(comprobar, 20000)}>Encender la IA</a> (Chrome te preguntará si abrir «IA local de Mi Despacho»: marca «Permitir siempre» y pulsa Abrir). Se abre una ventana negra; cuando diga <em>server is listening</em>, pulsa <button className="enlace" type="button" onClick={comprobar}>Comprobar de nuevo</button>. También puedes abrirla desde el icono del escritorio.</p>
       <p><strong>Si es la primera vez:</strong></p>
       <ol>
         <li><a className="btn" href="/instalar-ia-local.bat" download>Descargar el instalador</a></li>

@@ -126,7 +126,7 @@ export default function Ajustes({ config, guardar }) {
         <div>
           <div className="eyebrow">Ajustes</div>
           <h1>Mi despacho</h1>
-          <p className="muted">Todo se guarda solo en este navegador.</p>
+          <p className="muted">Se guarda en tu cuenta: lo verás igual en cualquier ordenador.</p>
         </div>
       </header>
 
@@ -154,7 +154,7 @@ export default function Ajustes({ config, guardar }) {
         </section>
 
 
-        <section className="tarjeta"><PlantillasCorreo /></section>
+        <a className="tarjeta enlace-tarjeta" href="#/correos"><strong>✉️ Plantillas de correo</strong><span className="muted">Ahora tienen su propio apartado en el menú: Herramientas → Plantillas de correo.</span></a>
 
         <section className="tarjeta">
           <h2>Apps contratadas</h2>
@@ -167,7 +167,8 @@ export default function Ajustes({ config, guardar }) {
 
         <section className="tarjeta">
           <h2>Inteligencia artificial</h2>
-          <FormIA />
+          <p className="muted">Ahora está en el menú: Herramientas → IA gratis en tu ordenador.</p>
+          <a className="btn" href="#/ia">Abrir</a>
         </section>
       </div>
       {nodo}

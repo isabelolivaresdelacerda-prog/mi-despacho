@@ -77,6 +77,13 @@ $acceso.WorkingDirectory = $carpeta
 $acceso.Description = "Enciende la IA local de Mi Despacho (ciérrala para liberar la memoria)"
 $acceso.Save()
 
+# Botón «Encender la IA» de Mi Despacho: enlace midespacho-ia:// que abre esta ventana (solo para tu usuario)
+$k = "HKCU:\Software\Classes\midespacho-ia"
+New-Item -Path "$k\shell\open\command" -Force | Out-Null
+Set-ItemProperty -Path $k -Name "(default)" -Value "URL:Mi Despacho IA local"
+Set-ItemProperty -Path $k -Name "URL Protocol" -Value ""
+Set-ItemProperty -Path "$k\shell\open\command" -Name "(default)" -Value ('cmd.exe /c start "IA local de Mi Despacho" "' + $encender + '"')
+
 # 4) Encenderla ya (la primera vez descarga el modelo)
 Paso "Encendiendo la IA. La primera vez descarga Gemma 4: puede tardar varios minutos."
 Start-Process -FilePath $encender

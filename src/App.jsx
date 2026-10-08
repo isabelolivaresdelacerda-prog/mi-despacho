@@ -4,6 +4,7 @@ import { NUBES } from "./nube.js";
 import Bienvenida from "./Bienvenida.jsx";
 import Ajustes, { FormIA } from "./Ajustes.jsx";
 import { EstadoIALocal } from "./comunes.jsx";
+import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
@@ -194,6 +195,8 @@ export default function App() {
       vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
     case "ia":
       vista = <PaginaIA />; break;
+    case "correos":
+      vista = <div className="app"><header className="app-cab"><div><div className="eyebrow">Herramientas</div><h1>Plantillas de correo</h1><p className="muted">Los textos que la app usa al preparar correos (a la gestoría, a clientes, avisos…).</p></div></header><section className="tarjeta"><PlantillasCorreo /></section></div>; break;
     case "ajustes":
       vista = <><Ajustes config={config} guardar={guardar} /><div className="app"><AccesosEmpresa empresa={empresa} yo={yo} esTitular={empresa.rol === "titular"} /></div></>; break;
     default:
@@ -244,7 +247,6 @@ export default function App() {
           <Seccion titulo="General">
             <Item r="inicio" icono="inicio">Inicio</Item>
             <Item r="calendario" icono="calendario">Calendario</Item>
-            <Item r="ia" icono="chispa">Conectar la IA</Item>
           </Seccion>
           {tiene("contabilidad") && <Seccion titulo="Contabilidad">
             <Item r="contabilidad" icono="conta">Mi contabilidad</Item>
@@ -264,6 +266,10 @@ export default function App() {
             </>}
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>
             <Item r="papeleria" icono="papel">Papelería corporativa <em className="pronto">pronto</em></Item>
+          </Seccion>
+          <Seccion titulo="Herramientas">
+            <Item r="ia" icono="chispa">IA gratis en tu ordenador</Item>
+            <Item r="correos" icono="papel">Plantillas de correo</Item>
           </Seccion>
           <Seccion titulo="Ayuda">
             <Item r="guias/asociaciones" icono="guia">Guía: asociaciones</Item>
@@ -317,8 +323,8 @@ function PaginaIA() {
   };
   return (
     <div className="app">
-      <header className="app-cab"><div><div className="eyebrow">General</div><h1>Conectar la IA</h1>
-        <p className="muted">La IA lee tus facturas, escrituras y extractos en tu propio ordenador. Ningún documento sale de él.</p></div></header>
+      <header className="app-cab"><div><div className="eyebrow">Herramientas</div><h1>IA gratis en tu ordenador</h1>
+        <p className="muted">Gratis y en tu PC: lee tus facturas, escrituras y extractos en tu propio ordenador. Tus datos no salen de él ni se comparten con ninguna empresa de IA.</p></div></header>
       <section className="tarjeta">
         <h2>1. Enciende la IA de tu ordenador</h2>
         <EstadoIALocal />
