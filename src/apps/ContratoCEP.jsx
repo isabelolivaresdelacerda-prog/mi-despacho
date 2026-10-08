@@ -7,23 +7,22 @@ import { DialogoCorreo } from "../lib/CorreoUI.jsx";
 import { guardar as guardarEnCarpeta, raizGuardada, DESTINO } from "../lib/carpetas.js";
 
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-const fmtFecha = (v) => { if (!v) return "[●]"; const [y, m, d] = v.split("-").map(Number); return d + " de " + MESES[m - 1] + " de " + y; };
-const fmtEur = (v) => { const n = parseFloat(v); return isNaN(n) ? "[●]" : n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " euros"; };
-const or = (v) => (v || "").trim() || "[●]";
+const fmtFecha = (v, etq = "fecha") => { if (!v) return `[${etq}]`; const [y, m, d] = v.split("-").map(Number); return d + " de " + MESES[m - 1] + " de " + y; };
+const fmtEur = (v) => { const n = parseFloat(v); return isNaN(n) ? "[importe]" : n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " euros"; };
+const or = (v, etq = "●") => (v || "").trim() || `[${etq}]`;
 
 const EJEMPLO = {
-  ciudad: "Madrid", fecha: "2026-10-01",
-  g_nombre: "Promociones Alameda, S.L.", g_nif: "B00000000", g_dom: "calle Ejemplo 1, 28001 Madrid", g_rep: "Ana Pérez Gómez", g_cargo: "administradora única",
-  p_nombre: "Luis Martín Ruiz", p_nif: "00000000T", p_dom: "avenida Ejemplo 2, 28002 Madrid", p_rep: "", p_cargo: "",
-  neg: { ...NEGOCIO_VACIO, tipo: "promocion", denominacion: "Residencial Alameda", actuacion: "la construcción de 24 viviendas con garajes y trasteros",
-    finca_dir: "calle Ejemplo 10, 28001 Madrid", ref_catastral: "0000000AA0000A0001AA", ingresos: "la venta de las viviendas", presupuesto: "3200000", plazo_meses: "30" },
-  importe: "150000", f_aport: "2026-10-15", iban: "ES00 0000 0000 0000 0000 0000",
-  pct: "20", perdidas: "limite", info: "trimestral", dias: "60",
-  dur: "negocio", f_fin: "2028-12-31", trib: "Madrid",
+  ciudad: "", fecha: new Date().toISOString().slice(0, 10),
+  g_nombre: "", g_nif: "", g_dom: "", g_rep: "", g_cargo: "",
+  p_nombre: "", p_nif: "", p_dom: "", p_rep: "", p_cargo: "",
+  neg: { ...NEGOCIO_VACIO },
+  importe: "", f_aport: "", iban: "",
+  pct: "", perdidas: "limite", info: "trimestral", dias: "60",
+  dur: "negocio", f_fin: "", trib: "",
 };
 
 function parte(d, pre, rol) {
-  let s = or(d[pre + "_nombre"]) + ", con NIF " + or(d[pre + "_nif"]) + " y domicilio en " + or(d[pre + "_dom"]);
+  let s = or(d[pre + "_nombre"], rol.toUpperCase()) + ", con NIF " + or(d[pre + "_nif"], "NIF del " + rol) + " y domicilio en " + or(d[pre + "_dom"], "domicilio del " + rol);
   if ((d[pre + "_rep"] || "").trim()) s += ", representada por " + d[pre + "_rep"].trim() + (d[pre + "_cargo"] ? ", en su condición de " + d[pre + "_cargo"].trim() : "");
   return s + " (en adelante, el «" + rol + "»).";
 }
@@ -40,7 +39,7 @@ function construir(d) {
     : "El presente contrato estará en vigor desde su firma hasta la terminación del negocio descrito en la cláusula primera.";
 
   B.push({ t: "title", text: "CONTRATO DE CUENTAS EN PARTICIPACIÓN" });
-  p("En " + or(d.ciudad) + ", a " + fmtFecha(d.fecha) + ".");
+  p("En " + or(d.ciudad, "ciudad") + ", a " + fmtFecha(d.fecha, "fecha") + ".");
   h("REUNIDOS");
   p("De una parte, " + parte(d, "g", "Gestor"));
   p("De otra parte, " + parte(d, "p", "Partícipe"));
@@ -54,20 +53,20 @@ function construir(d) {
   p("III. Que, a tal fin, las partes acuerdan celebrar un contrato de cuentas en participación conforme a los artículos 239 a 243 del Código de Comercio, que se regirá por las siguientes");
   h("CLÁUSULAS");
   p("Por el presente contrato el Partícipe aporta capital al Negocio del Gestor y adquiere el derecho a participar en sus resultados prósperos o adversos en la proporción pactada. " + perimetroNegocio(neg), "Primera. Objeto.");
-  p("El Partícipe aporta la cantidad de " + fmtEur(d.importe) + ", que ingresará mediante transferencia a la cuenta del Gestor " + or(d.iban) + " no más tarde del " + fmtFecha(d.f_aport) + ". El justificante bancario servirá de carta de pago. Desde su entrega, la aportación pasa a ser propiedad del Gestor, que la destinará exclusivamente al Negocio.", "Segunda. Aportación.");
+  p("El Partícipe aporta la cantidad de " + fmtEur(d.importe) + ", que ingresará mediante transferencia a la cuenta del Gestor " + or(d.iban, "IBAN del Gestor") + " no más tarde del " + fmtFecha(d.f_aport, "fecha de desembolso") + ". El justificante bancario servirá de carta de pago. Desde su entrega, la aportación pasa a ser propiedad del Gestor, que la destinará exclusivamente al Negocio.", "Segunda. Aportación.");
   p("El Gestor dirigirá y administrará el Negocio en su propio nombre y bajo su exclusiva responsabilidad, con plena autonomía. El Partícipe no intervendrá en la gestión. Entre las partes no existe sociedad ni razón comercial común (art. 241 del Código de Comercio).", "Tercera. Gestión.");
   p("Los terceros que contraten con el Gestor solo tendrán acción contra este, y no contra el Partícipe (art. 242 del Código de Comercio).", "Cuarta. Responsabilidad frente a terceros.");
-  p("El Partícipe tendrá derecho al " + or(d.pct) + " % de los beneficios netos del Negocio. " + perd, "Quinta. Participación en resultados.");
+  p("El Partícipe tendrá derecho al " + or(d.pct, "porcentaje") + " % de los beneficios netos del Negocio. " + perd, "Quinta. Participación en resultados.");
   p("El Gestor informará al Partícipe con periodicidad " + or(d.info) + " sobre la marcha del Negocio y pondrá a su disposición la documentación que lo justifique. Al terminar el Negocio, rendirá una cuenta final justificada de su resultado (art. 243 del Código de Comercio).", "Sexta. Información y rendición de cuentas.");
   p(dur + " Cualquiera de las partes podrá resolverlo si la otra incumple gravemente sus obligaciones y no lo subsana en los treinta días siguientes a ser requerida por escrito.", "Séptima. Duración.");
-  p("Terminado el contrato, el Gestor practicará la liquidación y, en el plazo de " + or(d.dias) + " días desde la rendición de la cuenta final, abonará al Partícipe su aportación incrementada con la parte de beneficios o, en su caso, minorada con la parte de pérdidas que le corresponda.", "Octava. Liquidación.");
+  p("Terminado el contrato, el Gestor practicará la liquidación y, en el plazo de " + or(d.dias, "número de") + " días desde la rendición de la cuenta final, abonará al Partícipe su aportación incrementada con la parte de beneficios o, en su caso, minorada con la parte de pérdidas que le corresponda.", "Octava. Liquidación.");
   p("Cada parte cumplirá las obligaciones fiscales que le correspondan. El Gestor practicará las retenciones o ingresos a cuenta que procedan sobre las cantidades que abone al Partícipe.", "Novena. Fiscalidad.");
   p("El Partícipe declara que los fondos aportados tienen origen lícito y se compromete a facilitar al Gestor la documentación que este le solicite para cumplir la normativa de prevención del blanqueo de capitales.", "Décima. Prevención del blanqueo de capitales.");
   p("Ninguna de las partes podrá ceder su posición en este contrato sin el consentimiento previo y por escrito de la otra.", "Undécima. Cesión.");
   p("Las partes guardarán confidencialidad sobre el contenido de este contrato y sobre la información del Negocio, salvo obligación legal o requerimiento de autoridad.", "Duodécima. Confidencialidad.");
-  p("Este contrato se rige por la ley española. Para cualquier controversia, las partes se someten a los juzgados y tribunales de " + or(d.trib) + ".", "Decimotercera. Ley aplicable y jurisdicción.");
+  p("Este contrato se rige por la ley española. Para cualquier controversia, las partes se someten a los juzgados y tribunales de " + or(d.trib, "ciudad") + ".", "Decimotercera. Ley aplicable y jurisdicción.");
   p("Y en prueba de conformidad, las partes firman el presente contrato por duplicado y a un solo efecto en el lugar y fecha indicados en el encabezamiento.");
-  B.push({ t: "sig", a: "El Gestor\n" + or(d.g_nombre) + (d.g_rep ? "\np.p. " + d.g_rep : ""), b: "El Partícipe\n" + or(d.p_nombre) + (d.p_rep ? "\np.p. " + d.p_rep : "") });
+  B.push({ t: "sig", a: "El Gestor\n" + or(d.g_nombre, "GESTOR") + (d.g_rep ? "\np.p. " + d.g_rep : ""), b: "El Partícipe\n" + or(d.p_nombre, "PARTÍCIPE") + (d.p_rep ? "\np.p. " + d.p_rep : "") });
   const anexo = anexoNegocio(neg);
   if (anexo) { h(anexo.titulo); anexo.filas.forEach(([k, v]) => p(v, k + ":")); }
   return B;
@@ -147,7 +146,7 @@ function EditorClausulas({ base, cambios, setCambios, aviso }) {
 }
 
 function Marcas({ texto }) {
-  return texto.split(/(\[●\])/g).map((t, i) => (t === "[●]" ? <mark key={i}>[●]</mark> : t));
+  return texto.split(/(\[[^\]]+\])/g).map((t, i) => (/^\[[^\]]+\]$/.test(t) ? <mark key={i}>{t}</mark> : t));
 }
 
 export default function ContratoCEP({ config, irAAjustes }) {
@@ -203,7 +202,7 @@ export default function ContratoCEP({ config, irAAjustes }) {
         <div>
           <div className="eyebrow">Contratos · Crear</div>
           <h1>Contrato de cuentas en participación</h1>
-          <p className="muted">Rellena los datos y el borrador se escribe solo (arts. 239 a 243 del Código de Comercio). Los datos de ejemplo son inventados.</p>
+          <p className="muted">Rellena los datos y el borrador se escribe solo (arts. 239 a 243 del Código de Comercio). Los huecos entre corchetes se rellenan con tus datos.</p>
         </div>
         <div className="acciones">
           <button className="btn" type="button" onClick={crear}>Crear contrato</button>
