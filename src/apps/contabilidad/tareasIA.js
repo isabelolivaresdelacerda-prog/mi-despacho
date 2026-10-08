@@ -77,7 +77,11 @@ function regla(m) {
     if (/HOSTINGER/.test(c)) return T("Hostinger");
     if (/BASE44|WIX/.test(c)) return T("Base44 (Wix.com Ltd)");
     if (/WIRES/.test(c)) return T("WIRES Women in Real Estate Spain");
+    if (/LA BOHEMIA/.test(c)) return C("629", "Comida La Bohemia (sin ticket: gasto entero, sin IVA)");
   } else {
+    // Desembolsos de una ampliación de capital antes de inscribirla: capital emitido pendiente de inscripción (194).
+    // Al inscribirse la escritura se pasa a capital social (100) y, si la hay, prima de emisión (110).
+    if (/AMPLIACI.N DE CAP|AMPLIACION CAPITAL|PARTICIPACI.N EN BEATRIZ/.test(c)) return C("194", "Desembolso ampliación de capital (pendiente de inscripción)");
     if (/APORTACI/.test(c)) return C("449", "Aportación partícipe Brunete (cuentas en participación)");
     if (/DEVOLUCION|NOTARI|611834570200/.test(c)) return T("Notarios Serrano 41");
   }
