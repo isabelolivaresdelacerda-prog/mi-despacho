@@ -88,6 +88,7 @@ function regla(m) {
     if (/HOSTINGER/.test(c)) return T("Hostinger");
     if (/BASE44|WIX/.test(c)) return T("Base44 (Wix.com Ltd)");
     if (/WIRES/.test(c)) return T("WIRES Women in Real Estate Spain");
+    if (/PARKING|APARCAMIENTO|EMPARK|TELPARK|SABA /.test(c) && /OP\.?TARJ/.test(c)) return C("629", "Aparcamiento (cargo de tarjeta)");
     if (/LA BOHEMIA/.test(c)) return C("629", "Comida La Bohemia (sin ticket: gasto entero, sin IVA)");
   } else {
     // Desembolsos de una ampliación de capital antes de inscribirla: capital emitido pendiente de inscripción (194).
