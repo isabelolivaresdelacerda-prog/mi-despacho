@@ -116,7 +116,9 @@ export function generarDiario({ facturas, emitidas = [], movimientos }, vinculad
       // Pagada por otro (p. ej. Solve con la provisión de fondos): se descuenta de la subcuenta de quien pagó
       const pagador = f._pago.manual ? entidadDe(f._pago.texto, provisionistas) : null;
       const contra = f._pago.manual ? (pagador ? sub("410", pagador) : "551") : "572";
-      asiento(f._pago.fecha || f.fecha, `Pago ${c}${pagador ? ` (por ${pagador})` : ""}`, [{ cuenta: cta, titulo: f.proveedor, debe: f.total }, { cuenta: contra, titulo: pagador || undefined, haber: f.total }], "pago", f.archivo, m ? m._id : null);
+      // Se apunta lo que de verdad salió del banco: si no coincide con la factura, la diferencia queda en la cuenta del proveedor
+      const pagado = m ? Math.abs(m.importe) : f.total;
+      asiento(f._pago.fecha || f.fecha, `Pago ${c}${pagador ? ` (por ${pagador})` : ""}${f._pago.dif ? ` · ojo: ${f._pago.dif > 0 ? "pagado de más" : "pagado de menos"} ${Math.abs(f._pago.dif).toFixed(2)}` : ""}`, [{ cuenta: cta, titulo: f.proveedor, debe: pagado }, { cuenta: contra, titulo: pagador || undefined, haber: pagado }], "pago", f.archivo, m ? m._id : null);
     }
   }
 

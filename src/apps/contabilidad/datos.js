@@ -143,6 +143,23 @@ function mejorMovimiento(movimientos, usados, total, signo, fecha, tercero) {
   return cand[0]?.x || null;
 }
 
+// Movimiento que lleva en el concepto el número de la factura («FRA PRO 05207», «Factura 0716-26», «PRO5337»…)
+function porNumero(movimientos, usados, numero, signo, fecha, total) {
+  const grupos = String(numero || "").match(/\d+/g) || [];
+  const utiles = grupos.map((g) => g.replace(/^0+/, "")).filter((g) => g.length >= 3 && !/^20[2-3]\d$/.test(g));
+  // Si el número es corto («PROY-005/2026»), se busca con sus letras: «PROY005»
+  const alnum = String(numero || "").toUpperCase().replace(/[/-]20[2-3]\d$/, "").replace(/[^A-Z0-9]/g, "");
+  if (!utiles.length && !(alnum.length >= 6 && /[A-Z]/.test(alnum) && /\d/.test(alnum))) return null;
+  const clave = utiles.sort((a, b) => b.length - a.length)[0];
+  const re = clave ? new RegExp(`(?<!\\d)0*${clave}(?!\\d)`) : { test: (t) => t.toUpperCase().replace(/[^A-Z0-9]/g, "").includes(alnum) };
+  const f0 = Date.parse(fechaOrden(fecha)) || 0;
+  const cand = movimientos.filter((x) => !usados.has(x._id) && Math.sign(x.importe) === signo && re.test(String(x.concepto || "").replace(/[\s/.-]/g, " ").replace(/([A-Z])\s+(\d)/gi, "$1$2")))
+    .map((x) => ({ x, dias: ((Date.parse(fechaOrden(x.fecha)) || 0) - f0) / 86400000 }))
+    .filter((c) => c.dias >= -30 && c.dias <= 400)
+    .sort((a, b) => Math.abs(Math.abs(a.x.importe) - total) - Math.abs(Math.abs(b.x.importe) - total) || Math.abs(a.dias) - Math.abs(b.dias));
+  return cand[0]?.x || null;
+}
+
 export async function cargarTodo(raiz) {
   const [cacheF, editsF, editsE, cacheIA, cacheB, extractoApi, vincular, empresa, capital, justManual] = await Promise.all([
     leerJSON(raiz, "cache_facturas.json", {}), leerJSON(raiz, "edits_facturas.json", {}), leerJSON(raiz, "edits_emitidas.json", {}),
@@ -173,13 +190,15 @@ export async function cargarTodo(raiz) {
     }
     if (v && !v.clave_banco) { f._pago = { fecha: v.fecha, texto: v.descripcion, manual: true }; continue; }
     if (!f.total) continue;
-    const m = mejorMovimiento(movimientos, usados, f.total, -1, f.fecha, f.proveedor);
-    if (m) { usados.add(m._id); m._factura = f.archivo; f._pago = { fecha: m.fecha, texto: m.concepto }; }
+    // 1º por el número de factura escrito en el concepto del banco (aunque el importe no coincida: se avisa de la diferencia)
+    let m = porNumero(movimientos, usados, f.numero, -1, f.fecha, f.total);
+    if (!m) m = mejorMovimiento(movimientos, usados, f.total, -1, f.fecha, f.proveedor);
+    if (m) { usados.add(m._id); m._factura = f.archivo; const dif = Math.round((Math.abs(m.importe) - f.total) * 100) / 100; f._pago = { fecha: m.fecha, texto: m.concepto, importe: Math.abs(m.importe), ...(Math.abs(dif) >= 0.01 ? { dif } : {}) }; }
   }
   // Cobros de las facturas emitidas
   for (const f of emitidas.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)))) {
     if (!f.total) continue;
-    const m = mejorMovimiento(movimientos, usados, f.total, 1, f.fecha, f.cliente);
+    const m = porNumero(movimientos, usados, f.numero, 1, f.fecha, f.total) || mejorMovimiento(movimientos, usados, f.total, 1, f.fecha, f.cliente);
     if (m) { usados.add(m._id); m._emitida = f.archivo; f._cobro = { fecha: m.fecha, texto: m.concepto }; }
   }
   // Justificantes individuales del banco (adeudos, transferencias, recibos) en «documentos_banco»
