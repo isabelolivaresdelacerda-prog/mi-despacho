@@ -5,6 +5,7 @@ import {
   guardarEdicion, guardarLectura, guardarVinculo, eur, fechaOrden, trimestre, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
 } from "./datos.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
+import EnviarGestoria from "./EnviarGestoria.jsx";
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
@@ -17,6 +18,7 @@ export default function ContabilidadWeb({ config }) {
   const [tab, setTab] = useState("resumen");
   const [cargando, setCargando] = useState(false);
   const [aviso, nodoAviso] = useAviso();
+  const [enviar, setEnviar] = useState(false);
 
   const cargar = async (h = raiz) => {
     if (!h) return;
@@ -62,6 +64,7 @@ export default function ContabilidadWeb({ config }) {
   return (
     <div className="app">
       <Cabecera carpeta={raiz.name} acciones={<>
+        <button className="btn" type="button" disabled={!datos} onClick={() => setEnviar(true)}>Enviar a la gestoría</button>
         <button className="btn ghost" type="button" onClick={() => cargar()}>{cargando ? "Leyendo…" : "Actualizar"}</button>
         <button className="btn ghost" type="button" onClick={async () => { await olvidarCarpeta(); setRaiz(null); setDatos(null); }}>Cambiar carpeta</button>
       </>} />
@@ -75,6 +78,7 @@ export default function ContabilidadWeb({ config }) {
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
         {tab === "exportar" && <Exportar d={datos} config={config} />}
       </>}
+      {enviar && datos && <EnviarGestoria raiz={raiz} datos={datos} config={config} aviso={aviso} onCerrar={() => setEnviar(false)} />}
       {nodoAviso}
     </div>
   );
