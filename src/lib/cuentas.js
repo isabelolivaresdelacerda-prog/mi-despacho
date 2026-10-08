@@ -87,10 +87,32 @@ export const admin = {
 export async function misEmpresas() {
   const { data, error } = await sb.from("empresas").select("id,nombre,cif,tipo").order("nombre");
   if (error) throw error;
-  return data || [];
+  // Mi papel en cada empresa (titular, gestoría…)
+  const { data: s } = await sb.auth.getSession();
+  const yo = (s?.session?.user?.email || "").toLowerCase();
+  const { data: mias } = await sb.from("empresa_usuarios").select("empresa_id,rol,activo").eq("email", yo);
+  const rol = Object.fromEntries((mias || []).filter((x) => x.activo).map((x) => [x.empresa_id, x.rol]));
+  return (data || []).map((e) => ({ ...e, rol: rol[e.id] || null }));
 }
 export const empresasAdmin = {
   async accesos() { const { data, error } = await sb.from("empresa_usuarios").select("empresa_id,email,rol,activo"); if (error) throw error; return data; },
   async crear(nombre, cif, tipo) { const { data, error } = await sb.rpc("admin_empresa_crear", { p_nombre: nombre, p_cif: cif, p_tipo: tipo }); if (error) throw error; return data; },
   async asignar(empresa, email, rol, activo = true) { const { error } = await sb.rpc("admin_empresa_asignar", { p_empresa: empresa, p_email: email, p_rol: rol, p_activo: activo }); if (error) throw new Error(error.message); },
+};
+
+// ---- Dominio propio de cada empresa y enlace con la gestoría ----
+const rpc = async (f, args) => { const { data, error } = await sb.rpc(f, args); if (error) throw new Error(error.message); return data; };
+export async function empresaPorDominio(dominio = location.hostname) {
+  try { const d = await rpc("empresa_por_dominio", { p_dominio: dominio }); return d?.[0] || null; } catch { return null; }
+}
+export const enlace = {
+  generar: (empresa) => rpc("enlace_generar", { p_empresa: empresa }),
+  canjear: (codigo) => rpc("enlace_canjear", { p_codigo: codigo }),
+  solicitar: (cif, mensaje) => rpc("enlace_solicitar", { p_cif: cif, p_mensaje: mensaje || null }),
+  solicitudes: (empresa) => rpc("enlace_solicitudes", { p_empresa: empresa }),
+  resolver: (id, aceptar, empresa) => rpc("enlace_resolver", { p_id: id, p_aceptar: aceptar, p_empresa: empresa || null }),
+  accesos: (empresa) => rpc("empresa_accesos", { p_empresa: empresa }),
+  quitar: (empresa, email) => rpc("empresa_quitar_acceso", { p_empresa: empresa, p_email: email }),
+  dominios: (empresa) => rpc("empresa_dominios_de", { p_empresa: empresa }),
+  ponerDominio: (empresa, dominio, quitar = false) => rpc("admin_dominio_poner", { p_empresa: empresa, p_dominio: dominio, p_quitar: quitar }),
 };

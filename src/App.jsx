@@ -13,7 +13,8 @@ import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
 import Usuarios from "./Usuarios.jsx";
-import { sb, miFicha, salir as salirCuenta, admin, misEmpresas } from "./lib/cuentas.js";
+import { sb, miFicha, salir as salirCuenta, admin, misEmpresas, empresaPorDominio } from "./lib/cuentas.js";
+import { AccesosEmpresa, VincularEmpresa } from "./lib/Enlaces.jsx";
 import { fijarEspacio, hayDatosAntiguos, moverDatosAntiguos, borrarDatosAntiguos } from "./lib/espacio.js";
 import { recortarLogo } from "./lib/logo.js";
 import { migrarRaizAntigua, borrarRaizAntigua } from "./lib/carpetas.js";
@@ -95,10 +96,13 @@ export default function App() {
   };
   useEffect(() => {
     if (!yo) return;
-    misEmpresas().then((l) => {
+    Promise.all([misEmpresas(), empresaPorDominio()]).then(([l, dom]) => {
       setEmpresas(l);
       let ult = null; try { ult = localStorage.getItem("md-ultima-empresa:" + yo.email); } catch { /* nada */ }
-      if (l.length === 1) elegirEmpresa(l[0]);
+      // Dominio propio de una empresa (midespacho.beatrizinversiones.com): se entra directamente en ella
+      const porDominio = dom && l.find((x) => x.id === dom.id);
+      if (porDominio) elegirEmpresa(porDominio);
+      else if (l.length === 1) elegirEmpresa(l[0]);
       else if (ult && l.length > 1 && yo.rol !== "admin") { const e = l.find((x) => x.id === ult); if (e) elegirEmpresa(e); }
     }).catch(() => setEmpresas([]));
   }, [yo]);
@@ -154,6 +158,8 @@ export default function App() {
     case "empresa/carpeta":
     case "contratos/carpeta":
       vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Documentación" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
+    case "vincular":
+      vista = <VincularEmpresa onHecho={() => misEmpresas().then(setEmpresas)} />; break;
     case "seguridad":
       vista = <Seguridad config={config} />; break;
     case "guias/asociaciones":
@@ -169,7 +175,7 @@ export default function App() {
     case "usuarios":
       vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
     case "ajustes":
-      vista = <Ajustes config={config} guardar={guardar} />; break;
+      vista = <><Ajustes config={config} guardar={guardar} /><div className="app"><AccesosEmpresa empresa={empresa} yo={yo} esTitular={empresa.rol === "titular"} /></div></>; break;
     default:
       vista = <Inicio config={config} ir={ir} />;
   }
@@ -217,6 +223,7 @@ export default function App() {
             ]} />
             <Despl titulo="Administración" insignia={yo.rol === "admin" ? pendientes : 0} items={[
               yo.rol === "admin" && { ruta: "usuarios", titulo: "Usuarios y empresas", insignia: pendientes },
+              { ruta: "vincular", titulo: "Vincular una empresa (gestorías)" },
               { ruta: "ajustes", titulo: "Ajustes de la empresa" },
               (empresas.length > 1 || yo.rol === "admin") && { titulo: "Cambiar de empresa", accion: () => { fijarEspacio(null); setEmpresa(null); } },
               { titulo: "Salir", accion: salir },
