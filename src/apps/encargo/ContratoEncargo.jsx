@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { bloquesRellenos, generarContratoPDF, generarPDFFirmado, sha256Hex } from "./pdf.js";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { generarContratoPDF, generarPDFFirmado, sha256Hex } from "./pdf.js";
+import { bloquesEncargo } from "./bloques.js";
 import { VERSION_CONTRATO, TIPOS } from "./modelo.js";
-import { guardar as guardarEnCarpeta, DESTINO } from "../../lib/carpetas.js";
+import { bloquesADocx, bloquesATexto } from "../../docx.js";
+import { GuardarEnNube, RevisionIA, useAviso } from "../../comunes.jsx";
+import { EditorClausulas, VistaDocumento, aplicarCambios, leerCambios } from "../../lib/contratoUI.jsx";
+import { guardar as guardarEnCarpeta, raizGuardada, DESTINO } from "../../lib/carpetas.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
-import "./contrato.css";
 
-const CLAVE = "md-contrato-encargo-v2";
+const CLAVE = "md-contrato-encargo-v2"; // la lee también lib/encargoEstado.js
+const CLAVE_CAMBIOS = "md-encargo-clausulas";
 
 const PARTE_VACIA = { razon_social: "", nif: "", domicilio: "", email_rgpd: "", firmante_nombre: "", firmante_dni: "", firmante_cargo: "" };
 const VACIO = {
@@ -25,15 +29,10 @@ const VACIO = {
 
 // ---------- utilidades ----------
 const leer = () => { try { return JSON.parse(localStorage.getItem(CLAVE)); } catch { return null; } };
-const guardar = v => { try { localStorage.setItem(CLAVE, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
+const guardarLocal = v => { try { localStorage.setItem(CLAVE, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
 const b64 = bytes => { let s = ""; bytes.forEach(b => (s += String.fromCharCode(b))); return btoa(s); };
 const deB64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
 const normal = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
-let avisar = () => {};
-const descargar = async (bytes, nombre, tipo = "application/pdf") => {
-  const r = await guardarEnCarpeta(new Blob([bytes], { type: tipo }), nombre, DESTINO.encargo_tratamiento);
-  avisar(r.modo === "carpeta" ? `Guardado en ${r.ruta}` : `Descargado: ${nombre}`);
-};
 
 // Validación de NIF/NIE/CIF españoles
 function docValido(v) {
@@ -74,120 +73,42 @@ function errores(d) {
   return e;
 }
 
-// ---------- componentes de formulario ----------
-function Campo({ etiqueta, valor, onChange, error, ayuda, ...rest }) {
+// ---------- campos (mismo aspecto que el formulario de cuentas en participación) ----------
+function Campo({ etiqueta, error, ayuda, ...rest }) {
   return (
-    <label className={"ce-campo" + (error ? " ce-error" : "")}>
-      <span>{etiqueta}</span>
-      <input value={valor} onChange={e => onChange(e.target.value)} {...rest} />
-      {error ? <small className="ce-msg">{error}</small> : ayuda ? <small>{ayuda}</small> : null}
+    <label className={error ? "campo-error" : undefined}>
+      {etiqueta}
+      <input {...rest} aria-invalid={error ? true : undefined} />
+      {error ? <small className="msg-error">{error}</small> : ayuda ? <small>{ayuda}</small> : null}
     </label>
   );
 }
 
-function Parte({ titulo, k, datos, set, err, extra }) {
-  const p = datos[k];
-  const cambia = campo => v => set({ ...datos, [k]: { ...p, [campo]: v } });
-  const E = c => err[`${k}.${c}`];
+function Parte({ titulo, k, d, setD, err, extra, disabled }) {
+  const p = d[k];
+  const campo = c => ({ value: p[c], onChange: e => setD({ ...d, [k]: { ...p, [c]: e.target.value } }), error: err[`${k}.${c}`] });
   return (
-    <fieldset className="ce-grupo">
-      <legend>{titulo}</legend>
-      <div className="ce-rejilla">
-        <Campo etiqueta="Razón social" valor={p.razon_social} onChange={cambia("razon_social")} error={E("razon_social")} />
-        <Campo etiqueta="NIF" valor={p.nif} onChange={cambia("nif")} error={E("nif")} />
-        <Campo etiqueta="Domicilio" valor={p.domicilio} onChange={cambia("domicilio")} error={E("domicilio")} className="ce-ancho" />
-        <Campo etiqueta="Email para comunicaciones RGPD" type="email" valor={p.email_rgpd} onChange={cambia("email_rgpd")} error={E("email_rgpd")} />
-        {extra}
+    <fieldset disabled={disabled}><legend>{titulo}</legend>
+      <Campo etiqueta="Razón social" {...campo("razon_social")} />
+      <div className="fila">
+        <Campo etiqueta="NIF" {...campo("nif")} />
+        <Campo etiqueta="Email para comunicaciones RGPD" type="email" {...campo("email_rgpd")} />
       </div>
+      <Campo etiqueta="Domicilio" {...campo("domicilio")} />
+      {extra}
       <p className="ce-sub">Firmante</p>
-      <div className="ce-rejilla">
-        <Campo etiqueta="Nombre y apellidos" valor={p.firmante_nombre} onChange={cambia("firmante_nombre")} error={E("firmante_nombre")} />
-        <Campo etiqueta="DNI / NIE" valor={p.firmante_dni} onChange={cambia("firmante_dni")} error={E("firmante_dni")} />
-        <Campo etiqueta="Cargo o título de representación" valor={p.firmante_cargo} onChange={cambia("firmante_cargo")} error={E("firmante_cargo")}
-          ayuda="Ej.: administrador único; apoderado según escritura de …" className="ce-ancho" />
+      <div className="fila">
+        <Campo etiqueta="Nombre y apellidos" {...campo("firmante_nombre")} />
+        <Campo etiqueta="DNI / NIE" {...campo("firmante_dni")} />
       </div>
+      <Campo etiqueta="Cargo o título de representación" ayuda="Ej.: administrador único; apoderado según escritura de …" {...campo("firmante_cargo")} />
     </fieldset>
   );
 }
 
-// ---------- diálogo 1: datos ----------
-function DialogoDatos({ inicial, onCerrar, onGuardar }) {
-  const [d, setD] = useState(inicial);
-  const [intentado, setIntentado] = useState(false);
-  const err = intentado ? errores(d) : {};
-  const setLaboral = v => {
-    let s = d.servicios;
-    if (v && !/laboral/i.test(s)) s = s.replace(/ y fiscal$/i, ", fiscal") + " y laboral";
-    if (!v) s = s.replace(/, fiscal y laboral$/i, " y fiscal").replace(/ y laboral$/i, "");
-    setD({ ...d, laboral: v, servicios: s });
-  };
-  const aceptar = () => { setIntentado(true); if (!Object.keys(errores(d)).length) onGuardar(d); };
-
-  return (
-    <div className="ce-fondo" role="dialog" aria-modal="true" aria-labelledby="ce-t1">
-      <div className="ce-dialogo">
-        <header><h2 id="ce-t1">Datos del contrato de encargo</h2><button className="ce-x" onClick={onCerrar} aria-label="Cerrar">×</button></header>
-        <div className="ce-cuerpo">
-          <Parte titulo="Responsable del tratamiento (empresa cliente)" k="resp" datos={d} set={setD} err={err} />
-          <Parte titulo={`Encargado del tratamiento (${TIPOS[d.tipo].nombre.toLowerCase()})`} k="enc" datos={d} set={setD} err={err}
-            extra={<Campo etiqueta="Delegado de Protección de Datos (opcional)" valor={d.enc.dpd} onChange={v => setD({ ...d, enc: { ...d.enc, dpd: v } })}
-              ayuda="Nombre y email. Si no tiene, déjalo vacío." />} />
-          <fieldset className="ce-grupo">
-            <legend>Servicios y condiciones</legend>
-            <label className="ce-campo">
-              <span>Tipo de prestador (Encargado)</span>
-              <select value={d.tipo} onChange={e => { const t = e.target.value; setD({ ...d, tipo: t, laboral: false, servicios: TIPOS[t].servicios || d.servicios }); }}>
-                {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}
-              </select>
-            </label>
-            {TIPOS[d.tipo].aviso && <p className="ce-alerta">{TIPOS[d.tipo].aviso}</p>}
-            {d.tipo === "gestoria" && (
-              <div className="ce-sino">
-                <span>¿La gestoría lleva también la parte laboral (nóminas, Seguridad Social)?</span>
-                <div role="radiogroup">
-                  <button type="button" className={d.laboral ? "on" : ""} onClick={() => setLaboral(true)}>Sí</button>
-                  <button type="button" className={!d.laboral ? "on" : ""} onClick={() => setLaboral(false)}>No</button>
-                </div>
-              </div>
-            )}
-            <div className="ce-rejilla">
-              <Campo etiqueta="Servicios que presta el Encargado" valor={d.servicios} onChange={v => setD({ ...d, servicios: v })} error={err.servicios} className="ce-ancho" />
-              {d.tipo === "otro" && <>
-                <Campo etiqueta="Tratamientos que realiza el prestador" valor={d.tratamientos_otro} onChange={v => setD({ ...d, tratamientos_otro: v })} error={err.tratamientos_otro} className="ce-ancho" placeholder="consulta, conservación y elaboración de informes" />
-                <Campo etiqueta="Personas cuyos datos se tratan" valor={d.interesados_otro} onChange={v => setD({ ...d, interesados_otro: v })} error={err.interesados_otro} placeholder="clientes y proveedores" />
-                <Campo etiqueta="Tipos de datos" valor={d.datos_otro} onChange={v => setD({ ...d, datos_otro: v })} error={err.datos_otro} placeholder="identificativos y de contacto" />
-              </>}
-              <label className="ce-campo ce-ancho">
-                <span>Cómo se intercambian los documentos</span>
-                <select value={d.intercambio} onChange={e => setD({ ...d, intercambio: e.target.value })}>
-                  <option value="carpeta">Carpeta compartida del cliente (OneDrive, Google Drive…)</option>
-                  <option value="plataforma">Plataforma Mi Despacho (portal con usuarios)</option>
-                  <option value="otro">Otro medio</option>
-                </select>
-              </label>
-              {d.intercambio === "carpeta" && <Campo etiqueta="Servicio de almacenamiento" valor={d.almacenamiento} onChange={v => setD({ ...d, almacenamiento: v })} error={err.almacenamiento} />}
-              {d.intercambio === "plataforma" && <>
-                <Campo etiqueta="Nombre de la plataforma" valor={d.plataforma.nombre} onChange={v => setD({ ...d, plataforma: { ...d.plataforma, nombre: v } })} />
-                <Campo etiqueta="Titular de la plataforma" valor={d.plataforma.titular} onChange={v => setD({ ...d, plataforma: { ...d.plataforma, titular: v } })} error={err["plataforma.titular"]} />
-              </>}
-              {d.intercambio !== "plataforma" && <Campo etiqueta="Subencargados del prestador (Anexo II)" valor={d.subencargados} onChange={v => setD({ ...d, subencargados: v })} error={err.subencargados} className="ce-ancho" />}
-              <Campo etiqueta="Tribunales competentes" valor={d.jurisdiccion} onChange={v => setD({ ...d, jurisdiccion: v })} error={err.jurisdiccion} placeholder="Madrid capital" />
-              <Campo etiqueta="Lugar de firma" valor={d.lugar} onChange={v => setD({ ...d, lugar: v })} error={err.lugar} placeholder="Madrid" />
-            </div>
-          </fieldset>
-        </div>
-        <footer>
-          {intentado && Object.keys(err).length > 0 && <span className="ce-aviso">Revisa los {Object.keys(err).length} campos marcados.</span>}
-          <button className="ce-btn sec" onClick={onCerrar}>Cancelar</button>
-          <button className="ce-btn" onClick={aceptar}>Guardar datos</button>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-// ---------- diálogo 2: firma ----------
+// ---------- ventana de firma ----------
 function DialogoFirma({ rol, datos, hash, onCerrar, onFirmar }) {
+  const ref = useRef();
   const p = datos[rol];
   const [leido, setLeido] = useState(false);
   const [facultades, setFacultades] = useState(false);
@@ -196,68 +117,111 @@ function DialogoFirma({ rol, datos, hash, onCerrar, onFirmar }) {
   const [firmando, setFirmando] = useState(false);
   const coincide = normal(nombre) === normal(p.firmante_nombre);
   const listo = leido && facultades && electronica && coincide && !firmando;
+  useEffect(() => { const d = ref.current; if (d && !d.open) d.showModal(); }, []);
 
   return (
-    <div className="ce-fondo" role="dialog" aria-modal="true" aria-labelledby="ce-t2">
-      <div className="ce-dialogo ce-estrecho">
-        <header><h2 id="ce-t2">Firmar como {rol === "resp" ? "Responsable" : "Encargado"}</h2><button className="ce-x" onClick={onCerrar} aria-label="Cerrar">×</button></header>
-        <div className="ce-cuerpo">
-          <dl className="ce-ficha">
-            <dt>Entidad</dt><dd>{p.razon_social} — {p.nif}</dd>
-            <dt>Firmante</dt><dd>{p.firmante_nombre} — DNI {p.firmante_dni}</dd>
-            <dt>En calidad de</dt><dd>{p.firmante_cargo}</dd>
-            <dt>Huella del contrato (SHA-256)</dt><dd className="ce-hash">{hash}</dd>
-          </dl>
-          <label className="ce-check"><input type="checkbox" checked={leido} onChange={e => setLeido(e.target.checked)} /> He leído íntegramente el contrato cuya huella figura arriba.</label>
-          <label className="ce-check"><input type="checkbox" checked={facultades} onChange={e => setFacultades(e.target.checked)} /> Declaro que mi representación está vigente y tengo facultades suficientes para obligar a {p.razon_social}.</label>
-          <label className="ce-check"><input type="checkbox" checked={electronica} onChange={e => setElectronica(e.target.checked)} /> Acepto firmar electrónicamente y reconozco a esta firma plena validez (art. 25 eIDAS).</label>
-          <Campo etiqueta="Escribe tu nombre completo para firmar" valor={nombre} onChange={setNombre} autoComplete="off"
-            error={nombre && !coincide ? "Debe coincidir con el nombre del firmante" : ""} />
-        </div>
-        <footer>
-          <button className="ce-btn sec" onClick={onCerrar}>Cancelar</button>
-          <button className="ce-btn" disabled={!listo} onClick={async () => { setFirmando(true); await onFirmar(); }}>
+    <dialog ref={ref} className="dlg dlg-ancho" onClose={onCerrar} onCancel={onCerrar} aria-labelledby="ce-firma-t">
+      <div className="dlg-in">
+        <h2 id="ce-firma-t">Firmar como {rol === "resp" ? "Responsable" : "Encargado"}</h2>
+        <dl className="ficha">
+          <dt>Entidad</dt><dd>{p.razon_social} — {p.nif}</dd>
+          <dt>Firmante</dt><dd>{p.firmante_nombre} — DNI {p.firmante_dni}</dd>
+          <dt>En calidad de</dt><dd>{p.firmante_cargo}</dd>
+          <dt>Huella del contrato (SHA-256)</dt><dd className="huella">{hash}</dd>
+        </dl>
+        <label className="opcion"><input type="checkbox" checked={leido} onChange={e => setLeido(e.target.checked)} /> <span>He leído íntegramente el contrato cuya huella figura arriba.</span></label>
+        <label className="opcion"><input type="checkbox" checked={facultades} onChange={e => setFacultades(e.target.checked)} /> <span>Declaro que mi representación está vigente y tengo facultades suficientes para obligar a {p.razon_social}.</span></label>
+        <label className="opcion"><input type="checkbox" checked={electronica} onChange={e => setElectronica(e.target.checked)} /> <span>Acepto firmar electrónicamente y reconozco a esta firma plena validez (art. 25 eIDAS).</span></label>
+        <Campo etiqueta="Escribe tu nombre completo para firmar" value={nombre} onChange={e => setNombre(e.target.value)} autoComplete="off"
+          error={nombre && !coincide ? "Debe coincidir con el nombre del firmante" : ""} />
+        <div className="dlg-acciones">
+          <button className="btn ghost" type="button" onClick={onCerrar}>Cancelar</button>
+          <button className="btn" type="button" disabled={!listo} onClick={async () => { setFirmando(true); await onFirmar(); }}>
             {firmando ? "Firmando…" : "Firmar contrato"}
           </button>
-        </footer>
+        </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
 // ---------- miniapp ----------
-export default function ContratoEncargo() {
+export default function ContratoEncargo({ config, irAAjustes }) {
   const guardado = useMemo(leer, []);
-  const [datos, setDatos] = useState(guardado?.datos || VACIO);
-  const [expediente, setExpediente] = useState(guardado?.expediente || null); // { contrato_b64, hash, fecha_generacion, firmas: [] }
-  const [dialogo, setDialogo] = useState(null); // "datos" | "resp" | "enc"
-  const [aviso, setAviso] = useState("");
+  const [d, setD] = useState(guardado?.datos || VACIO);
+  const [expediente, setExpediente] = useState(guardado?.expediente || null); // { contrato_b64, hash, fecha_generacion, firmas: [], bloques }
+  const [dialogo, setDialogo] = useState(null); // "correo" | "resp" | "enc"
+  const [doc, setDoc] = useState(null); // { blob, nombre } cuando se crea el Word
+  const [intentado, setIntentado] = useState(false);
+  const [aviso, nodoAviso] = useAviso();
+  const [cambios, setCambios] = useState(() => leerCambios(CLAVE_CAMBIOS));
 
-  useEffect(() => guardar({ datos, expediente }), [datos, expediente]);
-  useEffect(() => { avisar = setAviso; return () => { avisar = () => {}; }; }, []);
+  useEffect(() => guardarLocal({ datos: d, expediente }), [d, expediente]);
 
-  const bloques = useMemo(() => bloquesRellenos(datos), [datos]);
-  const completo = Object.keys(errores(datos)).length === 0;
+  const base = useMemo(() => bloquesEncargo(d), [d]);
+  // Cerrado el contrato, se muestra exactamente el texto que se firma
+  const bloques = useMemo(() => expediente?.bloques || aplicarCambios(base, cambios), [base, cambios, expediente]);
+  const listaErr = errores(d);
+  const completo = Object.keys(listaErr).length === 0;
+  const err = intentado ? listaErr : {};
+  const bloqueado = !!expediente;
   const firmas = expediente?.firmas || [];
   const firmo = r => firmas.some(f => f.rol === r);
-  const nombreBase = `Contrato encargo tratamiento - ${datos.resp.razon_social || "cliente"} - ${datos.enc.razon_social || "prestador"}`;
+  const nombreBase = `Contrato encargo tratamiento - ${(d.resp.razon_social || "cliente").trim()} - ${(d.enc.razon_social || "prestador").trim()}`;
 
-  const texto = () => bloques.map(b => b.tipo === "lista" ? b.items.map(i => "• " + i).join("\n") : b.texto || "").filter(Boolean).join("\n\n");
+  const set = (k, v) => setD({ ...d, [k]: v });
+  const campo = (k) => ({ value: d[k], onChange: e => set(k, e.target.value), error: err[k] });
 
-  const borrador = async () => {
-    const { bytes } = await generarContratoPDF(datos);
-    descargar(bytes, `${nombreBase} (BORRADOR).pdf`);
+  // Guarda en la carpeta de la empresa si está elegida; si no, descarga
+  const guardarArchivo = async (bytes, nombre, tipo = "application/pdf") => {
+    const r = await guardarEnCarpeta(new Blob([bytes], { type: tipo }), nombre, DESTINO.encargo_tratamiento);
+    aviso(r.modo === "carpeta" ? "Guardado en " + r.ruta : "Descargado: " + nombre);
+  };
+
+  async function crear() {
+    const nombre = nombreBase + ".docx";
+    try {
+      const blob = await bloquesADocx(bloques);
+      if (await raizGuardada()) {
+        const r = await guardarEnCarpeta(blob, nombre, DESTINO.encargo_tratamiento);
+        if (r.modo === "carpeta") { aviso("Guardado en " + r.ruta); return; }
+      }
+      setDoc({ blob, nombre }); // sin carpeta de empresa: "¿Quieres guardarlo en tu Drive?"
+    } catch {
+      aviso("No se pudo crear el Word. Prueba con «Copiar texto».");
+    }
+  }
+
+  function copiar() {
+    try { navigator.clipboard.writeText(bloquesATexto(bloques)).then(() => aviso("Texto copiado"), () => aviso("No se pudo copiar")); }
+    catch { aviso("No se pudo copiar"); }
+  }
+
+  function vaciar() {
+    if (firmas.length && !window.confirm("Hay firmas registradas. Descarga antes el PDF firmado y las evidencias. ¿Seguro que quieres empezar de nuevo?")) return;
+    setD({ ...VACIO, jurisdiccion: d.jurisdiccion, lugar: d.lugar });
+    setExpediente(null);
+    setIntentado(false);
+  }
+
+  // ---- firma electrónica ----
+  const borradorPDF = async () => {
+    const { bytes } = await generarContratoPDF(d, bloques);
+    guardarArchivo(bytes, `${nombreBase} (BORRADOR).pdf`);
   };
 
   const cerrar = async () => {
+    setIntentado(true);
+    if (!completo) { aviso(`Revisa los ${Object.keys(listaErr).length} datos marcados en el formulario.`); return; }
+    if (!window.confirm("Al cerrar el contrato ya no se podrán cambiar los datos ni las cláusulas. ¿Continuar?")) return;
     const fecha_generacion = new Date().toISOString();
-    const { bytes, hash } = await generarContratoPDF({ ...datos, fecha_generacion });
-    setExpediente({ version: VERSION_CONTRATO, fecha_generacion, contrato_b64: b64(bytes), hash, firmas: [] });
-    setAviso("Contrato cerrado. Ya no se puede modificar: cualquier cambio exigiría generar uno nuevo.");
+    const { bytes, hash } = await generarContratoPDF({ ...d, fecha_generacion }, bloques);
+    setExpediente({ version: VERSION_CONTRATO, fecha_generacion, contrato_b64: b64(bytes), hash, firmas: [], bloques });
+    aviso("Contrato cerrado y listo para firmar");
   };
 
   const firmar = async rol => {
-    const p = datos[rol];
+    const p = d[rol];
     const ahora = new Date();
     const fecha_utc = ahora.toISOString();
     const id_firma = await sha256Hex(new TextEncoder().encode(`${expediente.hash}|${rol}|${p.firmante_dni}|${fecha_utc}`));
@@ -271,94 +235,169 @@ export default function ContratoEncargo() {
     const nuevo = { ...expediente, firmas: [...firmas, firma] };
     setExpediente(nuevo);
     setDialogo(null);
-    const { bytes, hash } = await generarPDFFirmado(deB64(nuevo.contrato_b64), nuevo.hash, datos, nuevo.firmas);
-    await descargar(bytes, `${nombreBase} (firmado ${nuevo.firmas.length} de 2).pdf`);
-    setAviso(a => `Firma registrada (huella del PDF con evidencias: ${hash.slice(0, 16)}…). ${a}`);
+    const { bytes } = await generarPDFFirmado(deB64(nuevo.contrato_b64), nuevo.hash, d, nuevo.firmas);
+    await guardarArchivo(bytes, `${nombreBase} (firmado ${nuevo.firmas.length} de 2).pdf`);
   };
 
   const descargarFirmado = async () => {
-    const { bytes } = await generarPDFFirmado(deB64(expediente.contrato_b64), expediente.hash, datos, firmas);
-    descargar(bytes, `${nombreBase} (firmado ${firmas.length} de 2).pdf`);
+    const { bytes } = await generarPDFFirmado(deB64(expediente.contrato_b64), expediente.hash, d, firmas);
+    guardarArchivo(bytes, `${nombreBase} (firmado ${firmas.length} de 2).pdf`);
   };
   const descargarEvidencias = () => {
-    const ev = { documento: "Contrato de encargo del tratamiento", version_modelo: expediente.version, generado: expediente.fecha_generacion, huella_contrato_sha256: expediente.hash, partes: { responsable: datos.resp, encargado: datos.enc }, laboral: datos.laboral, firmas };
-    descargar(new TextEncoder().encode(JSON.stringify(ev, null, 2)), `${nombreBase} - evidencias.json`, "application/json");
+    const ev = { documento: "Contrato de encargo del tratamiento", version_modelo: expediente.version, generado: expediente.fecha_generacion, huella_contrato_sha256: expediente.hash, partes: { responsable: d.resp, encargado: d.enc }, laboral: d.laboral, firmas };
+    guardarArchivo(new TextEncoder().encode(JSON.stringify(ev, null, 2)), `${nombreBase} - evidencias.json`, "application/json");
   };
-  const descargarOriginal = () => descargar(deB64(expediente.contrato_b64), `${nombreBase} (original sin firmas).pdf`);
+  const descargarOriginal = () => guardarArchivo(deB64(expediente.contrato_b64), `${nombreBase} (original sin firmas).pdf`);
 
-  const vaciar = () => {
-    if (expediente?.firmas?.length && !window.confirm("Hay firmas registradas. Descarga antes el PDF firmado y las evidencias. ¿Seguro que quieres empezar de nuevo?")) return;
-    setDatos(VACIO); setExpediente(null); setAviso("");
+  const setLaboral = v => {
+    let s = d.servicios;
+    if (v && !/laboral/i.test(s)) s = s.replace(/ y fiscal$/i, ", fiscal") + " y laboral";
+    if (!v) s = s.replace(/, fiscal y laboral$/i, " y fiscal").replace(/ y laboral$/i, "");
+    setD({ ...d, laboral: v, servicios: s });
   };
+
+  const prompt = (ctx) => [
+    "Actúa como especialista en protección de datos español. Revisa este borrador de contrato de encargo del tratamiento (art. 28 del RGPD y art. 33 de la LOPDGDD).",
+    "Señala, en español y sin tecnicismos innecesarios, un máximo de 8 puntos ordenados de más a menos importante. Para cada uno: el riesgo o hueco en una frase y una propuesta concreta de redacción o de cambio.",
+    "Fíjate en: que estén todos los contenidos mínimos del art. 28.3 RGPD, coherencia entre las partes y los servicios, si el prestador es realmente encargado o responsable, categorías de datos e interesados, subencargados y transferencias internacionales, plazo de notificación de brechas, medidas de seguridad del Anexo I, uso de IA, destino de los datos al terminar, y datos marcados entre corchetes pendientes.",
+    "No inventes artículos, sentencias ni cifras. Si citas una norma y no estás seguro, dilo. Termina con una línea recordando que es una revisión orientativa.",
+    "Formato: texto plano con números (1., 2., …), sin tablas.",
+    ctx ? "\nCONTEXTO DEL CASO:\n" + ctx : "",
+    "\nBORRADOR:\n" + bloquesATexto(bloques),
+  ].join("\n");
+
+  const adjuntoCorreo = expediente
+    ? { nombre: `${nombreBase}${firmas.length ? ` (firmado ${firmas.length} de 2)` : ""}.pdf`,
+        blob: async () => new Blob([firmas.length ? (await generarPDFFirmado(deB64(expediente.contrato_b64), expediente.hash, d, firmas)).bytes : deB64(expediente.contrato_b64)], { type: "application/pdf" }) }
+    : { nombre: nombreBase + ".docx", blob: () => bloquesADocx(bloques) };
 
   return (
-    <div className="ce">
-      <div className="ce-cabecera">
+    <div className="app">
+      <header className="app-cab">
         <div>
+          <div className="eyebrow">Contratos · Crear</div>
           <h1>Contrato de encargo del tratamiento</h1>
-          <p>Art. 28 RGPD · empresa y prestador de servicios · modelo v{VERSION_CONTRATO}</p>
+          <p className="muted">Rellena los datos y el borrador se escribe solo (art. 28 RGPD y art. 33 LOPDGDD · modelo v{VERSION_CONTRATO}). Los huecos entre corchetes se rellenan con tus datos.</p>
         </div>
-        <div className="ce-acciones">
-          {!expediente && <>
-            <button className="ce-btn" onClick={() => setDialogo("datos")}>{completo ? "Editar datos" : "Rellenar datos"}</button>
-            <button className="ce-btn sec" onClick={borrador}>Descargar borrador</button>
-            <button className="ce-btn sec" onClick={() => navigator.clipboard?.writeText(texto())}>Copiar texto</button>
-          </>}
-          <button className="ce-btn sec" onClick={vaciar}>Vaciar</button>
+        <div className="acciones">
+          <button className="btn" type="button" onClick={crear}>Crear contrato</button>
+          <button className="btn ghost" type="button" onClick={copiar}>Copiar texto</button>
+          <button className="btn ghost" type="button" onClick={() => setDialogo("correo")}>Enviar por correo</button>
+          <button className="btn ghost" type="button" onClick={vaciar}>Vaciar</button>
         </div>
+      </header>
+
+      <div className="dos-col">
+        <form className="formulario" onSubmit={(e) => e.preventDefault()} autoComplete="off">
+          {bloqueado && <p className="nota">El contrato está cerrado para la firma: los datos ya no se pueden cambiar. Para preparar otro, pulsa «Vaciar».</p>}
+          <fieldset disabled={bloqueado}><legend>Lugar y tribunales</legend>
+            <div className="fila">
+              <Campo etiqueta="Lugar de firma" placeholder="Madrid" {...campo("lugar")} />
+              <Campo etiqueta="Tribunales de" placeholder="Madrid capital" {...campo("jurisdiccion")} />
+            </div>
+          </fieldset>
+          <Parte titulo="Responsable del tratamiento (empresa cliente)" k="resp" d={d} setD={setD} err={err} disabled={bloqueado} />
+          <Parte titulo={`Encargado del tratamiento (${TIPOS[d.tipo].nombre.toLowerCase()})`} k="enc" d={d} setD={setD} err={err} disabled={bloqueado}
+            extra={<Campo etiqueta="Delegado de Protección de Datos (opcional)" ayuda="Nombre y email. Si no tiene, déjalo vacío."
+              value={d.enc.dpd} onChange={e => setD({ ...d, enc: { ...d.enc, dpd: e.target.value } })} />} />
+          <fieldset disabled={bloqueado}><legend>Servicios</legend>
+            <label>Tipo de prestador (Encargado)
+              <select value={d.tipo} onChange={e => { const t = e.target.value; setD({ ...d, tipo: t, laboral: false, servicios: TIPOS[t].servicios || d.servicios }); }}>
+                {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}
+              </select>
+            </label>
+            {TIPOS[d.tipo].aviso && <p className="nota">{TIPOS[d.tipo].aviso}</p>}
+            {d.tipo === "gestoria" && (
+              <label>¿Lleva también la parte laboral (nóminas, Seguridad Social)?
+                <select value={d.laboral ? "si" : "no"} onChange={e => setLaboral(e.target.value === "si")}>
+                  <option value="no">No</option><option value="si">Sí</option>
+                </select>
+              </label>
+            )}
+            <Campo etiqueta="Servicios que presta el Encargado" {...campo("servicios")} />
+            {d.tipo === "otro" && <>
+              <Campo etiqueta="Tratamientos que realiza el prestador" placeholder="consulta, conservación y elaboración de informes" {...campo("tratamientos_otro")} />
+              <div className="fila">
+                <Campo etiqueta="Personas cuyos datos se tratan" placeholder="clientes y proveedores" {...campo("interesados_otro")} />
+                <Campo etiqueta="Tipos de datos" placeholder="identificativos y de contacto" {...campo("datos_otro")} />
+              </div>
+            </>}
+          </fieldset>
+          <fieldset disabled={bloqueado}><legend>Intercambio de documentos</legend>
+            <label>Cómo se intercambian los documentos
+              <select value={d.intercambio} onChange={e => set("intercambio", e.target.value)}>
+                <option value="carpeta">Carpeta compartida del cliente (OneDrive, Google Drive…)</option>
+                <option value="plataforma">Plataforma Mi Despacho (portal con usuarios)</option>
+                <option value="otro">Otro medio</option>
+              </select>
+            </label>
+            {d.intercambio === "carpeta" && <Campo etiqueta="Servicio de almacenamiento" {...campo("almacenamiento")} />}
+            {d.intercambio === "plataforma" && <div className="fila">
+              <Campo etiqueta="Nombre de la plataforma" value={d.plataforma.nombre} onChange={e => set("plataforma", { ...d.plataforma, nombre: e.target.value })} />
+              <Campo etiqueta="Titular de la plataforma" value={d.plataforma.titular} onChange={e => set("plataforma", { ...d.plataforma, titular: e.target.value })} error={err["plataforma.titular"]} />
+            </div>}
+            {d.intercambio !== "plataforma" && <label className={err.subencargados ? "campo-error" : undefined}>Subencargados del prestador (Anexo II)
+              <textarea rows={3} value={d.subencargados} onChange={e => set("subencargados", e.target.value)} />
+              {err.subencargados && <small className="msg-error">{err.subencargados}</small>}
+            </label>}
+          </fieldset>
+        </form>
+
+        <VistaDocumento bloques={bloques} />
       </div>
 
-      <div className="ce-estado">
-        {!expediente ? (
-          <>
-            <span className={"ce-paso" + (completo ? " ok" : "")}>1. Datos {completo ? "completos" : "pendientes"}</span>
-            <button className="ce-btn" disabled={!completo} onClick={cerrar} title={completo ? "" : "Completa los datos primero"}>2. Cerrar contrato y pasar a firma</button>
-          </>
-        ) : (
-          <>
-            <span className="ce-paso ok">Contrato cerrado · huella <code>{expediente.hash.slice(0, 16)}…</code></span>
-            {["resp", "enc"].map(r => (
-              <span key={r} className={"ce-paso" + (firmo(r) ? " ok" : "")}>
-                {r === "resp" ? "Responsable" : "Encargado"}: {firmo(r) ? "firmado" : <button className="ce-btn mini" onClick={() => setDialogo(r)}>Firmar</button>}
-              </span>
-            ))}
-            <span className="ce-descargas">
-              {firmas.length > 0 && <button className="ce-btn mini" onClick={descargarFirmado}>PDF firmado</button>}
-              <button className="ce-btn mini sec" onClick={descargarOriginal}>Original</button>
-              {firmas.length > 0 && <button className="ce-btn mini sec" onClick={descargarEvidencias}>Evidencias (.json)</button>}
-              <button className="ce-btn mini" onClick={() => setDialogo("correo")}>Enviar por correo</button>
-            </span>
-          </>
-        )}
+      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS}
+        ejemploTitulo="13. Título de la cláusula." bloqueado={bloqueado} />
+
+      <section className="editor-clausulas">
+        <div className="ia-cab">
+          <div>
+            <h2>Firma electrónica</h2>
+            <p className="muted">
+              {!expediente
+                ? "Cuando los datos estén completos, cierra el contrato: se genera el PDF definitivo con su huella (SHA-256) y cada parte lo firma aquí. El PDF firmado lleva una hoja de evidencias."
+                : <>Contrato cerrado · huella <code>{expediente.hash.slice(0, 16)}…</code> · {firmas.length === 2 ? "firmado por ambas partes." : `${firmas.length} de 2 firmas.`}</>}
+            </p>
+          </div>
+          <div className="acciones">
+            {!expediente ? <>
+              <button className="btn ghost" type="button" onClick={borradorPDF}>Descargar borrador (PDF)</button>
+              <button className="btn" type="button" onClick={cerrar}>Cerrar contrato y pasar a firma</button>
+            </> : <>
+              {firmas.length > 0 && <button className="btn" type="button" onClick={descargarFirmado}>PDF firmado</button>}
+              <button className="btn ghost" type="button" onClick={descargarOriginal}>Original</button>
+              {firmas.length > 0 && <button className="btn ghost" type="button" onClick={descargarEvidencias}>Evidencias (.json)</button>}
+            </>}
+          </div>
+        </div>
+        {!expediente
+          ? <p className={completo ? "ok-texto" : "muted"}>{completo ? "Datos completos." : `Faltan ${Object.keys(listaErr).length} datos por completar o corregir.`}</p>
+          : <ul className="contratadas">
+              {["resp", "enc"].map(r => (
+                <li key={r}>
+                  <span className={firmo(r) ? "si" : "no"}>{firmo(r) ? "✓" : "○"}</span>
+                  {r === "resp" ? "Responsable" : "Encargado"} ({d[r].firmante_nombre}): {firmo(r) ? "firmado" : <button className="enlace" type="button" onClick={() => setDialogo(r)}>Firmar ahora</button>}
+                </li>
+              ))}
+            </ul>}
+      </section>
+
+      <div className="sin-ia">
+        <strong>Este contrato no lo escribe la IA.</strong> El texto es una plantilla jurídica fija que se completa con tus datos y con las cláusulas que tú modifiques. La IA solo lo revisa si tú se lo pides aquí abajo, y no cambia nada por su cuenta.
       </div>
-      {aviso && <p className="ce-nota">{aviso}</p>}
 
-      <article className="ce-vista" aria-label="Vista previa del contrato">
-        {bloques.map((b, i) => {
-          const marca = t => t.split(/(\[[^\]]+\])/).map((x, j) => /^\[.+\]$/.test(x) ? <mark key={j}>{x}</mark> : x);
-          switch (b.tipo) {
-            case "titulo": return <h2 key={i}>{b.texto}</h2>;
-            case "subtitulo": return <p key={i} className="ce-subt">{b.texto}</p>;
-            case "seccion": return <h3 key={i}>{b.texto}</h3>;
-            case "clausula": return <h4 key={i}>{b.texto}</h4>;
-            case "p": return <p key={i}>{marca(b.texto)}</p>;
-            case "lista": return <ul key={i}>{b.items.map((t, j) => <li key={j}>{marca(t)}</li>)}</ul>;
-            case "salto": return <hr key={i} />;
-            case "firmas": return <div key={i} className="ce-firmas"><div><b>Fdo.: El Responsable</b><br />{marca(datos.resp.razon_social || "[Razón social del Responsable]")}</div><div><b>Fdo.: El Encargado</b><br />{marca(datos.enc.razon_social || "[Razón social de la gestoría]")}</div></div>;
-            default: return null;
-          }
-        })}
-      </article>
+      <RevisionIA construirPrompt={prompt} irAAjustes={irAAjustes} />
+      <p className="muted pie">Borrador orientativo. Revísalo y adáptalo a cada caso antes de firmar.</p>
 
-      {dialogo === "datos" && <DialogoDatos inicial={datos} onCerrar={() => setDialogo(null)} onGuardar={d => { setDatos(d); setDialogo(null); }} />}
+      {config && <GuardarEnNube abierto={!!doc} blob={doc?.blob} nombre={doc?.nombre || ""} config={config} onCerrar={() => setDoc(null)} irAAjustes={irAAjustes} />}
       {dialogo === "correo" && <DialogoCorreo
         opciones={firmas.length === 2 ? ["contrato_firmado", "contrato_firma"] : ["contrato_firma"]}
-        para={datos.enc.email_rgpd}
-        vars={{ documento: "contrato de encargo del tratamiento de datos", empresa: datos.resp.razon_social, destinatario: datos.enc.firmante_nombre?.split(" ")[0] || "", remitente: datos.resp.firmante_nombre }}
-        adjuntos={[{ nombre: `${nombreBase.replace(/\.$/, "")}${firmas.length ? ` (firmado ${firmas.length} de 2)` : ""}.pdf`,
-          blob: async () => new Blob([firmas.length ? (await generarPDFFirmado(deB64(expediente.contrato_b64), expediente.hash, datos, firmas)).bytes : deB64(expediente.contrato_b64)], { type: "application/pdf" }) }]}
+        para={d.enc.email_rgpd}
+        vars={{ documento: "contrato de encargo del tratamiento de datos", empresa: d.resp.razon_social, destinatario: d.enc.firmante_nombre?.split(" ")[0] || "", remitente: d.resp.firmante_nombre || config?.nombre || "" }}
+        adjuntos={[adjuntoCorreo]}
         onCerrar={() => setDialogo(null)} />}
-      {(dialogo === "resp" || dialogo === "enc") && <DialogoFirma rol={dialogo} datos={datos} hash={expediente.hash} onCerrar={() => setDialogo(null)} onFirmar={() => firmar(dialogo)} />}
+      {(dialogo === "resp" || dialogo === "enc") && <DialogoFirma rol={dialogo} datos={d} hash={expediente.hash} onCerrar={() => setDialogo(null)} onFirmar={() => firmar(dialogo)} />}
+      {nodoAviso}
     </div>
   );
 }

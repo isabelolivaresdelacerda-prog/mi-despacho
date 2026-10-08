@@ -52,7 +52,7 @@ function crearEscritor(pdf, fonts, pie) {
   const escribir = (texto, { font = fonts.normal, size = 10, centrado = false, sangria = 0, antes = 0, despues = 6, color = rgb(0, 0, 0), vineta = false, interlinea = 1.45 } = {}) => {
     y -= antes;
     const ancho = ANCHO - sangria;
-    const lineas = partir(texto, font, size, ancho);
+    const lineas = partir(apto(texto), font, size, ancho);
     const alto = size * interlinea;
     lineas.forEach((l, i) => {
       if (y - alto < M + 20) nueva();
@@ -84,17 +84,73 @@ function crearEscritor(pdf, fonts, pie) {
 
 async function fuentes(pdf) {
   return {
-    normal: await pdf.embedFont(StandardFonts.Helvetica),
-    negrita: await pdf.embedFont(StandardFonts.HelveticaBold),
-    cursiva: await pdf.embedFont(StandardFonts.HelveticaOblique),
+    normal: await pdf.embedFont(StandardFonts.TimesRoman),
+    negrita: await pdf.embedFont(StandardFonts.TimesRomanBold),
+    cursiva: await pdf.embedFont(StandardFonts.TimesRomanItalic),
   };
 }
 
+// Las fuentes estándar del PDF solo admiten WinAnsi: se cambian los caracteres que no caben
+const EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+const apto = (t) => String(t || "").replace(/●/g, "•").replace(/[\t\r]/g, " ")
+  .replace(/./gu, (c) => { const n = c.codePointAt(0); return (n >= 32 && n < 127) || (n >= 160 && n <= 255) || EXTRA.includes(c) ? c : "?"; });
+
+// Maquetación con la misma presentación que el Word del sistema de contratos (docx.js):
+// Times 12, interlineado 1,25, 8 pt tras cada párrafo, texto justificado y título de cláusula en negrita delante.
+const W = { tam: 12, inter: 1.25, tras: 8, izq: 85, der: 71, sup: 71, inf: 71 };
+function maquetador(pdf, f, pie) {
+  let page, y;
+  const paginas = [];
+  const ancho = A4[0] - W.izq - W.der;
+  const nueva = () => { page = pdf.addPage(A4); paginas.push(page); y = A4[1] - W.sup; };
+  nueva();
+  const alto = W.tam * W.inter;
+
+  // runs: [{ texto, font }]; jc: "both" | "center" | "left"
+  const parrafo = (runs, jc = "both") => {
+    const palabras = [];
+    runs.forEach((r) => apto(r.texto).split(/ +/).filter(Boolean).forEach((w) => palabras.push({ w, font: r.font })));
+    if (!palabras.length) { y -= alto + W.tras; if (y < W.inf + 20) nueva(); return; }
+    const espacio = f.normal.widthOfTextAtSize(" ", W.tam);
+    const lineas = [];
+    let linea = [], usado = 0;
+    palabras.forEach((p) => {
+      p.ancho = p.font.widthOfTextAtSize(p.w, W.tam);
+      const extra = (linea.length ? espacio : 0) + p.ancho;
+      if (linea.length && usado + extra > ancho) { lineas.push(linea); linea = [p]; usado = p.ancho; }
+      else { linea.push(p); usado += extra; }
+    });
+    if (linea.length) lineas.push(linea);
+    lineas.forEach((l, i) => {
+      if (y - alto < W.inf + 20) nueva();
+      const total = l.reduce((s, p) => s + p.ancho, 0);
+      const ultima = i === lineas.length - 1;
+      let hueco = espacio;
+      let x = W.izq;
+      if (jc === "both" && !ultima && l.length > 1) hueco = (ancho - total) / (l.length - 1);
+      if (jc === "center") x = W.izq + (ancho - total - espacio * (l.length - 1)) / 2;
+      l.forEach((p) => { page.drawText(p.w, { x, y: y - W.tam, size: W.tam, font: p.font, color: rgb(0, 0, 0) }); x += p.ancho + hueco; });
+      y -= alto;
+    });
+    y -= W.tras;
+  };
+  const reservar = (h) => { if (y - h < W.inf + 20) nueva(); };
+  const numerar = () => {
+    paginas.forEach((p, i) => {
+      const t = apto(`${pie} · página ${i + 1} de ${paginas.length}`);
+      const w = f.normal.widthOfTextAtSize(t, 8);
+      p.drawText(t, { x: (A4[0] - w) / 2, y: W.inf / 2, size: 8, font: f.normal, color: rgb(0.5, 0.5, 0.5) });
+    });
+  };
+  return { parrafo, reservar, nueva, numerar };
+}
+
 // 1) PDF del contrato (sin firmas). Su huella SHA-256 es lo que se firma.
-export async function generarContratoPDF(datos) {
+// `bloques`: el contrato en el formato del sistema (los mismos que el Word y la vista previa, con las cláusulas modificadas).
+export async function generarContratoPDF(datos, bloques) {
   const pdf = await PDFDocument.create();
   pdf.setTitle("Contrato de encargo del tratamiento de datos personales");
-  pdf.setSubject(`${datos.resp?.razon_social || ""} / ${datos.enc?.razon_social || ""}`);
+  pdf.setSubject(apto(`${datos.resp?.razon_social || ""} / ${datos.enc?.razon_social || ""}`));
   pdf.setCreator("Mi Despacho");
   pdf.setProducer("Mi Despacho");
   // Fecha fija para que el mismo contenido produzca siempre el mismo PDF (y la misma huella)
@@ -103,29 +159,25 @@ export async function generarContratoPDF(datos) {
   pdf.setModificationDate(fija);
 
   const f = await fuentes(pdf);
-  const e = crearEscritor(pdf, f, `Contrato de encargo del tratamiento · modelo v${VERSION_CONTRATO}`);
+  const m = maquetador(pdf, f, `Contrato de encargo del tratamiento · modelo v${VERSION_CONTRATO}`);
+  const n = (texto) => ({ texto, font: f.normal });
+  const b_ = (texto) => ({ texto, font: f.negrita });
 
-  for (const b of bloquesRellenos(datos)) {
-    switch (b.tipo) {
-      case "titulo": e.escribir(b.texto, { font: f.negrita, size: 13, centrado: true, despues: 2 }); break;
-      case "subtitulo": e.escribir(b.texto, { font: f.cursiva, size: 8.5, centrado: true, despues: 16 }); break;
-      case "seccion": e.escribir(b.texto, { font: f.negrita, size: 10.5, centrado: true, antes: 8, despues: 8 }); break;
-      case "clausula": e.espacio(60); e.escribir(b.texto, { font: f.negrita, size: 10, antes: 6, despues: 4 }); break;
-      case "p": e.escribir(b.texto); break;
-      case "lista": b.items.forEach(t => e.escribir(t, { sangria: 18, vineta: true, despues: 4 })); e.escribir("", { despues: 2 }); break;
-      case "salto": e.nueva(); break;
-      case "firmas": {
-        e.espacio(110);
-        e.escribir("Fdo.: El Responsable", { font: f.negrita, antes: 14, despues: 0 });
-        e.escribir(`${datos.resp.razon_social} — p.p. ${datos.resp.firmante_nombre}`, { despues: 10 });
-        e.escribir("Fdo.: El Encargado", { font: f.negrita, despues: 0 });
-        e.escribir(`${datos.enc.razon_social} — p.p. ${datos.enc.firmante_nombre}`, { despues: 4 });
-        e.escribir("Firmado electrónicamente. Ver hoja de evidencias anexa.", { font: f.cursiva, size: 8.5, color: rgb(0.4, 0.4, 0.4) });
-        break;
-      }
+  for (const b of bloques) {
+    if (b.t === "title" || b.t === "h") m.parrafo([b_(b.text)], "center");
+    else if (b.t === "sub") m.parrafo([n(b.text)], "center");
+    else if (b.t === "salto") m.nueva();
+    else if (b.t === "sig") {
+      m.reservar(150);
+      m.parrafo([]);
+      [b.a, b.b].forEach((s) => { m.parrafo([]); s.split("\n").forEach((l, i) => m.parrafo([i === 0 ? b_(l) : n(l)], "left")); });
+      m.parrafo([{ texto: "Firmado electrónicamente. Ver hoja de evidencias anexa.", font: f.cursiva }], "left");
+    } else {
+      if (b.lead) m.reservar(60);
+      String(b.text).split("\n").forEach((t, i) => { if (i === 0 || t.trim()) m.parrafo(i === 0 && b.lead ? [b_(b.lead), n(t)] : [n(t)]); });
     }
   }
-  e.numerar();
+  m.numerar();
   const bytes = await pdf.save({ useObjectStreams: false });
   return { bytes, hash: await sha256Hex(bytes) };
 }

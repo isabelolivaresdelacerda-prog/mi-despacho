@@ -370,3 +370,20 @@ a.ia-menu { text-decoration: none; }
 .pasos-clave { margin: 10px 0; padding: 10px 14px; border: 1px solid var(--linea); border-radius: 10px; }
 .pasos-clave ol { margin: 8px 0 0 18px; padding: 0; }
 .pasos-clave li { margin: 4px 0; }
+
+/* --- Contratos: añadidos para el contrato de encargo (mismo sistema que cuentas en participación) --- */
+.documento .subtitulo { text-align: center; font-style: italic; font-size: 13.5px; color: var(--suave); margin-top: -8px; }
+.documento hr.salto { border: 0; border-top: 1px dashed var(--linea); margin: 28px 0; }
+.campo-error input, .campo-error textarea, .campo-error select { border-color: var(--error); }
+.msg-error { color: var(--error); font-size: 12px; }
+label small { font-size: 12px; }
+.opcion input[type=checkbox] { width: auto; flex: none; margin-top: 3px; }
+.dlg .opcion { align-items: flex-start; font-size: 14px; }
+.dlg-ancho { width: min(600px, calc(100vw - 32px)); }
+.ficha { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; font-size: 14px; margin: 0; }
+.ficha dt { color: var(--suave); }
+.ficha dd { margin: 0; }
+.huella { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
+/* Casilla con texto (antes en encargo/contrato.css; la usa también «Enviar a la gestoría») */
+.ce-check { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.4; color: var(--tinta); }
+.ce-check input { width: auto; flex: none; margin-top: 3px; }

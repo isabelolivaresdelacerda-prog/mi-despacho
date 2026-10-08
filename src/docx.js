@@ -1,4 +1,5 @@
-// Genera un Word (.docx) sencillo a partir de bloques {t:'title'|'h'|'p'|'sig', text, lead, a, b}
+// Genera un Word (.docx) sencillo a partir de bloques {t:'title'|'sub'|'h'|'p'|'sig'|'salto', text, lead, a, b}
+// Un texto puede llevar varios párrafos separados por "\n" (el título en negrita va solo en el primero).
 import JSZip from "jszip";
 
 const x = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -12,13 +13,15 @@ export async function bloquesADocx(bloques) {
   const body = [];
   bloques.forEach((b) => {
     if (b.t === "title" || b.t === "h") body.push(para(run(b.text, true), "center"));
+    else if (b.t === "sub") body.push(para(run(b.text), "center"));
+    else if (b.t === "salto") body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
     else if (b.t === "sig") {
       body.push(para(""));
       [b.a, b.b].forEach((s) => {
         body.push(para(""));
         s.split("\n").forEach((l, i) => body.push(para(run(l, i === 0), "left")));
       });
-    } else body.push(para((b.lead ? run(b.lead + " ", true) : "") + run(b.text)));
+    } else String(b.text).split("\n").forEach((t, i) => { if (i === 0 || t.trim()) body.push(para((i === 0 && b.lead ? run(b.lead + " ", true) : "") + run(t))); });
   });
   const doc =
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
@@ -33,10 +36,11 @@ export async function bloquesADocx(bloques) {
 
 export function bloquesATexto(bloques) {
   return bloques
+    .filter((b) => b.t !== "salto")
     .map((b) => {
       if (b.t === "sig") return "\n\n" + b.a + "\n\n\n" + b.b;
-      if (b.t === "h" || b.t === "title") return "\n" + b.text + "\n";
-      return (b.lead ? b.lead + " " : "") + b.text;
+      if (b.t === "h" || b.t === "title" || b.t === "sub") return "\n" + b.text + "\n";
+      return (b.lead ? b.lead + " " : "") + String(b.text).split("\n").filter((t, i) => i === 0 || t.trim()).join("\n\n");
     })
     .join("\n\n")
     .trim();

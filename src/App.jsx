@@ -169,7 +169,7 @@ export default function App() {
     case "contratos/crear/cuentas-participacion":
       vista = <ContratoCEP config={config} irAAjustes={irAAjustes} />; break;
     case "contratos/crear/encargo-tratamiento":
-      vista = <div className="app"><ContratoEncargo /></div>; break;
+      vista = <ContratoEncargo config={config} irAAjustes={irAAjustes} />; break;
     case "empresa/carpeta":
     case "contratos/carpeta":
       vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Documentación" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
