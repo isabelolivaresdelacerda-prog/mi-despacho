@@ -24,7 +24,7 @@ import "./contabilidad.css";
 
 const PESTANAS = [["resumen", "Resumen"], ["bandeja", "Bandeja de entrada"], ["facturas", "Facturas"], ["banco", "Banco y cierre"], ["impuestos", "Impuestos"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Exportar A3 / Sage"]];
 
-export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
+export default function ContabilidadWeb({ config, guardar: guardarConfig, empresaId }) {
   const [raiz, setRaiz] = useState(null);
   const [necesitaPermiso, setNecesitaPermiso] = useState(false);
   const [datos, setDatos] = useState(null);
@@ -64,8 +64,27 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
 
   // Documentos esperando en la bandeja de entrada (llegados por correo o arrastrados)
   const [nEntrada, setNEntrada] = useState(0);
+  // Recoge lo que ha llegado al correo de contabilidad y lo deja en la carpeta «entrada»
+  const recogerCorreo = async (h) => {
+    try {
+      const { correoEntrada } = await import("../../lib/cuentas.js");
+      const lista = (await correoEntrada.pendientes()).filter((x) => !empresaId || x.empresa_id === empresaId);
+      if (!lista.length) return 0;
+      const dir = await h.getDirectoryHandle(CARPETA_ENTRADA, { create: true });
+      let n = 0;
+      for (const x of lista) {
+        const blob = await correoEntrada.descargar(x.ruta);
+        let nombre = x.nombre; const [b, e] = nombre.match(/^(.*?)(\.[^.]+)?$/).slice(1);
+        for (let k = 2; k < 100; k++) { try { await dir.getFileHandle(nombre); nombre = `${b} (${k})${e || ""}`; } catch { break; } }
+        const w = await (await dir.getFileHandle(nombre, { create: true })).createWritable(); await w.write(blob); await w.close();
+        await correoEntrada.recogido(x); n++;
+      }
+      if (n) aviso(`Han llegado ${n} documentos al correo de contabilidad: están en la bandeja de entrada.`);
+      return n;
+    } catch { return 0; }
+  };
   const contarEntrada = async (h = raiz) => { if (!h) return; try { setNEntrada((await listar(h, CARPETA_ENTRADA)).filter((x) => !/^_/.test(x.nombre)).length); } catch { setNEntrada(0); } };
-  useEffect(() => { contarEntrada(); }, [raiz]);
+  useEffect(() => { if (raiz) recogerCorreo(raiz).then(() => contarEntrada()); }, [raiz]);
 
   const cargar = async (h = raiz) => {
     if (!h) return;

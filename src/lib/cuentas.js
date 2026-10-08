@@ -116,3 +116,10 @@ export const enlace = {
   dominios: (empresa) => rpc("empresa_dominios_de", { p_empresa: empresa }),
   ponerDominio: (empresa, dominio, quitar = false) => rpc("admin_dominio_poner", { p_empresa: empresa, p_dominio: dominio, p_quitar: quitar }),
 };
+
+// ---- Correo de contabilidad: adjuntos que esperan en el servidor hasta que la app los recoge ----
+export const correoEntrada = {
+  pendientes: async () => { const { data, error } = await sb.from("correo_entrada").select("id,empresa_id,de,asunto,nombre,ruta,recibido").order("recibido"); if (error) throw error; return data || []; },
+  descargar: async (ruta) => { const { data, error } = await sb.storage.from("entrada").download(ruta); if (error) throw error; return data; },
+  recogido: async (x) => { await sb.storage.from("entrada").remove([x.ruta]); await rpc("correo_entrada_recogido", { p_id: x.id }); },
+};

@@ -169,7 +169,7 @@ export default function App() {
     case "carpetas":
       vista = <div className="app"><header className="app-cab"><div><div className="eyebrow">Mi empresa</div><h1>Carpetas de la empresa</h1></div></header><CarpetasEmpresa config={config} guardar={guardar} /></div>; break;
     case "contabilidad":
-      vista = <ContabilidadWeb config={config} guardar={guardar} />; break;
+      vista = <ContabilidadWeb config={config} guardar={guardar} empresaId={empresa.id} />; break;
     case "contabilidad/carpeta":
       vista = <VistaCarpeta titulo="Carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} contabilidad config={config} />; break;
     case "usuarios":
