@@ -92,3 +92,9 @@ Write-Host "Listo. Se ha abierto una ventana negra: es la IA." -ForegroundColor 
 Write-Host "Cuando en esa ventana ponga 'server is listening', vuelve a Mi Despacho y pulsa 'Comprobar de nuevo'."
 Write-Host "Otros días: abre «IA local de Mi Despacho» en el escritorio. Para apagarla, cierra su ventana."
 Write-Host "Si el navegador pregunta si permites el acceso a la red local, pulsa 'Permitir'."
+Write-Host ""
+Write-Host "Esta IA es gratis y NO necesita claves (API keys): trabaja en tu ordenador." -ForegroundColor Cyan
+Write-Host "Claves opcionales de IA en la nube (por si el ordenador esta apagado): en Mi Despacho, menu Herramientas > IA gratis en tu ordenador."
+Write-Host "  Google (recomendada): https://aistudio.google.com/apikey"
+Write-Host "  Groq: https://console.groq.com/keys    Cerebras: https://cloud.cerebras.ai"
+Write-Host "Se guardan cifradas en tu cuenta de Mi Despacho; solo hay que ponerlas una vez."
