@@ -5,6 +5,7 @@ import { estadoEncargo, marcarFirmadoFuera } from "../../lib/encargoEstado.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
 import { leerJSON, escribirJSON, leerVinculados } from "./datos.js";
 import { paquete } from "./paquete.js";
+import { PROGRAMAS } from "./motor.js";
 import { enRango, noPagada } from "./periodo.js";
 
 async function escribirArchivo(raiz, ruta, nombre, texto) {
@@ -20,7 +21,7 @@ export default function EnviarGestoria({ raiz, empresa, datos, diario, extra, r,
   const [fuera, setFuera] = useState({ abierto: false, gestoria: enc.gestoria || "", fecha: "" });
   const [hecho, setHecho] = useState(null);
   const [correo, setCorreo] = useState(false);
-  const [formato, setFormato] = useState(config?.formatoGestoria || "a3");
+  const [formato, setFormato] = useState(config?.programaGestoria || "a3eco");
   const firmado = enc.estado === "firmado";
   const fact = datos.facturas.filter((f) => enRango(f.fecha, r));
   const etiqueta = r.corta;
@@ -81,8 +82,8 @@ export default function EnviarGestoria({ raiz, empresa, datos, diario, extra, r,
           {(firmado || seguir) && (
             <>
               <p><strong>Periodo: {r.etiqueta}</strong> <span className="muted pequeño">(se cambia arriba, en el selector de periodo)</span></p>
-              <label className="mc-campo"><span>Programa de la gestoría</span><select value={formato} onChange={(e) => setFormato(e.target.value)}><option value="a3">A3</option><option value="sage">Sage / ContaPlus</option></select></label>
-              <p className="mc-nota">{fact.length} facturas · {pendientes.length} pendientes de pago{sinRevisar.length ? ` · ${sinRevisar.length} sin revisar` : ""}. Se guardarán el diario para {formato === "sage" ? "Sage" : "A3"}, el plan de subcuentas, los libros de facturas, los impuestos, el extracto conciliado y lo pendiente en <strong>para la gestoria › {etiqueta}</strong>, dentro de la carpeta compartida: la gestoría lo verá al momento.</p>
+              <label className="mc-campo"><span>Programa de la gestoría</span><select value={formato} onChange={(e) => setFormato(e.target.value)}>{Object.entries(PROGRAMAS).map(([k, x]) => <option key={k} value={k}>{x.nombre}</option>)}</select></label>
+              <p className="mc-nota">{fact.length} facturas · {pendientes.length} pendientes de pago{sinRevisar.length ? ` · ${sinRevisar.length} sin revisar` : ""}. Se guardarán el diario para {PROGRAMAS[formato]?.nombre}, el plan de subcuentas, los libros de facturas, los impuestos, el extracto conciliado y lo pendiente en <strong>para la gestoria › {etiqueta}</strong>, dentro de la carpeta compartida: la gestoría lo verá al momento.</p>
               {hecho && <p className="mc-ok">Hecho: guardado en {hecho}. Ahora puedes avisar a la gestoría por correo.</p>}
             </>
           )}

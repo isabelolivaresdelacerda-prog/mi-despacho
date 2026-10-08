@@ -306,28 +306,49 @@ export function balance(asientos, esfl = PLAN === "esfl") {
   return { activo, pn, pasivo, totalActivo: tA, totalPasivo: tP, cuadra: Math.abs(tA - tP) < 0.05 };
 }
 
-// ---- Exportación para A3 / Sage: un apunte por línea, subcuentas a 8 dígitos ----
-const pad8 = (c) => (String(c).length >= 8 ? String(c) : String(c).padEnd(8, "0"));
-export function exportarApuntes(asientos, formato = "a3") {
+// ---- Exportación para A3 / Sage / ContaPlus: un apunte por línea, subcuentas a la longitud del programa ----
+// Programas de la gestoría: formato de columnas, longitud de subcuenta y formato de fecha
+export const PROGRAMAS = {
+  a3eco: { nombre: "A3ECO", formato: "a3", digitos: 8, fecha: "dmy" },
+  a3asesor: { nombre: "A3ASESOR | con (A3 Software)", formato: "a3", digitos: 8, fecha: "dmy" },
+  a3innuva: { nombre: "a3innuva Contabilidad", formato: "a3", digitos: 8, fecha: "dmy" },
+  sage50: { nombre: "Sage 50 (antes ContaWin)", formato: "sage", digitos: 8, fecha: "dmy" },
+  sage200: { nombre: "Sage 200", formato: "sage", digitos: 9, fecha: "dmy" },
+  sagedespachos: { nombre: "Sage Despachos Connected", formato: "sage", digitos: 8, fecha: "dmy" },
+  contaplus: { nombre: "ContaPlus (Sage)", formato: "contaplus", digitos: 8, fecha: "ymd" },
+};
+// Cuenta a n dígitos: las subcuentas de terceros (410/430/400 + número) rellenan con ceros por dentro; el resto por detrás
+export function cuentaN(c, n = 8) {
+  const s = String(c);
+  if (/^(400|410|430)\d{5,}$/.test(s)) return s.slice(0, 3) + String(+s.slice(3)).padStart(n - 3, "0");
+  return s.length >= n ? s.slice(0, n) : s.padEnd(n, "0");
+}
+const pad8 = (c) => cuentaN(c, 8);
+const fechaPrograma = (f, tipo) => { const o = fechaOrden(f); return tipo === "ymd" ? o.replace(/-/g, "") : `${o.slice(8, 10)}/${o.slice(5, 7)}/${o.slice(0, 4)}`; };
+export function exportarApuntes(asientos, formato = "a3", opciones = {}) {
+  const P = PROGRAMAS[opciones.programa] || {};
+  const n = opciones.digitos || P.digitos || 8, tf = P.fecha || "dmy";
+  const fmtF = PROGRAMAS[formato] ? PROGRAMAS[formato].formato : P.formato || formato;
   const sep = ";";
-  const fmt = (n) => (n ? n.toFixed(2).replace(".", ",") : "");
+  const fmt = (x) => (x ? x.toFixed(2).replace(".", ",") : "");
   const q = (s) => { const t = String(s ?? ""); return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-  const cab = formato === "sage"
+  const cab = fmtF === "sage" || fmtF === "contaplus"
     ? ["Asiento", "Fecha", "Subcuenta", "Contrapartida", "Concepto", "Documento", "Debe", "Haber"]
     : ["Fecha", "Asiento", "Cuenta", "Descripción cuenta", "Concepto", "Debe", "Haber", "Documento"];
   const filas = [cab];
   for (const a of asientos) for (const l of a.lineas) {
     const contra = a.lineas.find((x) => x !== l && (l.debe ? x.haber : x.debe));
-    filas.push(formato === "sage"
-      ? [a.num, a.fecha, pad8(l.cuenta), contra ? pad8(contra.cuenta) : "", a.concepto.slice(0, 40), (a.doc || "").slice(0, 20), fmt(l.debe), fmt(l.haber)]
-      : [a.fecha, a.num, pad8(l.cuenta), l.titulo, a.concepto.slice(0, 60), fmt(l.debe), fmt(l.haber), a.doc || ""]);
+    const f = fechaPrograma(a.fecha, tf);
+    filas.push(fmtF === "sage" || fmtF === "contaplus"
+      ? [a.num, f, cuentaN(l.cuenta, n), contra ? cuentaN(contra.cuenta, n) : "", a.concepto.slice(0, fmtF === "contaplus" ? 25 : 40), (a.doc || "").slice(0, fmtF === "contaplus" ? 10 : 20), fmt(l.debe), fmt(l.haber)]
+      : [f, a.num, cuentaN(l.cuenta, n), l.titulo, a.concepto.slice(0, 60), fmt(l.debe), fmt(l.haber), a.doc || ""]);
   }
-  return "﻿" + filas.map((r) => r.map(q).join(sep)).join("\r\n");
+  return "\ufeff" + filas.map((r) => r.map(q).join(sep)).join("\r\n");
 }
-export function exportarPlanCuentas(asientos) {
+export function exportarPlanCuentas(asientos, digitos = 8) {
   const m = mayores(asientos);
   const nifs = {};
   for (const a of asientos) for (const l of a.lineas) if (l.nif) nifs[l.cuenta] = l.nif;
   const q = (s) => { const t = String(s ?? ""); return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-  return "﻿" + [["Cuenta", "Título", "NIF"], ...m.map((c) => [pad8(c.cuenta), c.titulo, nifs[c.cuenta] || ""])].map((r) => r.map(q).join(";")).join("\r\n");
+  return "﻿" + [["Cuenta", "Título", "NIF"], ...m.map((c) => [cuentaN(c.cuenta, digitos), c.titulo, nifs[c.cuenta] || ""])].map((r) => r.map(q).join(";")).join("\r\n");
 }

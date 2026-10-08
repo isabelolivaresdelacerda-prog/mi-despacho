@@ -141,7 +141,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
         {tab === "libros" && <Libros datos={dd} diario={diario} extra={extra} guardarExtra={guardarExtra} r={r} sub={subLibros} setSub={setSubLibros} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
         {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} onCambio={() => cargarExtra()} propia={propia} revisionAuto={revAuto} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
-        {tab === "exportar" && <ExportarTodo d={dd} diario={diario} extra={extra} r={r} config={config} raiz={raiz} aviso={aviso} />}
+        {tab === "exportar" && <ExportarTodo d={dd} diario={diario} extra={extra} r={r} config={config} guardarConfig={guardarConfig} raiz={raiz} aviso={aviso} />}
       </>}
       {enviar && datos && <EnviarGestoria raiz={raiz} empresa={empresa} datos={dd} diario={diario} extra={extra} r={r} config={config} aviso={aviso} onCerrar={() => setEnviar(false)} />}
       {nodoAviso}

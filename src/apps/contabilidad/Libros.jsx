@@ -1,7 +1,7 @@
 // Contabilidad completa dentro de Mi Despacho: diario, mayores, sumas y saldos, pérdidas y ganancias, balance,
 // banco por aplicar (con asistente para elegir la cuenta), asientos manuales y exportación a A3 / Sage.
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov, adivinarTercero, claveTercero } from "./motor.js";
+import { filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov, adivinarTercero, claveTercero, PROGRAMAS } from "./motor.js";
 export { adivinarTercero };
 import { planPorDefecto } from "../../lib/entidad.js";
 import { eur, num, descargarTexto, fechaOrden } from "./datos.js";
@@ -27,15 +27,15 @@ export default function Libros({ datos, diario, extra, guardarExtra, r, sub, set
       <div className="acciones cont-barra">
         <nav className="sub-tabs">{SUB.map(([k, t]) => <button key={k} className={sub === k ? "on" : ""} onClick={() => setSub(k)}>{t}{k === "aplicar" && pendP.length > 0 && <span className="insignia">{pendP.length}</span>}</button>)}</nav>
       </div>
-      <p className="muted pequeño">{r.etiqueta}. La contabilidad se genera sola con las facturas, el banco y las escrituras y contratos vinculados. Lo propuesto por la IA debe revisarlo una persona.{descuadrados > 0 && <span className="pend"> Hay {descuadrados} asientos descuadrados: revisa esas facturas.</span>}</p>
+      <p className="muted pequeño">{r.etiqueta}. La contabilidad se genera sola con las facturas, el banco y las escrituras y contratos vinculados. Lo propuesto por la IA debe revisarlo una persona.{descuadrados > 0 && <span className="pend"> Hay {descuadrados} asientos descuadrados (diferencia {eur(Math.abs(asientos.filter((a) => !a.cuadra).reduce((t, a) => t + a.lineas.reduce((s, l) => s + l.debe - l.haber, 0), 0)))}): <button className="enlace" type="button" onClick={() => setSub("sumas")}>ver cuáles</button>.</span>}</p>
       {sub === "diario" && <Diario asientos={asientos} />}
       {sub === "mayor" && <Mayor asientos={asientos} />}
-      {sub === "sumas" && <Sumas asientos={asientos} />}
+      {sub === "sumas" && <Sumas asientos={asientos} irDiario={() => setSub("diario")} />}
       {sub === "pyg" && <PyG esfl={tipoPlan === "esfl"} asientos={asientos} anio={r.etiqueta} acumulado={r.tramo !== "anio" ? ejercicio : null} />}
       {sub === "balance" && <Balance esfl={tipoPlan === "esfl"} asientos={ejercicio} anio={fin} />}
       {sub === "aplicar" && <Aplicar pendientes={pendP} total={pendientes.length} asig={extra.asig} plan={tipoPlan} guardar={async (n) => { await guardarExtra("asig", n); aviso?.("Movimiento contabilizado"); }} />}
       {sub === "manual" && <Manual manuales={extra.manuales} plan={tipoPlan} guardar={async (n) => { await guardarExtra("manuales", n); aviso?.("Asiento guardado"); }} />}
-      {sub === "exportar" && <Exportar asientos={asientos} anio={r.corta} />}
+      {sub === "exportar" && <Exportar asientos={asientos} anio={r.corta} config={config} />}
       {sub === "plan" && <PlanContable tipo={tipoPlan} cambiar={(p) => guardarConfig({ ...config, planContable: p })} aviso={aviso} />}
     </div>
   );
@@ -76,15 +76,27 @@ function Mayor({ asientos }) {
   );
 }
 
-function Sumas({ asientos }) {
+function Sumas({ asientos, irDiario }) {
   const m = mayores(asientos);
   const T = m.reduce((t, c) => ({ d: t.d + c.debe, h: t.h + c.haber }), { d: 0, h: 0 });
+  const dif = Math.round((T.d - T.h) * 100) / 100;
+  const desc = asientos.filter((a) => !a.cuadra).map((a) => ({ a, dif: Math.round(a.lineas.reduce((s, l) => s + l.debe - l.haber, 0) * 100) / 100 }));
   return (
-    <div className="tabla-scroll"><table className="tabla">
-      <thead><tr><th>Cuenta</th><th>Título</th><th className="num">Sumas debe</th><th className="num">Sumas haber</th><th className="num">Saldo deudor</th><th className="num">Saldo acreedor</th></tr></thead>
-      <tbody>{m.map((c) => { const s = c.debe - c.haber; return <tr key={c.cuenta}><td className="cta">{a8(c.cuenta)}</td><td>{c.titulo}</td><td className="num">{eur(c.debe)}</td><td className="num">{eur(c.haber)}</td><td className="num">{s > 0.005 ? eur(s) : ""}</td><td className="num">{s < -0.005 ? eur(-s) : ""}</td></tr>; })}</tbody>
-      <tfoot><tr><td colSpan="2"><strong>Totales</strong> {Math.abs(T.d - T.h) < 0.01 ? <span className="ok">cuadra</span> : <span className="pend">no cuadra</span>}</td><td className="num"><strong>{eur(T.d)}</strong></td><td className="num"><strong>{eur(T.h)}</strong></td><td colSpan="2" /></tr></tfoot>
-    </table></div>
+    <div>
+      {Math.abs(dif) >= 0.01 && (
+        <div className="nota error">
+          <p><strong>No cuadra: diferencia de {eur(Math.abs(dif))}</strong> ({dif > 0 ? "el debe supera al haber" : "el haber supera al debe"}). Viene de {desc.length} asiento{desc.length === 1 ? "" : "s"} descuadrado{desc.length === 1 ? "" : "s"}; normalmente falta la base, el IVA, la retención o el total en la factura.</p>
+          <table className="tabla"><thead><tr><th>Asiento</th><th>Fecha</th><th>Concepto</th><th>Documento</th><th className="num">Descuadre</th></tr></thead>
+            <tbody>{desc.map(({ a, dif: x }) => <tr key={a.num}><td>{a.num}</td><td>{a.fecha}</td><td>{a.concepto}</td><td className="pequeño">{a.doc}</td><td className="num"><strong>{eur(x)}</strong></td></tr>)}</tbody></table>
+          <p className="pequeño">Corrígelas en «Facturas» (botón «Corregir», con el PDF al lado) o mira el <button className="enlace" type="button" onClick={irDiario}>libro diario</button>.</p>
+        </div>
+      )}
+      <div className="tabla-scroll"><table className="tabla">
+        <thead><tr><th>Cuenta</th><th>Título</th><th className="num">Sumas debe</th><th className="num">Sumas haber</th><th className="num">Saldo deudor</th><th className="num">Saldo acreedor</th></tr></thead>
+        <tbody>{m.map((c) => { const s = c.debe - c.haber; return <tr key={c.cuenta}><td className="cta">{a8(c.cuenta)}</td><td>{c.titulo}</td><td className="num">{eur(c.debe)}</td><td className="num">{eur(c.haber)}</td><td className="num">{s > 0.005 ? eur(s) : ""}</td><td className="num">{s < -0.005 ? eur(-s) : ""}</td></tr>; })}</tbody>
+        <tfoot><tr><td colSpan="2"><strong>Totales</strong> {Math.abs(dif) < 0.01 ? <span className="ok">cuadra</span> : <span className="pend">no cuadra · diferencia {eur(Math.abs(dif))}</span>}</td><td className="num"><strong>{eur(T.d)}</strong></td><td className="num"><strong>{eur(T.h)}</strong></td><td colSpan="2" /></tr></tfoot>
+      </table></div>
+    </div>
   );
 }
 
@@ -220,17 +232,17 @@ function Manual({ manuales, guardar, plan: tipo }) {
   );
 }
 
-function Exportar({ asientos, anio }) {
+function Exportar({ asientos, anio, config }) {
+  const prog = config?.programaGestoria || "a3eco", P = PROGRAMAS[prog] || PROGRAMAS.a3eco, n = +config?.digitosGestoria || P.digitos;
+  const nom = P.nombre.split(" (")[0].replace(/[|/\\:*?"<>]/g, "").trim();
   return (
     <div className="tarjeta">
-      <h3>Llevar la contabilidad a A3 o Sage</h3>
-      <p>Se descarga el libro diario del periodo {anio}, un apunte por línea, con las subcuentas a 8 dígitos, y el plan de cuentas usado. La gestoría lo importa con la opción de importar asientos desde Excel o texto de su programa.</p>
+      <h3>Diario para {P.nombre}</h3>
+      <p>Libro diario del periodo {anio}, preparado para <strong>{P.nombre}</strong>: subcuentas a {n} dígitos y fecha {P.fecha === "ymd" ? "aaaammdd" : "dd/mm/aaaa"}. El programa y los dígitos se eligen en la pestaña «Exportar A3 / Sage», donde también está el paquete completo en ZIP.</p>
       <div className="acciones">
-        <button className="btn" type="button" onClick={() => descargarTexto(exportarApuntes(asientos, "a3"), `Diario ${anio} - A3.csv`)}>Diario para A3</button>
-        <button className="btn" type="button" onClick={() => descargarTexto(exportarApuntes(asientos, "sage"), `Diario ${anio} - Sage.csv`)}>Diario para Sage / ContaPlus</button>
-        <button className="btn ghost" type="button" onClick={() => descargarTexto(exportarPlanCuentas(asientos), `Plan de cuentas ${anio}.csv`)}>Plan de cuentas</button>
+        <button className="btn" type="button" onClick={() => descargarTexto(exportarApuntes(asientos, prog, { programa: prog, digitos: n }), `Diario ${anio} - ${nom}.csv`)}>Descargar el diario</button>
+        <button className="btn ghost" type="button" onClick={() => descargarTexto(exportarPlanCuentas(asientos, n), `Plan de cuentas ${anio}.csv`)}>Plan de cuentas</button>
       </div>
-      <p className="muted pequeño">Cada versión de A3 y Sage tiene su propio asistente de importación: la primera vez, la gestoría indica qué columna es cada dato (fecha, cuenta, debe, haber…). Si me pasan un archivo de ejemplo de su programa, se puede generar exactamente en su formato.</p>
     </div>
   );
 }

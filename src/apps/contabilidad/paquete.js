@@ -1,5 +1,5 @@
 // Paquete completo del periodo para la gestoría y para importar en A3 o Sage.
-import { exportarApuntes, exportarPlanCuentas, filtrarPeriodo } from "./motor.js";
+import { exportarApuntes, exportarPlanCuentas, filtrarPeriodo, PROGRAMAS } from "./motor.js";
 import { libroFacturasCSV, libroEmitidasCSV, csv, eur, num } from "./datos.js";
 import { enRango, porGestionar, cifras, modelosDelAnio, casillas, fechaBonita, NOMBRE_MODELO } from "./periodo.js";
 
@@ -7,7 +7,11 @@ export function paquete({ d, diario, extra, r, formato = "a3", config }) {
   const todos = diario.asientos;
   const A = filtrarPeriodo(todos, r.desde, r.hasta);
   const eti = r.corta.replace(/\s+/g, " ");
-  const F = formato === "sage" ? "Sage" : "A3";
+  // formato = clave del programa de la gestoría (a3eco, sage50, contaplus…) o, por compatibilidad, "a3" / "sage"
+  const prog = PROGRAMAS[formato] ? formato : formato === "sage" ? "sage50" : "a3eco";
+  const P = PROGRAMAS[prog];
+  const digitos = +config?.digitosGestoria || P.digitos;
+  const F = P.nombre.split(" (")[0].replace(/[|/\\:*?"<>]/g, "").trim();
   const fR = d.facturas.filter((f) => enRango(f.fecha, r)), fE = (d.emitidas || []).filter((f) => enRango(f.fecha, r));
   const movs = d.movimientos.filter((m) => enRango(m.fecha, r));
   const pendIds = new Set(diario.pendientes.map((m) => m._id));
@@ -30,7 +34,7 @@ export function paquete({ d, diario, extra, r, formato = "a3", config }) {
   const empresa = config?.empresa?.razon_social || config?.nombre || "";
   const leeme = [
     `CONTABILIDAD ${empresa} – ${r.etiqueta}`, `Preparado con Mi Despacho el ${new Date().toLocaleString("es-ES")}`, "",
-    `Diario ${F}.csv: un apunte por línea (fecha, asiento, cuenta a 8 dígitos, concepto, debe, haber, documento). En ${F}: importar asientos desde fichero de texto/Excel, separador «;», decimales con coma.`,
+    `Diario ${F}.csv: preparado para ${P.nombre}. Un apunte por línea, subcuentas a ${digitos} dígitos, fecha ${P.fecha === "ymd" ? "aaaammdd" : "dd/mm/aaaa"}, separador «;», decimales con coma. En el programa: importar asientos desde fichero de texto/Excel.`,
     "Plan de subcuentas.csv: cuentas y subcuentas usadas, con el NIF de cada proveedor (410xxxxx) y cliente (430xxxxx). Conviene importarlo antes que el diario.",
     "Libro facturas recibidas / emitidas.csv: libros registro de IVA del periodo.",
     "Impuestos.csv: modelos del periodo con sus casillas (orientativas) y lo ya presentado.",
@@ -41,8 +45,8 @@ export function paquete({ d, diario, extra, r, formato = "a3", config }) {
   ].join("\r\n");
 
   return [
-    { nombre: `Diario ${F} ${eti}.csv`, texto: exportarApuntes(A, formato) },
-    { nombre: `Plan de subcuentas ${eti}.csv`, texto: exportarPlanCuentas(filtrarPeriodo(todos, null, r.hasta)) },
+    { nombre: `Diario ${F} ${eti}.csv`, texto: exportarApuntes(A, prog, { programa: prog, digitos }) },
+    { nombre: `Plan de subcuentas ${eti}.csv`, texto: exportarPlanCuentas(filtrarPeriodo(todos, null, r.hasta), digitos) },
     { nombre: `Libro facturas recibidas ${eti}.csv`, texto: libroFacturasCSV(fR) },
     { nombre: `Libro facturas emitidas ${eti}.csv`, texto: libroEmitidasCSV(fE) },
     { nombre: `Impuestos ${eti}.csv`, texto: csv(imp) },
