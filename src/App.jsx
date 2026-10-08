@@ -180,7 +180,7 @@ export default function App() {
     <div className="marco" style={tema}>
       <aside className={"lateral" + (menuAbierto ? " abierto" : "")}>
         <div className="lateral-cab">
-          <a href="#/inicio" className={"marca" + (config.logo ? " con-logo" : "")}>{config.logo ? <><img className="logo-apilado" src={config.logo} alt="" /><span>{config.nombre || "Mi Despacho"}</span></> : <><Logo config={config} /><span>{config.nombre || "Mi Despacho"}</span></>}</a>
+          <a href="#/inicio" className={"marca" + (config.logo ? " con-logo" : "")}>{config.logo ? <><img className="logo-apilado" src={config.logo} alt={config.nombre || "Mi Despacho"} /><span className="marca-usuario">{yo.nombre || yo.email}</span></> : <><Logo config={config} /><span>{config.nombre || "Mi Despacho"}</span></>}</a>
           <button className="btn-menu" type="button" aria-label="Menú" aria-expanded={menuAbierto} onClick={() => setMenuAbierto(!menuAbierto)}>☰</button>
         </div>
         <nav className="menu">

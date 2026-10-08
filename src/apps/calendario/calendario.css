@@ -19,3 +19,45 @@
 .avisos-inicio .vencido { color: var(--error); }
 .etq-v { font-size: 11px; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
 @media (max-width: 700px) { .cal-ev { grid-template-columns: auto 1fr; } .cal-ev .cal-tipo { grid-column: 2; } }
+
+/* Hoy y cuenta atrás */
+.cal-hoy { display: flex; gap: 18px; align-items: center; }
+.cal-hoy-dia { display: flex; flex-direction: column; align-items: center; min-width: 92px; padding: 8px 10px; border-radius: 14px; background: var(--brand); color: var(--sobre-brand); text-transform: capitalize; font-size: 13px; }
+.cal-hoy-dia strong { font: 600 36px/1 var(--serif); }
+.cal-hoy-txt { margin: 0 0 4px; font: 600 18px var(--serif); }
+.cal-sig { margin: 0; }
+.cal-cuenta { display: inline-block; background: color-mix(in srgb, var(--aviso) 18%, var(--superficie)); border-radius: 999px; padding: 1px 10px; }
+.avisos-inicio .cal-hoy { margin-bottom: 12px; }
+
+/* Cuadro del mes + avisos al lado */
+.cal-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+.cal-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cal-nav h2 { margin: 0 6px; min-width: 190px; text-align: center; font-size: 20px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dsem { text-align: center; font-size: 12px; color: var(--suave); font-weight: 600; padding: 4px 0; }
+.cal-celda { min-height: 86px; background: var(--papel); border: 1px solid var(--linea); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; cursor: pointer; overflow: hidden; color: var(--tinta); }
+.cal-celda.vacia { background: transparent; border-color: transparent; cursor: default; }
+.cal-celda:hover { border-color: var(--brand); }
+.cal-celda.hoy { border: 2px solid var(--brand); background: var(--brand-suave); }
+.cal-celda.hoy .cal-num { background: var(--brand); color: var(--sobre-brand); border-radius: 999px; padding: 0 6px; }
+.cal-celda.sel { box-shadow: 0 0 0 2px var(--brand) inset; }
+.cal-num { font-size: 13px; font-weight: 600; align-self: flex-start; }
+.cal-chip { font-size: 11px; line-height: 1.25; padding: 1px 4px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--linea); background: var(--superficie); }
+.cal-chip.t-impuesto { border-left-color: var(--brand); }
+.cal-chip.t-mercantil { border-left-color: #3b5b8c; }
+.cal-chip.t-laboral { border-left-color: #6b7f3a; }
+.cal-chip.t-propio { border-left-color: #8a5a00; }
+.cal-chip.vencido { background: color-mix(in srgb, var(--error) 14%, var(--superficie)); }
+.cal-chip.pronto { background: color-mix(in srgb, var(--aviso) 16%, var(--superficie)); }
+.cal-chip.hecho { opacity: .5; text-decoration: line-through; }
+.cal-mas { font-size: 11px; color: var(--suave); }
+.cal-leyenda { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0 0; color: var(--suave); }
+.punto { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--linea); vertical-align: middle; }
+.punto.t-impuesto { background: var(--brand); } .punto.t-mercantil { background: #3b5b8c; } .punto.t-laboral { background: #6b7f3a; } .punto.t-propio { background: #8a5a00; }
+.cal-avisos { position: sticky; top: 12px; max-height: 80vh; overflow: auto; }
+.cal-avisos h3 { font-size: 16px; margin: 4px 0 8px; display: flex; justify-content: space-between; gap: 8px; text-transform: none; }
+.cal-avisos h3.error { color: var(--error); }
+.cal-avisos ul { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cal-avisos .cal-ev { grid-template-columns: auto 1fr; }
+.cal-avisos .cal-fecha { flex-direction: row; gap: 6px; align-items: baseline; text-transform: capitalize; }
+@media (max-width: 900px) { .cal-layout { grid-template-columns: 1fr; } .cal-celda { min-height: 54px; } .cal-chip { font-size: 0; height: 6px; padding: 0; } .cal-avisos { position: static; max-height: none; } }

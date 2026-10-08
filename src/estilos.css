@@ -252,3 +252,8 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 
 .enlace-tarjeta { text-decoration: none; color: var(--tinta); margin-bottom: 16px; }
 .enlace-tarjeta:hover { border-color: var(--brand); }
+
+/* Con logo: el logo ocupa el ancho del menú y debajo va quién ha entrado (el nombre de la empresa ya está en el logo) */
+.marca.con-logo { display: flex; width: 100%; align-items: center; }
+.marca.con-logo .logo-apilado { width: 100%; min-width: 0; max-width: 220px; max-height: 130px; }
+.marca.con-logo > .marca-usuario { font: 400 13px var(--sans); color: var(--suave); max-width: 100%; }
