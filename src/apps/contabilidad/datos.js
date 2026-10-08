@@ -72,7 +72,7 @@ export async function subir(raiz, carpeta, files) {
 }
 
 // ---- datos internos (carpeta "programa") ----
-async function dirEstado(raiz) { return (await sub(raiz, "programa")) || raiz; }
+export async function dirEstado(raiz) { return (await sub(raiz, "programa")) || raiz; }
 export async function leerJSON(raiz, nombre, defecto) {
   try {
     const d = await dirEstado(raiz);
@@ -158,7 +158,10 @@ export async function cargarTodo(raiz) {
     d._sinTexto = !d._leida && !!cacheF["facturas_emitidas/" + a.nombre]?.ocr;
     return d;
   });
-  const movimientos = (extractoApi.movimientos || []).map((m, i) => ({ ...m, importe: num(m.importe), _id: i }));
+  // Movimientos: los de la conexión con el banco + los de los extractos en Excel que la conexión no trae (más antiguos)
+  let extractos = [];
+  try { const b = await import("./banco.js"); extractos = b.juntarMovimientos(extractoApi.movimientos || [], await b.leerExtractos(raiz)); } catch { extractos = extractoApi.movimientos || []; }
+  const movimientos = extractos.map((m, i) => ({ ...m, importe: num(m.importe), _id: i }));
   // Conciliación sencilla: vínculo manual o movimiento con el mismo importe (pago) a partir de la fecha de la factura
   const usados = new Set();
   for (const f of facturas.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)))) {
