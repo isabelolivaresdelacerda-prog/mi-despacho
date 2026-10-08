@@ -11,7 +11,8 @@ import { revisarCarpeta } from "./inventario.js";
 const FORMATO = /^\d{8} - /;
 const limpio = (t) => String(t || "").replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
 const aaaammdd = (f) => { const m = String(f || "").match(/(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/); if (!m) return ""; const y = m[3].length === 2 ? "20" + m[3] : m[3]; return y + m[2].padStart(2, "0") + m[1].padStart(2, "0"); };
-const eurNombre = (x) => Math.abs(num(x)).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// 1.815,00 (con punto de miles siempre: toLocaleString no lo pone en números de 4 cifras)
+const eurNombre = (x) => { const [e, d] = Math.abs(num(x)).toFixed(2).split("."); return e.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "," + d; };
 const ext = (n) => (n.match(/\.[^.]+$/) || [".pdf"])[0].toLowerCase();
 
 const PROMPT_BANCO = `Eres contable. Este es un documento del banco de la empresa. Responde SOLO con JSON:

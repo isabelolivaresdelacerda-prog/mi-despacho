@@ -264,7 +264,9 @@ function marcarDuplicadas(lista, ter) {
   const vistos = new Map(), dup = new Map();
   for (const f of orden) {
     const numero = String(f.numero || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const claves = [numero && f.total ? `n|${numero}|${Math.round(f.total * 100)}` : null, f._arch?.tam ? `s|${f._arch.tam}` : null].filter(Boolean);
+    // Mismo proveedor y mismo número de factura = la misma factura (aunque una copia se haya leído con otro importe)
+    const prov = String(f[ter] || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    const claves = [numero && numero.length >= 3 ? `n|${prov}|${numero}` : null, f._arch?.tam ? `s|${f._arch.tam}` : null].filter(Boolean);
     const ya = claves.map((k) => vistos.get(k)).find(Boolean);
     if (ya && ya !== f.archivo) dup.set(f.archivo, ya); else claves.forEach((k) => vistos.set(k, f.archivo));
   }

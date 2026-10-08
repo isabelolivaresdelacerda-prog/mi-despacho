@@ -44,6 +44,25 @@ export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAni
   };
   const quitar = async (m) => { if (!window.confirm(`¿Quitar el registro del modelo ${m.modelo} ${m.etiqueta}?`)) return; const n = { ...presentados }; delete n[m.clave]; await guardar(n); };
 
+  // Leer los PDF de la AEAT de la carpeta «impuestos» y dejarlos registrados como presentados (con sus casillas)
+  const [leyendoDecl, setLeyendoDecl] = useState(false);
+  const leerDeclaraciones = async () => {
+    setLeyendoDecl(true);
+    try {
+      const { textoPDF } = await import("./leer.js"); const { leerDeclaracion } = await import("./declaraciones.js");
+      const n = { ...presentados }; let k = 0; const raros = [];
+      for (const x of docs.filter((y) => /\.pdf$/i.test(y.nombre))) {
+        const t = await textoPDF(await x.h.getFile(), 8, { ocr: false });
+        const dcl = leerDeclaracion(t);
+        if (!dcl || !dcl.anio || !dcl.tramo) { raros.push(x.nombre); continue; }
+        const clave = claveModelo(dcl.anio, dcl.tramo === "0A" ? "anio" : dcl.tramo, dcl.modelo);
+        n[clave] = { ...(n[clave] || {}), modelo: dcl.modelo, anio: dcl.anio, tramo: dcl.tramo, fecha: dcl.fecha, importe: dcl.importe, justificante: dcl.justificante, resultado: dcl.resultado, archivo: x.nombre, casillas: dcl.casillas, ...(dcl.modelo === "303" ? { ivaRep: dcl.ivaRep, ivaSop: dcl.ivaSop, baseSop: dcl.baseSop, declarado: true } : {}), leidoDelPDF: true, registrado: new Date().toISOString() };
+        k++;
+      }
+      await guardar(n); aviso?.(`${k} declaraciones leídas de la carpeta «impuestos»${raros.length ? ` · sin reconocer: ${raros.join(", ")}` : ""}`);
+    } catch (e) { aviso?.("No se han podido leer: " + (e.message || e)); } finally { setLeyendoDecl(false); }
+  };
+
   const exportar = () => {
     const filas = [["Modelo", "Periodo", "Casilla", "Concepto", "Importe", "Presentado", "Fecha presentación", "Resultado", "Importe presentado", "Justificante", "Pagado en banco"]];
     for (const m of modelos) {
@@ -95,6 +114,22 @@ export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAni
           </tbody></table>
         </section>
       )}
+
+      <section className="tarjeta">
+        <div className="acciones"><button className="btn" type="button" disabled={leyendoDecl} onClick={leerDeclaraciones}>{leyendoDecl ? "Leyendo…" : "Leer las declaraciones de la carpeta «impuestos»"}</button>
+          <span className="muted pequeño">Lee los justificantes de la AEAT (PDF) y compara lo declarado con lo que hay en la contabilidad de ese trimestre.</span></div>
+        {modelos.filter((m) => m.modelo === "303" && presentados[m.clave]?.declarado).map((m) => {
+          const p = presentados[m.clave], fs = (d.facturas || []).filter((f) => !f._duplicadoDe && !f.noFactura && f.iva_importe && fechaOrden(f.fecha) >= m.r.desde && fechaOrden(f.fecha) <= m.r.hasta);
+          const libro = fs.reduce((a, f) => a + (f.iva_importe || 0), 0) + fs.filter((f) => f.isp).reduce((a, f) => a + Math.round(f.base * 21) / 100, 0);
+          const dif = Math.round((libro - (p.ivaSop || 0)) * 100) / 100;
+          return (
+            <div key={m.clave} className={"comprobacion " + (Math.abs(dif) < 1 ? "bien" : "mal")}>
+              <strong>303 {m.etiqueta}</strong>: IVA soportado declarado {eur(p.ivaSop || 0)} (base {eur(p.baseSop || 0)}) · según las facturas del trimestre {eur(libro)} ·{" "}
+              {Math.abs(dif) < 1 ? <span className="ok">cuadra</span> : <span className="pend">{dif > 0 ? `faltan por deducir ${eur(dif)}: facturas de este trimestre que no entraron en la declaración (se pueden deducir en una posterior, hasta 4 años)` : `se dedujo ${eur(-dif)} más de lo que hay en facturas: puede que falte subir alguna factura o que se metiera una de otro trimestre`}</span>}
+              {Math.abs(dif) >= 1 && <details><summary className="pequeño">Ver las {fs.length} facturas del trimestre</summary><ul className="pequeño">{fs.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha))).map((f) => <li key={f.archivo}>{f.fecha} · {f.proveedor} {f.numero} · IVA {eur(f.iva_importe)}{f.isp ? " (+ISP)" : ""}</li>)}</ul></details>}
+            </div>);
+        })}
+      </section>
 
       {grupos.map(([t, titulo]) => {
         const ms = modelos.filter((m) => m.tramo === t);

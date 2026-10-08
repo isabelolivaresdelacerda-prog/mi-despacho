@@ -58,6 +58,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
 
   // Al abrir la contabilidad, la app revisa sola la carpeta de la empresa (solo lee lo nuevo)
   const [revAuto, setRevAuto] = useState(0);
+  useEffect(() => { if (raiz) import("./leer.js").then((m) => m.usarRegistroTextos(raiz)); }, [raiz]);
   const revisado = useRef(false);
   useEffect(() => { if (!datos || !empresa || !raiz || revisado.current) return; revisado.current = true;
     revisarCarpeta({ empresa, raiz, propia }).then((x) => { setRevAuto((n) => n + 1); if (x.vinculados) { cargarExtra(); aviso(`La app ha leído ${x.nuevos.length} documentos nuevos de la carpeta de la empresa y ha vinculado ${x.vinculados} a la contabilidad. Revísalos en «Escrituras y contratos».`); } }).catch(() => {});

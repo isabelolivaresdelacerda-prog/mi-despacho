@@ -7,9 +7,36 @@ import { num, asignarCuenta } from "./datos.js";
 
 pdfjs.GlobalWorkerOptions.workerSrc = worker;
 
+// Registro de textos ya leídos («programa/textos_documentos.json»): la huella (SHA-256) del archivo → su texto.
+// Así un documento ya leído (aunque se renombre o se mueva) no se vuelve a leer ni a pasar por el OCR.
+let _raizTextos = null, _textos = null, _pendiente = null;
+export function usarRegistroTextos(raiz) { _raizTextos = raiz; _textos = null; }
+async function registro() {
+  if (_textos || !_raizTextos) return _textos || {};
+  const { leerJSON } = await import("./datos.js");
+  _textos = await leerJSON(_raizTextos, "textos_documentos.json", {});
+  return _textos;
+}
+function guardarRegistro() {
+  if (!_raizTextos || !_textos) return;
+  clearTimeout(_pendiente);
+  _pendiente = setTimeout(async () => { const { escribirJSON } = await import("./datos.js"); await escribirJSON(_raizTextos, "textos_documentos.json", _textos); }, 1500);
+}
+export async function huellaArchivo(file) {
+  const h = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // Texto del PDF. Si es un escaneado (sin texto), se lee con OCR en tu ordenador (Tesseract, en español):
 // la imagen no sale del navegador; los archivos del OCR se sirven desde la propia app.
-export async function textoPDF(file, maxPaginas = 4, { ocr = true, onPaso } = {}) {
+export async function textoPDF(file, maxPaginas = 4, opciones = {}) {
+  let h = null;
+  try { const reg = await registro(); h = await huellaArchivo(file); if (reg[h]?.texto) return reg[h].texto; } catch { /* sin registro */ }
+  const t = await textoPDFsinRegistro(file, maxPaginas, opciones);
+  try { if (h && t && t.replace(/\s/g, "").length > 20) { const reg = await registro(); reg[h] = { nombre: file.name || "", texto: t.slice(0, 20000), leido: new Date().toISOString().slice(0, 10) }; guardarRegistro(); } } catch { /* nada */ }
+  return t;
+}
+async function textoPDFsinRegistro(file, maxPaginas = 4, { ocr = true, onPaso } = {}) {
   const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
   let t = "";
   for (let i = 1; i <= Math.min(doc.numPages, maxPaginas); i++) {
@@ -44,7 +71,13 @@ async function ocrPDF(doc, paginas) {
   return t;
 }
 // OCR de una imagen (jpg/png) suelta
-export async function textoImagen(file) { const w = await trabajadorOCR(); return (await w.recognize(file)).data.text; }
+export async function textoImagen(file) {
+  let h = null;
+  try { const reg = await registro(); h = await huellaArchivo(file); if (reg[h]?.texto) return reg[h].texto; } catch { /* sin registro */ }
+  const w = await trabajadorOCR(); const t = (await w.recognize(file)).data.text;
+  try { if (h && t) { const reg = await registro(); reg[h] = { nombre: file.name || "", texto: t.slice(0, 20000), leido: new Date().toISOString().slice(0, 10) }; guardarRegistro(); } } catch { /* nada */ }
+  return t;
+}
 
 const PROMPT = `Eres un extractor de facturas españolas. Lee el texto de la factura y responde SOLO con un JSON con esta estructura exacta:
 {"numero":"","fecha":"dd/mm/aaaa","proveedor":"","nif_proveedor":"","iban_proveedor":"","cliente":"","nif_cliente":"","base":0.0,"iva_pct":0.0,"iva_importe":0.0,"retencion_pct":0.0,"retencion_importe":0.0,"gastos_suplidos":0.0,"total":0.0,"moneda":"EUR","isp":false,"concepto":""}

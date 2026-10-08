@@ -395,3 +395,6 @@ label small { font-size: 12px; }
 .tarea-ia.hecha { background: color-mix(in srgb, #1d9a56 8%, transparent); border-color: color-mix(in srgb, #1d9a56 30%, transparent); }
 .girando { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; animation: girar 0.9s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
+.comprobacion { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; border: 1px solid var(--linea); }
+.comprobacion.bien { background: color-mix(in srgb, #1d9a56 7%, transparent); }
+.comprobacion.mal { background: color-mix(in srgb, var(--aviso) 8%, transparent); }
