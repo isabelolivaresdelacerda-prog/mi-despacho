@@ -175,8 +175,11 @@ export function generarDiario({ facturas, emitidas = [], movimientos }, vinculad
     if (!t.periodico) {
       if (!num(v.importe)) continue;
       const mov = movimientos.find((x) => !usados.has(x._id) && Math.abs(Math.abs(x.importe) - num(v.importe)) < 0.011 && Math.sign(x.importe) === t.signo);
-      if (mov) usados.add(mov._id);
-      asiento(v.fecha || mov?.fecha, c, t.signo > 0 ? [{ cuenta: "572", debe: v.importe }, { cuenta, haber: v.importe }] : [{ cuenta, debe: v.importe }, { cuenta: "572", haber: v.importe }], "documento", v.archivo, mov ? mov._id : null);
+      // Sin su movimiento en el banco no se apunta nada contra el banco (si no, el saldo de la 572 se inventa dinero):
+      // el documento queda como informativo hasta que aparezca el cobro o pago, o se aplique a mano.
+      if (!mov) continue;
+      usados.add(mov._id);
+      asiento(v.fecha || mov.fecha, c, t.signo > 0 ? [{ cuenta: "572", debe: v.importe }, { cuenta, haber: v.importe }] : [{ cuenta, debe: v.importe }, { cuenta: "572", haber: v.importe }], "documento", v.archivo, mov._id);
     } else {
       for (const q of vencimientos(v, movimientos)) {
         if (!q.mov) continue;
