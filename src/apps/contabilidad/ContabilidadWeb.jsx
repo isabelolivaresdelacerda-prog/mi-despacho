@@ -15,7 +15,7 @@ import { generarDiario, usarPlan } from "./motor.js";
 import Impuestos, { impuestosParaDiario, otrosParaDiario } from "./Impuestos.jsx";
 import ExportarTodo from "./ExportarTodo.jsx";
 import { noPagada } from "./periodo.js";
-import { leerVinculados, leerJSON, escribirJSON } from "./datos.js";
+import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.js";
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
@@ -60,9 +60,12 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
   };
   const tipoPlan = config?.planContable || "pymes";
   usarPlan(tipoPlan);
-  const diario = useMemo(() => (datos ? generarDiario(datos, extra.vinc, extra.manuales, extra.asig, [...impuestosParaDiario(extra.presentados), ...otrosParaDiario(extra.otros)]) : { asientos: [], pendientes: [], sinPagar: new Set() }), [datos, extra, tipoPlan]);
+  // Datos de la propia empresa (Ajustes) para no confundir emisor y receptor
+  const propia = useMemo(() => ({ nombre: config?.empresa?.razon_social || config?.nombre || "", cif: config?.empresa?.cif || "" }), [config]);
+  const datosC = useMemo(() => (datos ? corregirPropia(datos, propia) : null), [datos, propia]);
+  const diario = useMemo(() => (datosC ? generarDiario(datosC, extra.vinc, extra.manuales, extra.asig, [...impuestosParaDiario(extra.presentados), ...otrosParaDiario(extra.otros)]) : { asientos: [], pendientes: [], sinPagar: new Set() }), [datosC, extra, tipoPlan]);
   // Datos con el estado de pago calculado por saldo de cada tercero
-  const dd = useMemo(() => (datos ? { ...datos, sinPagar: diario.sinPagar } : null), [datos, diario]);
+  const dd = useMemo(() => (datosC ? { ...datosC, sinPagar: diario.sinPagar } : null), [datosC, diario]);
   const anios = useMemo(() => {
     const h = new Date().getFullYear(); const s = new Set([h, per.anio]);
     for (const x of [...(datos?.facturas || []), ...(datos?.emitidas || []), ...(datos?.movimientos || [])]) { const y = +fechaOrden(x.fecha).slice(0, 4); if (y > 2000 && y <= h + 1) s.add(y); }
@@ -123,7 +126,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
       {datos && ["resumen", "facturas", "banco", "libros", "exportar"].includes(tab) && <SelPeriodo anio={per.anio} tramo={per.tramo} cambiar={cambiarPeriodo} cierres={extra.cierres} anios={anios} />}
       {!datos ? <p className="muted">Leyendo la carpeta…</p> : <>
         {tab === "resumen" && <ResumenPeriodo d={dd} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
-        {tab === "facturas" && <Facturas d={dd} r={r} raiz={raiz} recargar={cargar} aviso={aviso} emitidas={verEmitidas} setEmitidas={setVerEmitidas} />}
+        {tab === "facturas" && <Facturas d={dd} propia={propia} r={r} raiz={raiz} recargar={cargar} aviso={aviso} emitidas={verEmitidas} setEmitidas={setVerEmitidas} />}
         {tab === "banco" && <BancoPeriodo d={dd} raiz={raiz} recargar={cargar} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
         {tab === "impuestos" && <Impuestos raiz={raiz} d={dd} todos={diario.asientos} pendientes={diario.pendientes} anio={per.anio} anios={anios} cambiarAnio={(a) => cambiarPeriodo(a, per.tramo)} presentados={extra.presentados} guardar={(n) => guardarExtra("presentados", n)} otros={extra.otros} guardarOtros={(n) => guardarExtra("otros", n)} opciones={config?.calendario || {}} entidad={config?.empresa?.forma || "sl"} aviso={aviso} />}
         {tab === "libros" && <Libros datos={dd} diario={diario} extra={extra} guardarExtra={guardarExtra} r={r} sub={subLibros} setSub={setSubLibros} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
@@ -154,7 +157,15 @@ function Cabecera({ carpeta, acciones }) {
 const CAMPOS_E = [["fecha", "Fecha"], ["numero", "Número"], ["cliente", "Cliente"], ["nif_cliente", "NIF"], ["base", "Base"], ["iva_pct", "% IVA"], ["iva_importe", "IVA"], ["retencion_pct", "% Ret."], ["retencion_importe", "Retención"], ["total", "Total"], ["cuenta_pgc", "Cuenta"]];
 const CAMPOS = [["fecha", "Fecha"], ["numero", "Número"], ["proveedor", "Proveedor"], ["nif_proveedor", "NIF"], ["base", "Base"], ["iva_pct", "% IVA"], ["iva_importe", "IVA"], ["retencion_pct", "% Ret."], ["retencion_importe", "Retención"], ["total", "Total"], ["cuenta_pgc", "Cuenta"]];
 
-function Facturas({ d, r, raiz, recargar, aviso, emitidas = false, setEmitidas }) {
+// Vista previa del documento dentro del cuadro de corrección
+function VistaDoc({ arch }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => { let u = ""; (async () => { if (!arch) return; const f = await arch.h.getFile(); u = URL.createObjectURL(f); setUrl(u); })(); return () => u && URL.revokeObjectURL(u); }, [arch]);
+  if (!url) return <div className="vista-doc vacia">Cargando el documento…</div>;
+  return /\.(jpe?g|png)$/i.test(arch.nombre) ? <img className="vista-doc" src={url} alt="Documento" /> : <iframe className="vista-doc" src={url} title="Documento" />;
+}
+
+function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEmitidas }) {
   const fuente = emitidas ? d.emitidas || [] : d.facturas;
   const campos = emitidas ? CAMPOS_E : CAMPOS;
   const ter = emitidas ? "cliente" : "proveedor";
@@ -172,7 +183,7 @@ function Facturas({ d, r, raiz, recargar, aviso, emitidas = false, setEmitidas }
       try {
         const file = await f._arch.h.getFile();
         const { leerFactura } = await import("./leer.js");
-        const r = await leerFactura(file);
+        const r = await leerFactura(file, { propia, emitida: emitidas });
         if (r.datos) await guardarLectura(raiz, f.archivo, file.lastModified, { archivo: f.archivo, ...r.datos, ...(emitidas ? { cuenta_pgc: "705" } : {}) }, emitidas);
       } catch { /* sigue con la siguiente */ }
     }
@@ -196,7 +207,7 @@ function Facturas({ d, r, raiz, recargar, aviso, emitidas = false, setEmitidas }
           <tbody>{lista.map((f) => (
             <tr key={f.archivo} className={!f._leida ? "sin-leer" : undefined}>
               <td>{f.fecha || "—"}</td>
-              <td>{f[ter] || <em className="muted">{f.archivo}</em>}{f.analizado_ia && !f._editada && <span className="etq" title="Datos propuestos por IA, sin revisar">IA</span>}</td>
+              <td>{f[ter] || <em className="muted">{f.archivo}</em>}{f.analizado_ia && !f._editada && <span className="etq" title="Datos propuestos por IA, sin revisar">IA</span>}{f._papelesCambiados && !f._editada && <span className="etq aviso" title="La IA puso a tu empresa como emisora: se han cambiado los papeles. Revísala.">emisor corregido</span>}{f._proveedorPropio && <span className="etq aviso" title="Sale tu propia empresa como proveedor: corrígela">¿tu empresa como proveedor?</span>}</td>
               <td>{f.numero}</td><td className="num">{eur(f.base)}</td><td className="num">{eur(f.iva_importe)}</td><td className="num">{f.retencion_importe ? eur(f.retencion_importe) : ""}</td>
               <td className="num"><strong>{eur(f.total)}</strong></td><td title={TITULOS_PGC[f.cuenta_pgc]}>{f.cuenta_pgc}</td>
               <td>{!f.total ? "" : !noPagada(f, d) ? <span className="ok" title={(f._pago || f._cobro)?.texto}>{emitidas ? "Cobrada" : "Pagada"}{(f._pago || f._cobro)?.fecha ? " " + (f._pago || f._cobro).fecha : ""}</span> : <span className="pend">Pendiente</span>}</td>
@@ -209,16 +220,21 @@ function Facturas({ d, r, raiz, recargar, aviso, emitidas = false, setEmitidas }
       </div>
       {edit && (
         <div className="mc-fondo" role="dialog" aria-modal="true">
-          <div className="mc-dialogo">
+          <div className="mc-dialogo ancho con-doc">
             <header><h2>Corregir factura {emitidas ? "emitida" : "recibida"}</h2><button className="mc-x" onClick={() => setEdit(null)} aria-label="Cerrar">×</button></header>
-            <div className="mc-cuerpo">
-              <p className="muted pequeño">{edit.archivo} · <button className="enlace" type="button" onClick={() => abrir(edit._arch)}>ver el PDF</button></p>
-              <div className="rejilla-edit">
-                {campos.map(([k, t]) => <label key={k} className="mc-campo"><span>{t}</span><input value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} /></label>)}
+            <div className="mc-cuerpo doc-y-datos">
+              <VistaDoc arch={edit._arch} />
+              <div>
+                <p className="muted pequeño">{edit.archivo} · <button className="enlace" type="button" onClick={() => abrir(edit._arch)}>abrir en otra pestaña</button></p>
+                {(edit._papelesCambiados || edit._proveedorPropio) && <p className="mc-nota">La IA había puesto a tu empresa como {emitidas ? "cliente" : "proveedora"}. {edit._papelesCambiados ? "Se han cambiado los papeles automáticamente: compruébalo con el documento y guarda." : "Escribe aquí quién emite realmente la factura."}</p>}
+                <div className="rejilla-edit">
+                  {campos.map(([k, t]) => <label key={k} className="mc-campo"><span>{t}</span><input value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} /></label>)}
+                </div>
+                {!emitidas && <label className="mc-campo"><span>Pago (si se pagó por otra vía: quién lo pagó, p. ej. «Pagado por Solve con la provisión»)</span>
+                  <input value={edit._pagoTxt ?? (edit._pago?.manual ? edit._pago.texto : "")} placeholder="p. ej. Pagado por Solve con la provisión" onChange={(e) => setEdit({ ...edit, _pagoTxt: e.target.value })} />
+                </label>}
+                {!emitidas && propia?.nombre && <button className="enlace pequeño" type="button" onClick={async () => { await guardarEdicion(raiz, edit.archivo, Object.fromEntries(CAMPOS.map(([k]) => [k, String(edit[k] ?? "")])), false); /* mover a emitidas */ const h = await edit._arch.h.getFile(); await subir(raiz, "facturas_emitidas", [new File([h], edit.archivo, { type: h.type })]); try { const dir = await raiz.getDirectoryHandle("facturas"); await dir.removeEntry(edit.archivo); } catch { /* si no se puede borrar, queda duplicada */ } setEdit(null); aviso("Movida a facturas emitidas"); recargar(); }}>Esta factura la emití yo: moverla a «facturas emitidas»</button>}
               </div>
-              {!emitidas && <label className="mc-campo"><span>Pago (si se pagó por otra vía: quién lo pagó, p. ej. «Pagado por Solve con la provisión»)</span>
-                <input value={edit._pagoTxt ?? (edit._pago?.manual ? edit._pago.texto : "")} placeholder="p. ej. Pagado por Solve con la provisión" onChange={(e) => setEdit({ ...edit, _pagoTxt: e.target.value })} />
-              </label>}
             </div>
             <footer>
               <button className="mc-btn sec" onClick={() => setEdit(null)}>Cancelar</button>

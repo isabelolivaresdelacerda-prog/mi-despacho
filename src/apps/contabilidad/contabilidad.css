@@ -98,3 +98,10 @@ label.check { flex-direction: row; align-items: center; gap: 6px; font-size: 14p
 .tarjeta.detectado, table.detectado { background: color-mix(in srgb, var(--brand) 5%, var(--superficie)); }
 .sel-periodo .hoy { margin-left: 8px; font-size: 13px; }
 .impuestos-anio .error, span.error { color: var(--error); font-size: 13px; font-weight: 600; }
+.mc-dialogo.con-doc { width: min(1200px, 97vw); }
+.doc-y-datos { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; align-items: start; }
+.vista-doc { width: 100%; height: 70vh; border: 1px solid var(--linea); border-radius: 10px; background: #fff; object-fit: contain; }
+.vista-doc.vacia { display: grid; place-items: center; color: var(--suave); }
+.etq.aviso { border-color: var(--aviso); color: var(--aviso); }
+.tabla tr.sub-fila td { font-size: 13px; background: var(--superficie); }
+@media (max-width: 900px) { .doc-y-datos { grid-template-columns: 1fr; } .vista-doc { height: 50vh; } }

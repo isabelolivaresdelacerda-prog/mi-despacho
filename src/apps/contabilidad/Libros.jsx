@@ -1,7 +1,8 @@
 // Contabilidad completa dentro de Mi Despacho: diario, mayores, sumas y saldos, pérdidas y ganancias, balance,
 // banco por aplicar (con asistente para elegir la cuenta), asientos manuales y exportación a A3 / Sage.
-import { useEffect, useMemo, useState } from "react";
-import { filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov } from "./motor.js";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov, adivinarTercero, claveTercero } from "./motor.js";
+export { adivinarTercero };
 import { eur, num, descargarTexto, fechaOrden } from "./datos.js";
 import { plan, comprobarBOE, descargarDelBOE, aplicarActualizacion, fechaBOE, a8 } from "./pgc.js";
 import Asistente from "./Asistente.jsx";
@@ -122,48 +123,61 @@ function Balance({ asientos, anio }) {
   );
 }
 
-// Nombre probable del tercero en el concepto del banco: "S/ORD.TRANSFERENCIA pago topografico SEPA 618289694330 david alcon martin" → "David Alcon Martin"
-export function adivinarTercero(concepto) {
-  let t = String(concepto || "");
-  const largos = [...t.matchAll(/\d{6,}/g)];
-  if (largos.length) { const resto = t.slice(largos[largos.length - 1].index + largos[largos.length - 1][0].length).trim(); if (resto.length > 3) t = resto; }
-  t = t.replace(/\b(s\/ord|ord|transf\w*|sepa|pago|recibo|adeudo|cargo|abono|bizum|a favor de|de|n[ºo]\.?|ref\w*|concepto)\b\.?/gi, " ").replace(/[\d/.:_-]+/g, " ").replace(/\s+/g, " ").trim();
-  return t.toLowerCase().replace(/(^|\s)\S/g, (x) => x.toUpperCase()).slice(0, 60);
-}
 // ¿Esta cuenta suele llevar factura de un tercero?
 const llevaFactura = (c) => /^(60|62[0-579]|21|20)/.test(c) || /^7[05]/.test(c);
 
 function Aplicar({ pendientes, total, asig, guardar, plan: tipo }) {
-  const [mov, setMov] = useState(null);
-  const [paso, setPaso] = useState(null); // { mov, cuenta, e, tercero, factura }
+  const [elegir, setElegir] = useState(null); // { movs, nombre, regla }
+  const [paso, setPaso] = useState(null);     // { movs, regla, cuenta, e, tercero, factura }
+  const [abierto, setAbierto] = useState(null);
+  // Agrupado por entidad: se contesta una vez y vale para todos sus movimientos (y los que lleguen después)
+  const grupos = useMemo(() => {
+    const g = new Map();
+    for (const m of pendientes) { const n = adivinarTercero(m.concepto) || "Sin nombre"; const k = claveTercero(n); if (!g.has(k)) g.set(k, { k, nombre: n, movs: [] }); g.get(k).movs.push(m); }
+    return [...g.values()].sort((a, b) => b.movs.length - a.movs.length || Math.abs(b.movs.reduce((s, m) => s + m.importe, 0)) - Math.abs(a.movs.reduce((s, m) => s + m.importe, 0)));
+  }, [pendientes]);
   if (!pendientes.length) return <div className="vacio"><p>✓ Todos los movimientos del banco de este periodo están contabilizados.</p>{total > 0 && <p className="muted">Quedan {total} sin documento en otros periodos.</p>}</div>;
   const terminar = (p) => {
-    const base = { cuenta: p.cuenta, concepto: p.mov.concepto, nota: p.e };
-    guardar({ ...asig, [claveMov(p.mov)]: p.factura && p.tercero.trim() ? { ...base, tercero: p.tercero.trim(), esperaFactura: true } : { ...base, tercero: p.tercero.trim() || undefined } });
-    setPaso(null);
+    const v = { cuenta: p.cuenta, nota: p.e, ...(p.tercero.trim() ? { tercero: p.tercero.trim() } : {}), ...(p.factura && p.tercero.trim() ? { esperaFactura: true } : {}) };
+    const n = { ...asig };
+    if (p.regla) n["@" + claveTercero(p.tercero || p.nombre)] = { ...v, regla: true, nombreBanco: p.nombre };
+    if (p.regla && claveTercero(p.tercero) !== claveTercero(p.nombre)) n["@" + claveTercero(p.nombre)] = { ...v, regla: true, nombreBanco: p.nombre };
+    if (!p.regla) for (const m of p.movs) n[claveMov(m)] = { ...v, concepto: m.concepto };
+    guardar(n); setPaso(null);
   };
+  const reglas = Object.entries(asig).filter(([k]) => k.startsWith("@"));
   return (
     <div>
-      <p className="muted pequeño">Estos movimientos del banco no tienen factura ni documento. Mientras no se les asigne cuenta van a «partidas pendientes de aplicación» (555). Pulsa «¿Dónde va?» y contesta unas preguntas sencillas. Si es un pago a un profesional o proveedor, se le abre su propia subcuenta y queda pendiente su factura.</p>
+      <p className="muted pequeño">Movimientos del banco sin factura ni documento, agrupados por entidad. Contesta una vez «¿Dónde va?» por cada entidad y se aplica a todos sus movimientos y a los que lleguen después. Mientras tanto van a «partidas pendientes de aplicación» (555). Si es un profesional o proveedor, se le abre su subcuenta y queda pendiente su factura.</p>
       <div className="tabla-scroll"><table className="tabla">
-        <thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th><th></th></tr></thead>
-        <tbody>{pendientes.map((m) => <tr key={m._id}><td>{m.fecha}</td><td>{m.concepto}</td><td className={"num " + (m.importe < 0 ? "neg" : "pos")}>{eur(m.importe)}</td><td><button className="btn mini" type="button" onClick={() => setMov(m)}>¿Dónde va?</button></td></tr>)}</tbody>
+        <thead><tr><th>Entidad</th><th className="num">Movimientos</th><th className="num">Importe</th><th></th></tr></thead>
+        <tbody>{grupos.map((g) => (<Fragment key={g.k}>
+          <tr>
+            <td><button className="enlace" type="button" onClick={() => setAbierto(abierto === g.k ? null : g.k)}>{abierto === g.k ? "▾" : "▸"} <strong>{g.nombre}</strong></button></td>
+            <td className="num">{g.movs.length}</td>
+            <td className={"num " + (g.movs.reduce((s, m) => s + m.importe, 0) < 0 ? "neg" : "pos")}>{eur(g.movs.reduce((s, m) => s + m.importe, 0))}</td>
+            <td><button className="btn mini" type="button" onClick={() => setElegir({ movs: g.movs, nombre: g.nombre, regla: true })}>¿Dónde va? {g.movs.length > 1 ? `(los ${g.movs.length})` : ""}</button></td>
+          </tr>
+          {abierto === g.k && g.movs.map((m) => <tr key={m._id} className="sub-fila"><td className="sangria">{m.fecha} · {m.concepto}</td><td></td><td className={"num " + (m.importe < 0 ? "neg" : "pos")}>{eur(m.importe)}</td><td><button className="enlace" type="button" onClick={() => setElegir({ movs: [m], nombre: g.nombre, regla: false })}>solo este</button></td></tr>)}
+        </Fragment>))}</tbody>
       </table></div>
-      {mov && <Asistente plan={tipo} contexto={`${mov.fecha} · ${mov.concepto} · ${eur(mov.importe)}`} onCerrar={() => setMov(null)}
-        onElegir={(cuenta, e) => { setPaso({ mov, cuenta, e, tercero: adivinarTercero(mov.concepto), factura: llevaFactura(cuenta) }); setMov(null); }} />}
+      {reglas.length > 0 && <details className="pequeño"><summary>Reglas por entidad ({reglas.length})</summary><ul>{reglas.map(([k, v]) => <li key={k}>{v.nombreBanco || v.tercero || k.slice(1)} → {a8(v.cuenta)}{v.esperaFactura ? " (subcuenta propia, espera factura)" : ""} <button className="enlace" type="button" onClick={() => { const n = { ...asig }; delete n[k]; guardar(n); }}>quitar</button></li>)}</ul></details>}
+      {elegir && <Asistente plan={tipo} contexto={`${elegir.nombre} · ${elegir.movs.length} movimiento${elegir.movs.length > 1 ? "s" : ""} · ${eur(elegir.movs.reduce((s, m) => s + m.importe, 0))}`} onCerrar={() => setElegir(null)}
+        onElegir={(cuenta, e) => { setPaso({ ...elegir, cuenta, e, tercero: elegir.nombre === "Sin nombre" ? "" : elegir.nombre, factura: llevaFactura(cuenta) }); setElegir(null); }} />}
       {paso && (
         <div className="mc-fondo" role="dialog" aria-modal="true" aria-labelledby="tr-t">
           <div className="mc-dialogo">
-            <header><h2 id="tr-t">{paso.mov.importe < 0 ? "¿A quién se le ha pagado?" : "¿Quién ha pagado?"}</h2><button className="mc-x" onClick={() => setPaso(null)} aria-label="Cerrar">×</button></header>
+            <header><h2 id="tr-t">{paso.movs[0].importe < 0 ? "¿A quién se le paga?" : "¿Quién paga?"}</h2><button className="mc-x" onClick={() => setPaso(null)} aria-label="Cerrar">×</button></header>
             <div className="mc-cuerpo">
-              <p className="mc-nota">{paso.mov.fecha} · {paso.mov.concepto} · {eur(paso.mov.importe)}</p>
-              <label className="mc-campo"><span>Nombre del {paso.mov.importe < 0 ? "profesional o proveedor" : "cliente"}</span><input autoFocus value={paso.tercero} onChange={(e) => setPaso({ ...paso, tercero: e.target.value })} placeholder="p. ej. David Alcón Martín" /></label>
+              <p className="mc-nota">{paso.movs.length} movimiento{paso.movs.length > 1 ? "s" : ""} · {paso.movs[0].concepto}{paso.movs.length > 1 ? "…" : ""}</p>
+              <label className="mc-campo"><span>Nombre de la entidad (corrígelo si hace falta)</span><input autoFocus value={paso.tercero} onChange={(e) => setPaso({ ...paso, tercero: e.target.value })} placeholder="p. ej. Solve Abogados" /></label>
               <div className="as-opciones">
                 <button type="button" className={paso.factura ? "on" : ""} onClick={() => setPaso({ ...paso, factura: true })}>
-                  <strong>Tiene o tendrá factura</strong><br /><small>Se apunta en su subcuenta ({paso.mov.importe < 0 ? "410" : "430"} + su nombre) y queda pendiente su factura. Cuando la subas, el gasto irá a {a8(paso.cuenta)}{paso.mov.importe < 0 && /^62[23]/.test(paso.cuenta) ? " con su retención (modelo 111)" : ""}.</small></button>
+                  <strong>Tiene o tendrá factura</strong><br /><small>Se le abre su subcuenta ({paso.movs[0].importe < 0 ? "410" : "430"} + su nombre) y se cuadra con sus facturas por saldo. El gasto irá a {a8(paso.cuenta)}{/^62[23]/.test(paso.cuenta) ? " con su retención (modelo 111)" : ""}.</small></button>
                 <button type="button" className={!paso.factura ? "on" : ""} onClick={() => setPaso({ ...paso, factura: false })}>
                   <strong>No lleva factura</strong><br /><small>Tasas, impuestos, comisiones del banco, nóminas, préstamos, aportaciones… Va directamente a {a8(paso.cuenta)}.</small></button>
               </div>
+              {paso.movs.length === 1 && <label className="check"><input type="checkbox" checked={paso.regla} onChange={(e) => setPaso({ ...paso, regla: e.target.checked })} /> Aplicarlo también a los próximos movimientos de esta entidad</label>}
             </div>
             <footer>
               <button className="mc-btn sec" onClick={() => setPaso(null)}>Cancelar</button>

@@ -130,6 +130,18 @@ export function importeEnNombre(nombre) {
   return [...String(nombre).matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})(?!\d)/g)].map((m) => num(m[1].includes(",") ? m[1] : m[1].replace(".", ",")));
 }
 
+// Movimiento del banco que paga (o cobra) una factura: mismo importe, desde 60 días antes de la factura hasta 1 año después;
+// si hay varios, el que lleva el nombre del tercero en el concepto y luego el más cercano en fecha.
+const palabras = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().split(/[^A-Z0-9]+/).filter((w) => w.length >= 4 && !/^(SL|SLU|SA|SERVICIOS|GESTION|ABOGADOS|DAVID|MARIA|JOSE)$/.test(w));
+function mejorMovimiento(movimientos, usados, total, signo, fecha, tercero) {
+  const f0 = Date.parse(fechaOrden(fecha)) || 0, pal = palabras(tercero);
+  const cand = movimientos.filter((x) => !usados.has(x._id) && Math.sign(x.importe) === signo && Math.abs(Math.abs(x.importe) - total) < 0.011)
+    .map((x) => { const dias = ((Date.parse(fechaOrden(x.fecha)) || 0) - f0) / 86400000; const c = palabras(x.concepto).join(" "); return { x, dias, nombre: pal.some((w) => c.includes(w)) }; })
+    .filter((c) => c.dias >= -60 && c.dias <= 366);
+  cand.sort((a, b) => (b.nombre - a.nombre) || (Math.abs(a.dias) - Math.abs(b.dias)));
+  return cand[0]?.x || null;
+}
+
 export async function cargarTodo(raiz) {
   const [cacheF, editsF, editsE, cacheIA, cacheB, extractoApi, vincular, empresa, capital, justManual] = await Promise.all([
     leerJSON(raiz, "cache_facturas.json", {}), leerJSON(raiz, "edits_facturas.json", {}), leerJSON(raiz, "edits_emitidas.json", {}),
@@ -151,13 +163,13 @@ export async function cargarTodo(raiz) {
     const v = vincular[f.archivo];
     if (v) { f._pago = { fecha: v.fecha, texto: v.descripcion, manual: true }; continue; }
     if (!f.total) continue;
-    const m = movimientos.find((x) => !usados.has(x._id) && x.importe < 0 && Math.abs(Math.abs(x.importe) - f.total) < 0.011 && fechaOrden(x.fecha) >= fechaOrden(f.fecha));
+    const m = mejorMovimiento(movimientos, usados, f.total, -1, f.fecha, f.proveedor);
     if (m) { usados.add(m._id); m._factura = f.archivo; f._pago = { fecha: m.fecha, texto: m.concepto }; }
   }
   // Cobros de las facturas emitidas
   for (const f of emitidas.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)))) {
     if (!f.total) continue;
-    const m = movimientos.find((x) => !usados.has(x._id) && x.importe > 0 && Math.abs(x.importe - f.total) < 0.011 && fechaOrden(x.fecha) >= fechaOrden(f.fecha));
+    const m = mejorMovimiento(movimientos, usados, f.total, 1, f.fecha, f.cliente);
     if (m) { usados.add(m._id); m._emitida = f.archivo; f._cobro = { fecha: m.fecha, texto: m.concepto }; }
   }
   // Justificantes individuales del banco (adeudos, transferencias, recibos) en «documentos_banco»
@@ -174,6 +186,22 @@ export async function cargarTodo(raiz) {
   }
   return { facturas, emitidas, movimientos, justificantes: justif, empresa, capital, cacheF, editsF, vincular, justManual, docsBanco: Object.values(cacheB) };
 }
+// Facturas en las que la IA ha confundido emisor y receptor: si el «proveedor» de una factura recibida es la propia empresa
+// (o el «cliente» de una emitida), se intercambian los papeles y se marca para revisar.
+const sinSignos = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\b(S\.?L\.?U?|S\.?A\.?)\b/g, "").replace(/[^A-Z0-9]/g, "");
+export function esPropia(nombre, nif, propia) {
+  if (!propia) return false;
+  const n = sinSignos(nombre), p = sinSignos(propia.nombre), c = sinSignos(propia.cif);
+  return (!!c && sinSignos(nif) === c) || (!!p && p.length >= 4 && !!n && (n.includes(p) || p.includes(n) && n.length >= 6));
+}
+export function corregirPropia(datos, propia) {
+  if (!propia || !datos) return datos;
+  const swap = (f, a, na, b, nb) => ({ ...f, [a]: f[b] || "", [na]: f[nb] || "", [b]: f[a], [nb]: f[na], _papelesCambiados: true });
+  const facturas = datos.facturas.map((f) => (esPropia(f.proveedor, f.nif_proveedor, propia) ? (f.cliente && !esPropia(f.cliente, f.nif_cliente, propia) ? swap(f, "proveedor", "nif_proveedor", "cliente", "nif_cliente") : { ...f, _proveedorPropio: true }) : f));
+  const emitidas = (datos.emitidas || []).map((f) => (esPropia(f.cliente, f.nif_cliente, propia) ? (f.proveedor && !esPropia(f.proveedor, f.nif_proveedor, propia) ? swap(f, "cliente", "nif_cliente", "proveedor", "nif_proveedor") : { ...f, _proveedorPropio: true }) : f));
+  return { ...datos, facturas, emitidas };
+}
+
 // Misma clave que el motor (fecha|importe|concepto) para guardar asociaciones a mano
 export const claveMovDatos = (m) => `${m.fecha}|${Math.round(num(m.importe) * 100) / 100}|${(m.concepto || "").slice(0, 60)}`;
 export async function guardarJustificante(raiz, m, nombre) {
