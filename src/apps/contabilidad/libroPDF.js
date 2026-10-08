@@ -1,5 +1,5 @@
 // Libro de facturas numerado y un único PDF con todas las facturas en ese orden, cada una sellada con su número del libro.
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, degrees } from "pdf-lib";
 import { fechaOrden, eur } from "./datos.js";
 
 const normal = (t) => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\x20-\x7E€]/g, " ").replace(/€/g, "EUR");
@@ -51,9 +51,14 @@ export async function libroPDF(libro, { titulo, empresa, emitidas = false, onPas
       if (/\.pdf$/i.test(f.archivo)) { const src = await PDFDocument.load(bytes, { ignoreEncryption: true }); paginas = await pdf.copyPages(src, src.getPageIndices()); paginas.forEach((p) => pdf.addPage(p)); }
       else { const img = /\.png$/i.test(f.archivo) ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes); const p = pdf.addPage([595, 842]); const e = Math.min(555 / img.width, 780 / img.height); p.drawImage(img, { x: 20, y: 820 - img.height * e, width: img.width * e, height: img.height * e }); paginas = [p]; }
       paginas.forEach((p, i) => {
-        const { width, height } = p.getSize(), t = i ? `${sello} (pag. ${i + 1})` : sello, w = fB.widthOfTextAtSize(t, 9);
-        p.drawRectangle({ x: width - w - 22, y: height - 24, width: w + 12, height: 16, color: rgb(1, 1, 0.85), borderColor: rgb(0.6, 0.5, 0), borderWidth: 0.6 });
-        p.drawText(t, { x: width - w - 16, y: height - 19, size: 9, font: fB, color: rgb(0.3, 0.2, 0) });
+        // Sello arriba a la derecha tal como se ve la página (aunque el escaneo esté girado)
+        const { width: W, height: H } = p.getSize(), a = ((p.getRotation().angle % 360) + 360) % 360;
+        const vw = a % 180 ? H : W, vh = a % 180 ? W : H;
+        const t = i ? `${sello} (pag. ${i + 1})` : sello, w = fB.widthOfTextAtSize(t, 9);
+        const aUser = (vx, vy) => (a === 90 ? [W - vy, vx] : a === 180 ? [W - vx, H - vy] : a === 270 ? [vy, H - vx] : [vx, vy]);
+        const [rx, ry] = aUser(vw - w - 22, vh - 24), [tx, ty] = aUser(vw - w - 16, vh - 19);
+        p.drawRectangle({ x: rx, y: ry, width: w + 12, height: 16, rotate: degrees(a), color: rgb(1, 1, 0.85), borderColor: rgb(0.6, 0.5, 0), borderWidth: 0.6 });
+        p.drawText(t, { x: tx, y: ty, size: 9, font: fB, color: rgb(0.3, 0.2, 0), rotate: degrees(a) });
       });
     } catch (e) { avisos.push(`${f._n} ${f.archivo}: ${e.message || e}`); const p = pdf.addPage([595, 842]); p.drawText(normal(`${sello}: no se ha podido incluir el documento (${f.archivo})`), { x: 28, y: 800, size: 10, font: fB }); }
   }
