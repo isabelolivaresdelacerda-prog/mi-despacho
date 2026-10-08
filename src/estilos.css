@@ -201,3 +201,8 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .logo-lateral { display: block; width: 100%; max-width: 210px; max-height: 90px; height: auto; object-fit: contain; object-position: left center; }
 .vista-previa img.logo-lateral { height: auto; max-height: 90px; max-width: 240px; }
 .logo.grande { height: 96px; max-width: 280px; }
+
+.rejilla-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.rejilla-2 .ancho { grid-column: 1 / -1; }
+.ce-sub { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--suave); margin: 4px 0 0; }
+@media (max-width: 600px) { .rejilla-2 { grid-template-columns: 1fr; } }

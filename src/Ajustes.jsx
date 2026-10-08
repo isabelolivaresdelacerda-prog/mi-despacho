@@ -1,3 +1,4 @@
+import DatosEmpresa from "./lib/DatosEmpresa.jsx";
 import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import { useState } from "react";
@@ -143,6 +144,8 @@ export default function Ajustes({ config, guardar }) {
           <FormDespacho datos={datos} cambiar={cambiar} />
           <button className="btn" type="button" onClick={() => { guardar(datos); aviso("Guardado"); }}>Guardar</button>
         </section>
+
+        <DatosEmpresa config={datos} guardar={(c) => { setDatos(c); guardar({ ...config, empresa: c.empresa }); }} />
 
         <section className="tarjeta">
           <h2>Mis documentos en la nube</h2>
