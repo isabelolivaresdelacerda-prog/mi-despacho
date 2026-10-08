@@ -7,6 +7,9 @@ import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import Carpeta from "./apps/Carpeta.jsx";
 import Contabilidad from "./apps/Contabilidad.jsx";
+import Acceso from "./Acceso.jsx";
+import Usuarios from "./Usuarios.jsx";
+import { sb, miFicha, salir, admin } from "./lib/cuentas.js";
 
 // Apps del despacho. "app" es la clave de contratación (de momento, todas activas).
 const MENU = [
@@ -65,6 +68,21 @@ export default function App() {
   const [config, setConfig] = useState(leerConfig);
   const [ruta, setRuta] = useState(rutaActual);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [yo, setYo] = useState(undefined); // undefined = comprobando; null = sin sesión
+  const [pendientes, setPendientes] = useState(0);
+
+  useEffect(() => {
+    miFicha().then((f) => setYo(f && f.estado === "activo" ? f : null)).catch(() => setYo(null));
+    const { data } = sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT") setYo(null); });
+    return () => data.subscription.unsubscribe();
+  }, []);
+  useEffect(() => {
+    if (yo?.rol !== "admin") return;
+    const mirar = () => admin.solicitudes().then((s) => setPendientes(s.length)).catch(() => {});
+    mirar();
+    const t = setInterval(mirar, 60000);
+    return () => clearInterval(t);
+  }, [yo]);
 
   useEffect(() => {
     const f = () => { setRuta(rutaActual()); setMenuAbierto(false); window.scrollTo(0, 0); };
@@ -78,6 +96,8 @@ export default function App() {
 
   const tema = { "--brand": config.color, "--fondo": config.fondo };
 
+  if (yo === undefined) return <div className="bienvenida" />;
+  if (!yo) return <Acceso onDentro={setYo} />;
   if (!config.configurado) return <Bienvenida config={config} guardar={guardar} />;
 
   let vista;
@@ -92,6 +112,8 @@ export default function App() {
       vista = <Contabilidad direccion={config.appContabilidad} irAAjustes={irAAjustes} />; break;
     case "contabilidad/carpeta":
       vista = <Carpeta titulo="Mi carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} irAAjustes={irAAjustes} />; break;
+    case "usuarios":
+      vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
     case "ajustes":
       vista = <Ajustes config={config} guardar={guardar} />; break;
     default:
@@ -123,7 +145,9 @@ export default function App() {
             </div>
           ))}
           <div className="menu-pie">
+            {yo.rol === "admin" && <Item r="usuarios">👤 Usuarios {pendientes > 0 && <span className="insignia" title="Solicitudes de acceso pendientes">{pendientes}</span>}</Item>}
             <Item r="ajustes">⚙ Ajustes</Item>
+            <button className="menu-item salir" type="button" onClick={salir}>Salir ({yo.email})</button>
             <div className="nube-actual">Documentos en {NUBES[config.nube].nombre}</div>
           </div>
         </nav>

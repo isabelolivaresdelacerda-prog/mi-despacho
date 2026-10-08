@@ -181,3 +181,17 @@ mark { background: color-mix(in srgb, #E3AE4F 45%, transparent); color: inherit;
 .ia-local.falta { border-color: var(--aviso); }
 fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .opcion span { line-height: 1.4; }
+
+/* Acceso y usuarios */
+.acceso { max-width: 440px; }
+.acceso-enlaces { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; font-size: 14px; }
+.nota.error { background: color-mix(in srgb, var(--error) 12%, var(--superficie)); color: var(--error); }
+.insignia { display: inline-flex; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--brand); color: var(--sobre-brand); font: 600 12px/20px var(--sans); justify-content: center; margin-left: 6px; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabla th, .tabla td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+.tabla th { color: var(--suave); font-weight: 500; font-size: 13px; }
+.tarjeta.destacado { border-color: var(--brand); }
+.codigo-grande { font: 600 32px/1.2 ui-monospace, Consolas, monospace; letter-spacing: .2em; margin: 0; color: var(--brand); }
+.menu-item.salir { background: none; border: 0; text-align: left; font: inherit; font-size: 13px; color: var(--suave); cursor: pointer; width: 100%; }
+.arbol { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+@media (max-width: 700px) { .tabla { display: block; overflow-x: auto; } }

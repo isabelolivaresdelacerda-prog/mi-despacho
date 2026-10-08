@@ -13,3 +13,8 @@ export const GOOGLE_CLIENT_ID = "";
 // Azure Portal → Registros de aplicaciones → Id. de aplicación (cliente)
 // Plataforma "Aplicación de página única (SPA)" con URI de redirección = https://mi-despacho-nine.vercel.app
 export const MICROSOFT_CLIENT_ID = "";
+
+// Cuentas de usuario (Supabase, proyecto exclusivo "portal-gestoria", servidores en la UE).
+// La clave publicable es pública por diseño: la seguridad la dan las reglas de la base de datos.
+export const SUPABASE_URL = "https://mrvtlumsekoxxhjvypcc.supabase.co";
+export const SUPABASE_KEY = "sb_publishable_i375lc5ZzZjvbA0cRBIc4A_HY3Le38X";
