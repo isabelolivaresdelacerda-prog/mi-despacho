@@ -1,6 +1,9 @@
 // Motor contable (PGC PYMES): genera el libro diario a partir de facturas, banco, escrituras/contratos vinculados
 // y asientos manuales; y de ahí los mayores, sumas y saldos, pérdidas y ganancias y balance.
 import { num, fechaOrden, TITULOS_PGC, TIPOS_VINCULO, vencimientos } from "./datos.js";
+import { tituloCuenta } from "./pgc.js";
+let PLAN = "pymes";
+export const usarPlan = (p) => { PLAN = p || "pymes"; };
 
 export const CUENTAS = {
   ...TITULOS_PGC,
@@ -14,7 +17,7 @@ export const CUENTAS = {
   "662": "Intereses de deudas", "669": "Otros gastos financieros", "681": "Amortización del inmovilizado material", "630": "Impuesto sobre beneficios",
   "700": "Ventas", "705": "Prestaciones de servicios", "740": "Subvenciones a la explotación", "752": "Ingresos por arrendamientos", "759": "Ingresos por servicios diversos", "769": "Otros ingresos financieros",
 };
-export const titulo = (c) => CUENTAS[c] || CUENTAS[String(c).slice(0, 4)] || CUENTAS[String(c).slice(0, 3)] || "";
+export const titulo = (c) => tituloCuenta(c, PLAN) || CUENTAS[c] || CUENTAS[String(c).slice(0, 4)] || CUENTAS[String(c).slice(0, 3)] || "";
 const r2 = (x) => Math.round(num(x) * 100) / 100;
 const claveMov = (m) => `${m.fecha}|${r2(m.importe)}|${(m.concepto || "").slice(0, 60)}`;
 export { claveMov };
@@ -147,13 +150,12 @@ export function balance(asientos) {
     ["Deudores y otras cuentas a cobrar", neto(deudores)],
     ["Tesorería (57)", neto(sal(["57"]))],
   ];
+  const ap = -neto(sal(["118"]));
   const pn = [
-    ["Capital y reservas (10, 11, 12)", -neto(sal(["10", "11", "12"]))],
-    ["Aportaciones de socios (118)", 0],
+    ["Capital y reservas (10, 11, 12)", r2(-neto(sal(["10", "11", "12"])) - ap)],
+    ["Aportaciones de socios (118)", r2(ap)],
     ["Resultado del ejercicio", pyg],
   ];
-  pn[0][1] = r2(pn[0][1] + neto(sal(["118"])) ); // 118 ya incluido en 11x: se muestra aparte
-  pn[1][1] = -neto(sal(["118"])); pn[0][1] = r2(pn[0][1] - pn[1][1]);
   const pasivo = [
     ["Deudas a largo plazo (17, 18)", -neto(sal(["17", "18"]))],
     ["Acreedores y otras deudas a corto plazo", -neto(acreedores)],

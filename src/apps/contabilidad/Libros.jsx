@@ -1,0 +1,227 @@
+// Contabilidad completa dentro de Mi Despacho: diario, mayores, sumas y saldos, pérdidas y ganancias, balance,
+// banco por aplicar (con asistente para elegir la cuenta), asientos manuales y exportación a A3 / Sage.
+import { useEffect, useMemo, useState } from "react";
+import { generarDiario, filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov, usarPlan } from "./motor.js";
+import { leerVinculados, leerJSON, escribirJSON, eur, num, descargarTexto, fechaOrden } from "./datos.js";
+import { plan, comprobarBOE, descargarDelBOE, aplicarActualizacion, fechaBOE, a8 } from "./pgc.js";
+import Asistente from "./Asistente.jsx";
+import { preguntarIA } from "../../ia-navegador.js";
+
+const SUB = [["diario", "Libro diario"], ["mayor", "Mayores"], ["sumas", "Sumas y saldos"], ["pyg", "Pérdidas y ganancias"], ["balance", "Balance"], ["aplicar", "Banco por aplicar"], ["manual", "Asiento manual"], ["exportar", "A3 / Sage"], ["plan", "Plan contable"]];
+const e2 = (n) => (n ? eur(n) : "");
+
+export default function Libros({ raiz, datos, config, guardarConfig, aviso }) {
+  const tipoPlan = config.planContable || "pymes";
+  usarPlan(tipoPlan);
+  const [sub, setSub] = useState("diario");
+  const [vinc, setVinc] = useState([]);
+  const [manuales, setManuales] = useState([]);
+  const [asig, setAsig] = useState({});
+  const anioActual = new Date().getFullYear();
+  const [anio, setAnio] = useState(anioActual);
+  const cargar = async () => { setVinc(await leerVinculados(raiz)); setManuales(await leerJSON(raiz, "asientos_manuales.json", [])); setAsig(await leerJSON(raiz, "asignaciones_banco.json", {})); };
+  useEffect(() => { cargar(); }, []);
+
+  const { asientos: todos, pendientes } = useMemo(() => generarDiario(datos, vinc, manuales, asig), [datos, vinc, manuales, asig, tipoPlan]);
+  const asientos = useMemo(() => filtrarPeriodo(todos, `${anio}-01-01`, `${anio}-12-31`), [todos, anio]);
+  const descuadrados = asientos.filter((a) => !a.cuadra).length;
+
+  return (
+    <div>
+      <div className="acciones cont-barra">
+        <nav className="sub-tabs">{SUB.map(([k, t]) => <button key={k} className={sub === k ? "on" : ""} onClick={() => setSub(k)}>{t}{k === "aplicar" && pendientes.length > 0 && <span className="insignia">{pendientes.length}</span>}</button>)}</nav>
+        <label className="anio-sel">Ejercicio <select value={anio} onChange={(e) => setAnio(+e.target.value)}>{[anioActual - 2, anioActual - 1, anioActual, anioActual + 1].map((a) => <option key={a}>{a}</option>)}</select></label>
+      </div>
+      <p className="muted pequeño">La contabilidad se genera sola con las facturas, el banco y las escrituras y contratos vinculados. Lo propuesto por la IA debe revisarlo una persona.{descuadrados > 0 && <span className="pend"> Hay {descuadrados} asientos descuadrados: revisa esas facturas.</span>}</p>
+      {sub === "diario" && <Diario asientos={asientos} />}
+      {sub === "mayor" && <Mayor asientos={asientos} />}
+      {sub === "sumas" && <Sumas asientos={asientos} />}
+      {sub === "pyg" && <PyG asientos={asientos} anio={anio} />}
+      {sub === "balance" && <Balance asientos={asientos} anio={anio} />}
+      {sub === "aplicar" && <Aplicar pendientes={pendientes} asig={asig} plan={tipoPlan} guardar={async (n) => { await escribirJSON(raiz, "asignaciones_banco.json", n); setAsig(n); aviso?.("Movimiento contabilizado"); }} />}
+      {sub === "manual" && <Manual manuales={manuales} plan={tipoPlan} guardar={async (n) => { await escribirJSON(raiz, "asientos_manuales.json", n); setManuales(n); aviso?.("Asiento guardado"); }} />}
+      {sub === "exportar" && <Exportar asientos={asientos} anio={anio} />}
+      {sub === "plan" && <PlanContable tipo={tipoPlan} cambiar={(p) => guardarConfig({ ...config, planContable: p })} aviso={aviso} />}
+    </div>
+  );
+}
+
+function Diario({ asientos }) {
+  if (!asientos.length) return <p className="muted">No hay asientos en este ejercicio.</p>;
+  return (
+    <div className="tabla-scroll"><table className="tabla libro">
+      <thead><tr><th>Nº</th><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th className="num">Debe</th><th className="num">Haber</th></tr></thead>
+      <tbody>{asientos.map((a) => a.lineas.map((l, i) => (
+        <tr key={a.num + "-" + i} className={(i === 0 ? "primera " : "") + (!a.cuadra ? "descuadre" : "")}>
+          <td>{i === 0 ? a.num : ""}</td><td>{i === 0 ? a.fecha : ""}</td>
+          <td><span className="cta">{a8(l.cuenta)}</span> <span className="muted pequeño">{l.titulo}</span></td>
+          <td>{i === 0 ? a.concepto : ""}</td><td className="num">{e2(l.debe)}</td><td className="num">{e2(l.haber)}</td>
+        </tr>)))}</tbody>
+    </table></div>
+  );
+}
+
+function Mayor({ asientos }) {
+  const m = useMemo(() => mayores(asientos), [asientos]);
+  const [sel, setSel] = useState(null);
+  const c = m.find((x) => x.cuenta === sel) || m[0];
+  if (!c) return <p className="muted">No hay movimientos.</p>;
+  return (
+    <div className="mayor">
+      <aside>{m.map((x) => <button key={x.cuenta} type="button" className={x.cuenta === c.cuenta ? "on" : ""} onClick={() => setSel(x.cuenta)}><span className="cta">{a8(x.cuenta)}</span><small>{x.titulo}</small></button>)}</aside>
+      <section>
+        <h3><span className="cta">{a8(c.cuenta)}</span> {c.titulo}</h3>
+        <div className="tabla-scroll"><table className="tabla">
+          <thead><tr><th>Fecha</th><th>Asiento</th><th>Concepto</th><th className="num">Debe</th><th className="num">Haber</th><th className="num">Saldo</th></tr></thead>
+          <tbody>{c.apuntes.map((a, i) => <tr key={i}><td>{a.fecha}</td><td>{a.num}</td><td>{a.concepto}</td><td className="num">{e2(a.debe)}</td><td className="num">{e2(a.haber)}</td><td className="num"><strong>{eur(a.saldo)}</strong></td></tr>)}</tbody>
+          <tfoot><tr><td colSpan="3"><strong>Total</strong></td><td className="num"><strong>{eur(c.debe)}</strong></td><td className="num"><strong>{eur(c.haber)}</strong></td><td className="num"><strong>{eur(c.debe - c.haber)}</strong></td></tr></tfoot>
+        </table></div>
+      </section>
+    </div>
+  );
+}
+
+function Sumas({ asientos }) {
+  const m = mayores(asientos);
+  const T = m.reduce((t, c) => ({ d: t.d + c.debe, h: t.h + c.haber }), { d: 0, h: 0 });
+  return (
+    <div className="tabla-scroll"><table className="tabla">
+      <thead><tr><th>Cuenta</th><th>Título</th><th className="num">Sumas debe</th><th className="num">Sumas haber</th><th className="num">Saldo deudor</th><th className="num">Saldo acreedor</th></tr></thead>
+      <tbody>{m.map((c) => { const s = c.debe - c.haber; return <tr key={c.cuenta}><td className="cta">{a8(c.cuenta)}</td><td>{c.titulo}</td><td className="num">{eur(c.debe)}</td><td className="num">{eur(c.haber)}</td><td className="num">{s > 0.005 ? eur(s) : ""}</td><td className="num">{s < -0.005 ? eur(-s) : ""}</td></tr>; })}</tbody>
+      <tfoot><tr><td colSpan="2"><strong>Totales</strong> {Math.abs(T.d - T.h) < 0.01 ? <span className="ok">cuadra</span> : <span className="pend">no cuadra</span>}</td><td className="num"><strong>{eur(T.d)}</strong></td><td className="num"><strong>{eur(T.h)}</strong></td><td colSpan="2" /></tr></tfoot>
+    </table></div>
+  );
+}
+
+function PyG({ asientos, anio }) {
+  const p = perdidasYGanancias(asientos);
+  const fila = (t, v, fuerte) => <tr className={fuerte ? "total" : ""}><td>{t}</td><td className={"num " + (v < 0 ? "neg" : "")}>{eur(v)}</td></tr>;
+  return (
+    <div className="estado">
+      <h3>Cuenta de pérdidas y ganancias {anio} <span className="muted pequeño">(modelo abreviado PGC PYMES)</span></h3>
+      <table className="tabla"><tbody>
+        {p.lineas.map(([t, v]) => fila(t, v))}
+        {fila("A) RESULTADO DE EXPLOTACIÓN", p.explotacion, true)}
+        {p.financieras.map(([t, v]) => fila(t, v))}
+        {fila("B) RESULTADO FINANCIERO", p.financiero, true)}
+        {fila("C) RESULTADO ANTES DE IMPUESTOS", p.antesImpuestos, true)}
+        {fila("17. Impuesto sobre beneficios", p.impuesto)}
+        {fila("D) RESULTADO DEL EJERCICIO", p.resultado, true)}
+      </tbody></table>
+    </div>
+  );
+}
+
+function Balance({ asientos, anio }) {
+  const b = balance(asientos);
+  const bloque = (t, filas, total) => (<><tr className="total"><td>{t}</td><td className="num">{total !== undefined ? eur(total) : ""}</td></tr>{filas.map(([x, v]) => <tr key={x}><td className="sangria">{x}</td><td className="num">{eur(v)}</td></tr>)}</>);
+  return (
+    <div className="estado">
+      <h3>Balance a 31/12/{anio} {b.cuadra ? <span className="ok pequeño">cuadra</span> : <span className="pend pequeño">no cuadra: revisa partidas pendientes</span>}</h3>
+      <div className="dos-estados">
+        <table className="tabla"><tbody>{bloque("ACTIVO", b.activo, b.totalActivo)}</tbody></table>
+        <table className="tabla"><tbody>{bloque("PATRIMONIO NETO", b.pn, b.pn.reduce((t, x) => t + x[1], 0))}{bloque("PASIVO", b.pasivo, b.pasivo.reduce((t, x) => t + x[1], 0))}<tr className="total"><td>TOTAL PATRIMONIO NETO Y PASIVO</td><td className="num">{eur(b.totalPasivo)}</td></tr></tbody></table>
+      </div>
+    </div>
+  );
+}
+
+function Aplicar({ pendientes, asig, guardar, plan: tipo }) {
+  const [mov, setMov] = useState(null);
+  if (!pendientes.length) return <div className="vacio"><p>✓ Todos los movimientos del banco están contabilizados.</p></div>;
+  return (
+    <div>
+      <p className="muted pequeño">Estos movimientos del banco no tienen factura ni documento. Mientras no se les asigne cuenta van a «partidas pendientes de aplicación» (555). Pulsa «¿Dónde va?» y contesta unas preguntas sencillas.</p>
+      <div className="tabla-scroll"><table className="tabla">
+        <thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th><th></th></tr></thead>
+        <tbody>{pendientes.map((m) => <tr key={m._id}><td>{m.fecha}</td><td>{m.concepto}</td><td className={"num " + (m.importe < 0 ? "neg" : "pos")}>{eur(m.importe)}</td><td><button className="btn mini" type="button" onClick={() => setMov(m)}>¿Dónde va?</button></td></tr>)}</tbody>
+      </table></div>
+      {mov && <Asistente plan={tipo} contexto={`${mov.fecha} · ${mov.concepto} · ${eur(mov.importe)}`} onCerrar={() => setMov(null)}
+        onElegir={(cuenta, e) => { guardar({ ...asig, [claveMov(mov)]: { cuenta, concepto: mov.concepto, nota: e } }); setMov(null); }} />}
+    </div>
+  );
+}
+
+function Manual({ manuales, guardar, plan: tipo }) {
+  const vacio = { fecha: new Date().toLocaleDateString("es-ES"), concepto: "", lineas: [{ cuenta: "", debe: "", haber: "" }, { cuenta: "", debe: "", haber: "" }] };
+  const [a, setA] = useState(vacio);
+  const [asis, setAsis] = useState(null);
+  const D = a.lineas.reduce((t, l) => t + num(l.debe), 0), H = a.lineas.reduce((t, l) => t + num(l.haber), 0);
+  const ok = a.concepto.trim() && Math.abs(D - H) < 0.01 && D > 0 && a.lineas.every((l) => !num(l.debe) && !num(l.haber) || l.cuenta);
+  const linea = (i, k, v) => setA({ ...a, lineas: a.lineas.map((l, j) => (j === i ? { ...l, [k]: v } : l)) });
+  return (
+    <div>
+      <div className="tarjeta">
+        <h3>Nuevo asiento</h3>
+        <div className="fila"><label>Fecha<input value={a.fecha} onChange={(e) => setA({ ...a, fecha: e.target.value })} /></label><label>Concepto<input value={a.concepto} onChange={(e) => setA({ ...a, concepto: e.target.value })} /></label></div>
+        <table className="tabla"><thead><tr><th>Cuenta</th><th className="num">Debe</th><th className="num">Haber</th><th></th></tr></thead>
+          <tbody>{a.lineas.map((l, i) => <tr key={i}>
+            <td><input value={l.cuenta} onChange={(e) => linea(i, "cuenta", e.target.value.replace(/\D/g, ""))} placeholder="p. ej. 629" /> <button className="enlace" type="button" onClick={() => setAsis(i)}>¿Cuál?</button></td>
+            <td><input className="num" value={l.debe} onChange={(e) => linea(i, "debe", e.target.value)} /></td>
+            <td><input className="num" value={l.haber} onChange={(e) => linea(i, "haber", e.target.value)} /></td>
+            <td>{a.lineas.length > 2 && <button className="enlace" type="button" onClick={() => setA({ ...a, lineas: a.lineas.filter((_, j) => j !== i) })}>Quitar</button>}</td></tr>)}</tbody>
+          <tfoot><tr><td><button className="enlace" type="button" onClick={() => setA({ ...a, lineas: [...a.lineas, { cuenta: "", debe: "", haber: "" }] })}>+ Línea</button></td><td className="num">{eur(D)}</td><td className="num">{eur(H)}</td><td>{Math.abs(D - H) < 0.01 ? <span className="ok">cuadra</span> : <span className="pend">descuadre {eur(D - H)}</span>}</td></tr></tfoot>
+        </table>
+        <button className="btn" type="button" disabled={!ok} onClick={() => { guardar([...manuales, { ...a, id: Date.now(), lineas: a.lineas.filter((l) => num(l.debe) || num(l.haber)).map((l) => ({ cuenta: l.cuenta, debe: num(l.debe), haber: num(l.haber) })) }]); setA(vacio); }}>Guardar asiento</button>
+      </div>
+      {manuales.length > 0 && <div className="tabla-scroll"><table className="tabla"><thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th><th></th></tr></thead>
+        <tbody>{manuales.map((m) => <tr key={m.id}><td>{m.fecha}</td><td>{m.concepto}</td><td className="num">{eur(m.lineas.reduce((t, l) => t + num(l.debe), 0))}</td><td><button className="enlace" type="button" onClick={() => window.confirm("¿Borrar este asiento manual?") && guardar(manuales.filter((x) => x.id !== m.id))}>Borrar</button></td></tr>)}</tbody></table></div>}
+      {asis !== null && <Asistente plan={tipo} onCerrar={() => setAsis(null)} onElegir={(c) => { linea(asis, "cuenta", c); setAsis(null); }} />}
+    </div>
+  );
+}
+
+function Exportar({ asientos, anio }) {
+  return (
+    <div className="tarjeta">
+      <h3>Llevar la contabilidad a A3 o Sage</h3>
+      <p>Se descarga el libro diario del ejercicio {anio}, un apunte por línea, con las subcuentas a 8 dígitos, y el plan de cuentas usado. La gestoría lo importa con la opción de importar asientos desde Excel o texto de su programa.</p>
+      <div className="acciones">
+        <button className="btn" type="button" onClick={() => descargarTexto(exportarApuntes(asientos, "a3"), `Diario ${anio} - A3.csv`)}>Diario para A3</button>
+        <button className="btn" type="button" onClick={() => descargarTexto(exportarApuntes(asientos, "sage"), `Diario ${anio} - Sage.csv`)}>Diario para Sage / ContaPlus</button>
+        <button className="btn ghost" type="button" onClick={() => descargarTexto(exportarPlanCuentas(asientos), `Plan de cuentas ${anio}.csv`)}>Plan de cuentas</button>
+      </div>
+      <p className="muted pequeño">Cada versión de A3 y Sage tiene su propio asistente de importación: la primera vez, la gestoría indica qué columna es cada dato (fecha, cuenta, debe, haber…). Si me pasan un archivo de ejemplo de su programa, se puede generar exactamente en su formato.</p>
+    </div>
+  );
+}
+
+function PlanContable({ tipo, cambiar, aviso }) {
+  const p = plan(tipo);
+  const [estado, setEstado] = useState(null);
+  const [nuevo, setNuevo] = useState(null);
+  const [resumen, setResumen] = useState("");
+  const [buscar, setBuscar] = useState("");
+  useEffect(() => { comprobarBOE(tipo).then(setEstado).catch(() => setEstado({ error: true })); }, [tipo]);
+  const lista = Object.entries(p.cuentas).filter(([k, v]) => !buscar || k.startsWith(buscar) || v.toLowerCase().includes(buscar.toLowerCase())).slice(0, 300);
+  return (
+    <div>
+      <div className="tarjeta">
+        <h3>Plan contable</h3>
+        <label>Plan que usa esta empresa
+          <select value={tipo} onChange={(e) => cambiar(e.target.value)}>
+            <option value="pymes">PGC de PYMES (la mayoría de sociedades pequeñas)</option>
+            <option value="pgc">PGC general</option>
+            <option value="esfl">Entidades sin fines lucrativos (asociaciones, fundaciones)</option>
+          </select>
+        </label>
+        <p className="pequeño">{p.nombre} · texto consolidado del BOE actualizado el <strong>{fechaBOE(p.fecha_actualizacion)}</strong> · {Object.keys(p.cuentas).length} cuentas. <a href={`https://www.boe.es/buscar/act.php?id=${p.boe}`} target="_blank" rel="noopener">Ver en el BOE</a></p>
+        {estado?.error && <p className="nota">No se ha podido consultar el BOE ahora. Se volverá a comprobar la próxima vez.</p>}
+        {estado && !estado.error && (estado.cambiado
+          ? <div className="nota error"><strong>El BOE ha publicado cambios</strong> ({fechaBOE(estado.boe)}). <button className="btn mini" type="button" onClick={async () => { try { const r = await descargarDelBOE(tipo); setNuevo(r); const t = `Nuevas: ${r.diff.nuevas.map((x) => x.join(" ")).join("; ")}\nCambiadas: ${r.diff.cambiadas.map((x) => x.join(" → ")).join("; ")}\nQuitadas: ${r.diff.quitadas.map((x) => x.join(" ")).join("; ")}`; const ia = await preguntarIA("Explica en lenguaje sencillo, en 5 líneas como máximo, qué cambios hay en el cuadro de cuentas del Plan General Contable y a qué empresas afectan:\n" + t.slice(0, 5000), { maxTokens: 400 }); setResumen(ia.estado === "ok" ? ia.texto : ""); } catch (e) { aviso?.(e.message); } }}>Ver los cambios</button></div>
+          : <p className="ok pequeño">✓ Al día con el BOE (comprobado ahora).</p>)}
+        {nuevo && (
+          <div className="nota">
+            <p><strong>{nuevo.diff.nuevas.length}</strong> cuentas nuevas · <strong>{nuevo.diff.cambiadas.length}</strong> cambiadas · <strong>{nuevo.diff.quitadas.length}</strong> quitadas.</p>
+            {resumen && <p className="pequeño">{resumen} <em>(resumen de la IA de tu ordenador)</em></p>}
+            <ul className="pequeño">{[...nuevo.diff.nuevas.map(([k, v]) => `+ ${k} ${v}`), ...nuevo.diff.cambiadas.map(([k, a, b]) => `~ ${k} ${a} → ${b}`), ...nuevo.diff.quitadas.map(([k, v]) => `− ${k} ${v}`)].slice(0, 40).map((x) => <li key={x}>{x}</li>)}</ul>
+            <button className="btn" type="button" onClick={() => { aplicarActualizacion(nuevo.base, nuevo.nuevo); setNuevo(null); setEstado({ ...estado, cambiado: false }); aviso?.("Plan contable actualizado"); }}>Aplicar la actualización</button>
+          </div>
+        )}
+      </div>
+      <input className="buscar" placeholder="Buscar cuenta (número o nombre)…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
+      <div className="tabla-scroll"><table className="tabla"><thead><tr><th>Cuenta</th><th>Nombre</th><th>8 dígitos</th></tr></thead>
+        <tbody>{lista.map(([k, v]) => <tr key={k} className={k.length === 2 ? "total" : ""}><td className="cta">{k}</td><td>{v}</td><td className="muted">{k.length >= 3 ? a8(k) : ""}</td></tr>)}</tbody></table></div>
+    </div>
+  );
+}

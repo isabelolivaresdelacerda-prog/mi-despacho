@@ -33,3 +33,27 @@
 .encargo.ok { background: color-mix(in srgb, #1d7a46 10%, var(--superficie)); }
 .encargo.mal { background: color-mix(in srgb, var(--aviso) 12%, var(--superficie)); border: 1px solid color-mix(in srgb, var(--aviso) 40%, transparent); }
 a.mc-btn { text-decoration: none; display: inline-flex; align-items: center; }
+
+.sub-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.sub-tabs button { background: var(--superficie); border: 1px solid var(--linea); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; color: var(--tinta); }
+.sub-tabs button.on { background: var(--brand); border-color: var(--brand); color: var(--sobre-brand); }
+.anio-sel { flex-direction: row; align-items: center; gap: 6px; margin-left: auto; }
+.cta { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.tabla.libro tr.primera td { border-top: 2px solid var(--linea); }
+.tabla tr.descuadre td { background: color-mix(in srgb, var(--error) 8%, transparent); }
+.tabla tr.total td { font-weight: 600; background: var(--superficie); }
+.tabla td.sangria { padding-left: 24px; }
+.tabla tfoot td { border-top: 2px solid var(--linea); }
+.mayor { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
+.mayor aside { display: flex; flex-direction: column; max-height: 70vh; overflow: auto; border: 1px solid var(--linea); border-radius: 10px; }
+.mayor aside button { text-align: left; background: none; border: 0; border-bottom: 1px solid var(--linea); padding: 8px 10px; cursor: pointer; font: inherit; color: var(--tinta); display: flex; flex-direction: column; }
+.mayor aside button.on { background: var(--brand-suave); }
+.mayor aside small { color: var(--suave); font-size: 12px; }
+.estado { max-width: 760px; }
+.dos-estados { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.as-pregunta { font: 600 18px var(--serif); margin: 4px 0 12px; }
+.as-opciones { display: flex; flex-direction: column; gap: 6px; }
+.as-opciones button { text-align: left; background: var(--superficie); border: 1px solid var(--linea); border-radius: 10px; padding: 10px 12px; font: inherit; cursor: pointer; color: var(--tinta); }
+.as-opciones button:hover { border-color: var(--brand); background: var(--brand-suave); }
+.as-cuenta { font-size: 18px; }
+@media (max-width: 800px) { .mayor, .dos-estados { grid-template-columns: 1fr; } }

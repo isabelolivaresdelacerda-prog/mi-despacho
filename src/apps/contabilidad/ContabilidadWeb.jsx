@@ -8,12 +8,13 @@ import {
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
 import EnviarGestoria from "./EnviarGestoria.jsx";
 import Vinculados from "./Vinculados.jsx";
+import Libros from "./Libros.jsx";
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
-const PESTANAS = [["resumen", "Resumen"], ["facturas", "Facturas recibidas"], ["banco", "Banco"], ["vinculados", "Escrituras y contratos"], ["documentos", "Documentos"], ["exportar", "Para la gestoría"]];
+const PESTANAS = [["resumen", "Resumen"], ["facturas", "Facturas recibidas"], ["banco", "Banco"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Para la gestoría"]];
 
-export default function ContabilidadWeb({ config }) {
+export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
   const [raiz, setRaiz] = useState(null);
   const [necesitaPermiso, setNecesitaPermiso] = useState(false);
   const [datos, setDatos] = useState(null);
@@ -84,6 +85,7 @@ export default function ContabilidadWeb({ config }) {
         {tab === "resumen" && <Resumen d={datos} />}
         {tab === "facturas" && <Facturas d={datos} raiz={raiz} recargar={cargar} aviso={aviso} />}
         {tab === "banco" && <Banco d={datos} />}
+        {tab === "libros" && <Libros raiz={raiz} datos={datos} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
         {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
         {tab === "exportar" && <Exportar d={datos} config={config} />}
