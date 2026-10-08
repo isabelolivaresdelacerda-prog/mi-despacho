@@ -101,7 +101,25 @@ export async function leerExtractos(raiz) {
       }
     } catch { /* un Excel que no se entiende no para lo demás */ }
   }
-  return out;
+  // Extractos mensuales en PDF guardados en «documentos_banco» (Cajamar: «dd/mm/aaaa dd/mm CONCEPTO 1.234,56-»)
+  const db = await sub(raiz, "documentos_banco");
+  if (db) {
+    const { textoPDF } = await import("./leer.js");
+    for await (const [n, h] of db.entries()) {
+      if (h.kind !== "file" || !/extracto/i.test(n) || !/\.pdf$/i.test(n)) continue;
+      try {
+        const t = await textoPDF(await h.getFile(), 6, { ocr: false });
+        for (const l of t.split(/\n/)) {
+          const m = l.trim().match(/^(\d{2}\/\d{2}\/\d{4})\s+\d{2}\/\d{2}\s+(.+?)\s+([\d.]+,\d{2})([+-])$/);
+          if (m) out.push({ fecha: m[1], concepto: m[2].slice(0, 120), importe: (m[4] === "-" ? -1 : 1) * num(m[3]), tercero: "", _origen: "extracto-pdf" });
+        }
+      } catch { /* sigue */ }
+    }
+  }
+  // El mismo movimiento puede venir en el Excel y en el PDF: se queda una sola vez por día e importe (respetando repeticiones reales)
+  const porFuente = {};
+  for (const m of out) { const k = `${m.fecha}|${num(m.importe).toFixed(2)}`; (porFuente[k] ||= { excel: 0, pdf: 0, lista: [] }); porFuente[k][m._origen === "extracto-pdf" ? "pdf" : "excel"]++; porFuente[k].lista.push(m); }
+  return Object.values(porFuente).flatMap((g) => { const n = Math.max(g.excel, g.pdf); const pref = g.lista.filter((m) => m._origen !== "extracto-pdf"); return [...pref, ...g.lista.filter((m) => m._origen === "extracto-pdf")].slice(0, n); });
 }
 
 // Junta la conexión del banco y los extractos sin duplicar (mismo día e importe = el mismo movimiento)

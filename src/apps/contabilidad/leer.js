@@ -70,11 +70,29 @@ export function lecturaBasica(t) {
   return { numero: (t.match(/factura\s*(?:n[ºo°.]*|número)?\s*:?\s*([A-Z0-9][\w/-]{2,})/i) || [])[1] || "", fecha, nif_proveedor: nifs[0] || "", base, iva_importe: iva, total };
 }
 
+// Plantillas fijas (sin IA): facturas en inglés tipo Stripe (Anthropic, Base44/Wix, OpenAI, Hostinger…) y recibos
+const MESES_EN = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+export function plantilla(t) {
+  if (!/Invoice number|Receipt number/i.test(t) || !/Date (of issue|paid)/i.test(t)) return null;
+  const fm = t.match(/Date (?:of issue|paid)\s+([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/i);
+  const fecha = fm ? `${fm[2].padStart(2, "0")}/${String(MESES_EN[fm[1].toLowerCase()] || 1).padStart(2, "0")}/${fm[3]}` : "";
+  const numero = ((t.match(/Invoice number[:\s]+([^\n]+)/i) || [])[1] || "").replace(/[^A-Za-z0-9]/g, "");
+  const tot = t.match(/\bTotal\s+([€$£])\s?([\d,]+\.\d{2})/i);
+  const total = tot ? num(tot[2].replace(/,/g, "").replace(".", ",")) : 0;
+  const prov = ((t.match(/^(.+?)(?:\s+@\w+)?\s+Bill to/m) || [])[1] || "").replace(/\s*-\s*\d+$/, "").trim();
+  const recibo = /^\s*Receipt\b/i.test(t) || /Receipt number/i.test(t);
+  const isp = /reverse charge/i.test(t) || !/\bIVA\b|\bVAT\s+\d+\s*%/i.test(t); // proveedor extranjero sin IVA español
+  return { numero, fecha, proveedor: prov, nif_proveedor: ((t.match(/EU VAT\W*([A-Z]{2}[A-Z0-9]{6,})/i) || [])[1] || ""), base: total, iva_pct: 0, iva_importe: 0, retencion_pct: 0, retencion_importe: 0, total, moneda: tot && tot[1] !== "€" ? (tot[1] === "$" ? "USD" : "GBP") : "EUR", isp, noFactura: recibo, notaNoFactura: recibo ? `Recibo de pago de la factura ${numero}` : undefined, cuenta_pgc: "629", concepto: "" };
+}
+
 // propia = { nombre, cif } de la empresa que usa la app; emitida = la factura la ha hecho ella
 export async function leerFactura(file, { propia, emitida = false } = {}) {
   let texto = "";
   try { texto = /\.(jpe?g|png)$/i.test(file.name || "") ? await textoImagen(file) : await textoPDF(file); } catch { texto = ""; }
   if (texto.replace(/\s/g, "").length < 30) return { datos: null, motivo: "No se ha podido leer ni con OCR. Rellena los datos a mano." };
+  const fija = !emitida && plantilla(texto);
+  if (fija && fija.proveedor && (fija.total || fija.noFactura)) { fija.analizado_ia = false; fija.metodo = "plantilla"; return { datos: fija, motivo: "leída con plantilla (sin IA)" }; }
+  if (!emitida && /PRESUPUESTO/i.test(texto.slice(0, 600)) && !/FACTURA\s*(N|n)/.test(texto)) { /* presupuesto: se lee igual pero se avisa */ }
   const quien = propia?.nombre ? `\nIMPORTANTE: nuestra empresa es «${propia.nombre}»${propia.cif ? ` (NIF ${propia.cif})` : ""}. ${emitida ? "Esta factura la EMITE nuestra empresa: proveedor = nuestra empresa; cliente = el otro." : "Esta factura la RECIBE nuestra empresa: cliente = nuestra empresa; proveedor = el otro (quien la emite y cobra)."}\n` : "";
   const r = await preguntarIA(PROMPT.replace("TEXTO:", quien + "TEXTO:") + texto.slice(0, 6000), { maxTokens: 450, json: true });
   let d = r.estado === "ok" ? jsonDe(r.texto) : null;
