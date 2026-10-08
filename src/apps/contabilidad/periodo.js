@@ -93,6 +93,14 @@ export function porGestionar(d, todos, pendientes, vinculados, r, hoy = new Date
   const mesActual = hoy.slice(0, 7), faltan = [];
   for (const p of Object.values(porProv)) {
     const ms = [...p.meses].sort(); if (ms.length < 3) continue;
+    // Solo los que de verdad facturan cada mes: importes parecidos (una suscripción, una iguala, un alquiler) y meses seguidos.
+    // Un notario o un abogado que factura a menudo pero por importes distintos no es «mensual».
+    const imps = p.importes.filter((x) => x > 0), media = imps.reduce((a, b) => a + b, 0) / (imps.length || 1);
+    const desv = Math.sqrt(imps.reduce((a, b) => a + (b - media) ** 2, 0) / (imps.length || 1));
+    if (!media || desv / media > 0.25) continue;
+    const idx = ms.map((k) => +k.slice(0, 4) * 12 + +k.slice(5, 7));
+    const huecos = idx.slice(1).filter((v, i) => v - idx[i] > 1).length;
+    if (huecos > Math.floor(ms.length / 3)) continue;
     const [y0, m0] = ms[0].split("-").map(Number);
     for (let y = y0, m = m0; `${y}-${String(m).padStart(2, "0")}` < mesActual; m === 12 ? (y++, m = 1) : m++) {
       const k = `${y}-${String(m).padStart(2, "0")}`;
