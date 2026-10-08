@@ -115,6 +115,26 @@ export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAni
         </section>
       )}
 
+      {(() => {
+        // IVA que se puede recuperar: lo que quedó «a compensar» en los 303 presentados + el IVA soportado de las facturas que aún no se ha declarado
+        const comp = modelos.filter((m) => m.modelo === "303" && presentados[m.clave]?.resultado === "compensar").reduce((a, m) => a + num(presentados[m.clave].importe), 0);
+        const sinDeclarar = modelos.filter((m) => m.modelo === "303" && presentados[m.clave]?.declarado).reduce((a, m) => {
+          const p = presentados[m.clave], fs = (d.facturas || []).filter((f) => !f._duplicadoDe && !f.noFactura && f.iva_importe && fechaOrden(f.fecha) >= m.r.desde && fechaOrden(f.fecha) <= m.r.hasta);
+          return a + Math.max(0, fs.reduce((x, f) => x + (f.iva_importe || 0), 0) + fs.filter((f) => f.isp).reduce((x, f) => x + Math.round(f.base * 21) / 100, 0) - (p.ivaSop || 0));
+        }, 0);
+        if (!comp && !sinDeclarar) return null;
+        return (
+          <section className="tarjeta devolucion-iva">
+            <h3>IVA a recuperar (devolución)</h3>
+            <div className="kpis">
+              <div className="kpi"><span>A compensar de declaraciones presentadas</span><strong>{eur(comp)}</strong><small>cuenta 4700 · Hacienda deudora por IVA</small></div>
+              <div className="kpi"><span>IVA de facturas aún no declarado</span><strong>{eur(sinDeclarar)}</strong><small>se puede meter en el 303 siguiente (hasta 4 años)</small></div>
+              <div className="kpi bien"><span>Total que se podría pedir</span><strong>{eur(comp + sinDeclarar)}</strong><small>en el 303 del 4T (se presenta en enero) marcando «a devolver»</small></div>
+            </div>
+            <p className="muted pequeño">La devolución solo se puede pedir en la última declaración del año (4T), salvo que la empresa esté en el registro de devolución mensual (REDEME). Hasta entonces, lo que salga a compensar se resta de los trimestres siguientes. Confírmalo con la gestoría.</p>
+          </section>);
+      })()}
+
       <section className="tarjeta">
         <div className="acciones"><button className="btn" type="button" disabled={leyendoDecl} onClick={leerDeclaraciones}>{leyendoDecl ? "Leyendo…" : "Leer las declaraciones de la carpeta «impuestos»"}</button>
           <span className="muted pequeño">Lee los justificantes de la AEAT (PDF) y compara lo declarado con lo que hay en la contabilidad de ese trimestre.</span></div>

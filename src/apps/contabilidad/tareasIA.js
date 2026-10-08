@@ -67,6 +67,9 @@ function regla(m) {
     if (/TRIBUTOS? COMUNIDAD|HACIENDA COMUNIDAD/.test(c)) return C(CTA_SUELO, "ITP compra suelo Brunete (mayor valor del suelo)");
     if (/CORREC+ION TRASPASO/.test(c)) return C("449", "Corrección aportación partícipe (cuentas en participación)");
     if (/^COMIS|COMISION (EMISION|TRANSFERENCIA|MANTENIMIENTO)|COMIS\.COMPRA/.test(c)) return C("626", "Comisión bancaria");
+    // Facturas de notaría de los vendedores que paga Beatriz por su cuenta (con lo retenido del precio): no son gasto de Beatriz
+    if (/PRO ?05211|AJE ?01116/.test(c)) return C("4109", "Gastos de notaría de un vendedor pagados por su cuenta (con cargo a lo retenido del precio)");
+    if (/TABERNA|RESTAURANTE|BAR |CAFETERIA/.test(c) && /OP\.?TARJ/.test(c)) return C("629", "Comida (cargo de tarjeta, sin ticket: gasto entero)");
     if (/EURO ?I/.test(c)) return T("EuroIndian Ventures, S.L.U.");
     if (/PIRAMIDE|COMISION INTERMEDIACION|PAGO COMISION BRUNETE/.test(c)) return T("Piramide Arquitectos, S.L.");
     if (/NOTARI|FRANCISCO CONSE|PRO ?\/ ?\d{4,6}|FRA NO (PRO|AJE)|FACTURA +PRO|611834570200/.test(c)) return T("Notarios Serrano 41");
