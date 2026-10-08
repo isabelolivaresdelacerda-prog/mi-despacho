@@ -51,8 +51,15 @@ export default function TraerDatos() {
   return (
     <div className="traer-datos" role="dialog" aria-label="Traer datos de la dirección antigua">
       <p><strong>Mi Despacho ha cambiado de dirección.</strong> Tus ajustes (logo, colores, plantillas, calendario, carpeta de la empresa) siguen en la dirección antigua de este navegador. Tráelos con un clic; tus documentos no se mueven.</p>
-      {estado ? <p className="ok">{estado}</p> : <div className="acciones">
+      {estado && <p className="ok">{estado}</p>}{!/^Listo/.test(estado) && <div className="acciones">
         <button className="btn" type="button" onClick={() => { window.open(ANTIGUA + "/migrar.html?a=" + encodeURIComponent(location.origin), "md-migrar", "width=480,height=360"); setEstado("Abriendo la dirección antigua…"); }}>Traer mis datos</button>
+        <label className="btn ghost">Cargar desde archivo<input type="file" accept=".json" hidden onChange={async (e) => {
+          const f = e.target.files[0]; if (!f) return;
+          try { const { ls = {} } = JSON.parse(await f.text()); let n = 0;
+            for (const [k, v] of Object.entries(ls)) if (typeof v === "string" && !/md-sesion|^sb-/.test(k)) { Storage.prototype.setItem.call(localStorage, k, v); n++; }
+            localStorage.setItem(HECHO, new Date().toISOString()); setEstado(`Listo: ${n} ajustes recuperados. Recargando… (la carpeta de la empresa tendrás que elegirla otra vez)`); setTimeout(() => location.reload(), 1500);
+          } catch { setEstado("Ese archivo no es de Mi Despacho."); }
+        }} /></label>
         <button className="btn ghost" type="button" onClick={() => { try { localStorage.setItem(HECHO, "no"); } catch { /* nada */ } setVer(false); }}>No hace falta</button>
       </div>}
     </div>

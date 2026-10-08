@@ -66,18 +66,5 @@
         }
       ]
     }
-  ],
-  "redirects": [
-    {
-      "source": "/((?!migrar).*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "mi-despacho-nine.vercel.app"
-        }
-      ],
-      "destination": "https://midespacho.vercel.app/$1",
-      "permanent": false
-    }
   ]
 }

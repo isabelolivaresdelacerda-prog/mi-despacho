@@ -15,6 +15,8 @@ import Acceso from "./Acceso.jsx";
 import Usuarios from "./Usuarios.jsx";
 import { sb, miFicha, salir as salirCuenta, admin, misEmpresas, empresaPorDominio } from "./lib/cuentas.js";
 import { AccesosEmpresa, VincularEmpresa } from "./lib/Enlaces.jsx";
+import { sincronizarAjustes, subirAjustes } from "./lib/ajustesNube.js";
+const DIRECCION_ANTIGUA = "mi-despacho-nine.vercel.app", DIRECCION_NUEVA = "https://midespacho.vercel.app";
 import { fijarEspacio, hayDatosAntiguos, moverDatosAntiguos, borrarDatosAntiguos } from "./lib/espacio.js";
 import { recortarLogo } from "./lib/logo.js";
 import { migrarRaizAntigua, borrarRaizAntigua } from "./lib/carpetas.js";
@@ -85,9 +87,18 @@ export default function App() {
   const [antiguos, setAntiguos] = useState(false);  // datos de este navegador de antes de las cuentas
 
   const salir = async () => { fijarEspacio(null); setEmpresa(null); setEmpresas(null); await salirCuenta(); };
-  const elegirEmpresa = (e) => {
+  const [sincronizando, setSincronizando] = useState(false);
+  const elegirEmpresa = async (e) => {
     fijarEspacio(yo.email, e.id);
     try { localStorage.setItem("md-ultima-empresa:" + yo.email, e.id); } catch { /* nada */ }
+    // Ajustes guardados en la cuenta: iguales en cualquier dirección y ordenador
+    setSincronizando(true);
+    // En la dirección antigua están los ajustes de verdad: se suben siempre a la cuenta y se lleva a la nueva
+    if (location.hostname === DIRECCION_ANTIGUA) {
+      const ok = await subirAjustes(yo.email, e.id);
+      if (ok) { location.replace(DIRECCION_NUEVA + "/#/inicio"); return; }
+    } else await sincronizarAjustes(yo.email, e.id);
+    setSincronizando(false);
     const c = leerConfig();
     setConfig(c.nombre ? c : { ...c, nombre: e.nombre, tipo: e.tipo === "gestoria" ? "gestoria" : "empresa", empresa: { ...(c.empresa || {}), razon_social: e.nombre, cif: e.cif || "" } });
     setEmpresa(e);
@@ -127,7 +138,9 @@ export default function App() {
   }, []);
 
   const ir = (r) => { window.location.hash = "/" + r; };
-  const guardar = (c) => { setConfig(c); guardarConfig(c); };
+  const guardar = (c) => { setConfig(c); guardarConfig(c); if (yo && empresa) { clearTimeout(window.__mdSubir); window.__mdSubir = setTimeout(() => subirAjustes(yo.email, empresa.id), 1500); } };
+  // Lo que guardan las demás apps (calendario, plantillas…) también se sube a la cuenta cada poco
+  useEffect(() => { if (!yo || !empresa) return; const t = setInterval(() => subirAjustes(yo.email, empresa.id), 120000); return () => clearInterval(t); }, [yo, empresa]);
   // El logo se recorta (sin márgenes blancos) una vez, para que ocupe todo su espacio
   useEffect(() => {
     if (config.logo && config.logoRecortado !== config.logo.length) {
@@ -140,7 +153,7 @@ export default function App() {
 
   if (yo === undefined) return <div className="bienvenida" />;
   if (!yo) return <Acceso onDentro={setYo} />;
-  if (empresas === null) return <div className="bienvenida" />;
+  if (empresas === null || sincronizando) return <div className="bienvenida"><p className="muted">{sincronizando ? (location.hostname === DIRECCION_ANTIGUA ? "Guardando tus ajustes en tu cuenta y llevándote a la nueva dirección…" : "Cargando tus ajustes…") : ""}</p></div>;
   if (!empresa) return <SelectorEmpresa yo={yo} empresas={empresas} elegir={elegirEmpresa} salir={salir} />;
   if (antiguos) return <DatosAntiguos empresa={empresa} usar={async () => { moverDatosAntiguos(); await migrarRaizAntigua(); setConfig(leerConfig()); setAntiguos(false); }} descartar={() => { borrarDatosAntiguos(); borrarRaizAntigua(); setAntiguos(false); }} />;
   if (!config.configurado) {
