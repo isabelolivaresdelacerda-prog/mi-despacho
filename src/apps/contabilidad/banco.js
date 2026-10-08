@@ -26,13 +26,15 @@ async function token(cfg, pem) {
   const base = txt64(JSON.stringify({ typ: "JWT", alg: "RS256", kid: cfg.application_id })) + "." + txt64(JSON.stringify({ iss: "enablebanking.com", aud: "api.enablebanking.com", iat: ahora, exp: ahora + 3600 }));
   return base + "." + b64url(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", clave, new TextEncoder().encode(base)));
 }
-async function proxy(ruta, tk) {
+// Error con marca para que la app ofrezca «Renovar banco» en vez de un mensaje suelto
+export class PermisoCaducado extends Error { constructor(m) { super(m || "El permiso del banco ha caducado (por ley hay que renovarlo cada 90 días)."); this.caducado = true; } }
+async function proxy(ruta, tk, metodo = "GET", cuerpo) {
   const { data } = await sb.auth.getSession();
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/banco-proxy`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${data?.session?.access_token || ""}` }, body: JSON.stringify({ ruta, token: tk }) });
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/banco-proxy`, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${data?.session?.access_token || ""}` }, body: JSON.stringify({ ruta, token: tk, metodo, cuerpo }) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
     const t = JSON.stringify(j);
-    if (r.status === 401 || /expired|EXPIRED|session|consent|revoked/i.test(t)) throw new Error("El permiso del banco ha caducado (por ley hay que renovarlo cada 90 días). Hay que volver a autorizar la cuenta en la web de Cajamar.");
+    if (metodo === "GET" && (r.status === 401 || /expired|EXPIRED|session|consent|revoked/i.test(t))) throw new PermisoCaducado();
     throw new Error(`Banco ${r.status}: ${t.slice(0, 200)}`);
   }
   return j;
@@ -51,6 +53,13 @@ export async function sincronizarBanco(raiz) {
   const dir = await dirEstado(raiz);
   const pem = await (await (await dir.getFileHandle(cfg.key_file || "enablebanking_key.pem")).getFile()).text();
   const tk = await token(cfg, pem);
+  // Antes de pedir movimientos se mira si el permiso sigue vivo (si no, la app ofrece renovarlo)
+  if (cfg.session_id) {
+    const ses = await proxy(`/sessions/${cfg.session_id}`, tk).catch((e) => { if (e.caducado) throw e; return null; });
+    const hasta = ses?.access?.valid_until;
+    if (ses && (ses.status && ses.status !== "AUTHORIZED" || (hasta && Date.parse(hasta) < Date.now()))) throw new PermisoCaducado();
+    if (hasta && hasta !== cfg.valid_until) { cfg.valid_until = hasta; await escribirJSON(raiz, "banco_api_config.json", cfg); }
+  }
   const nuevos = [];
   let cont = null;
   for (let i = 0; i < 50; i++) {
@@ -69,7 +78,61 @@ export async function sincronizarBanco(raiz) {
   const movimientos = [...antiguos, ...nuevos].sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
   await escribirJSON(raiz, "extracto_api.json", { actualizado: new Date().toLocaleString("es-ES"), movimientos });
   try { await excelTodoElAnio(raiz, movimientos); } catch { /* el Excel es solo para consultar; si está abierto no se puede escribir */ }
-  return { nuevos: nuevos.length, total: movimientos.length };
+  const dias = cfg.valid_until ? Math.floor((Date.parse(cfg.valid_until) - Date.now()) / 86400000) : null;
+  return { nuevos: nuevos.length, total: movimientos.length, diasPermiso: dias };
+}
+
+// Días que le quedan al permiso del banco (lo que se sabe sin preguntar al banco)
+export async function diasPermiso(raiz) {
+  const cfg = await leerJSON(raiz, "banco_api_config.json", {});
+  return cfg.valid_until ? Math.floor((Date.parse(cfg.valid_until) - Date.now()) / 86400000) : null;
+}
+
+export const urlVuelta = () => `${location.origin}/banco-vuelta.html`;
+
+// Renovar el permiso (PSD2 obliga cada 90 días). Se abre la web del banco en una ventana; al volver, la página
+// banco-vuelta.html avisa a esta pestaña con el código y aquí se crea la sesión nueva y se guarda en tu carpeta.
+// «ventana» se abre en el mismo clic (si no, el navegador la bloquea).
+export async function renovarPermiso(raiz, ventana, onPaso = () => {}) {
+  const cfg = await leerJSON(raiz, "banco_api_config.json", {});
+  if (!cfg.application_id) throw new Error("Falta la configuración del banco en la carpeta «programa».");
+  const dir = await dirEstado(raiz);
+  const pem = await (await (await dir.getFileHandle(cfg.key_file || "enablebanking_key.pem")).getFile()).text();
+  const tk = await token(cfg, pem);
+  const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
+  const hasta = new Date(Date.now() + 90 * 86400000).toISOString().replace(/\.\d{3}Z$/, ".000Z");
+  onPaso("Pidiendo al banco la página de autorización…");
+  let r;
+  try {
+    r = await proxy("/auth", tk, "POST", { access: { valid_until: hasta }, aspsp: { name: cfg.aspsp_name || "Cajamar", country: cfg.aspsp_country || "ES" }, state, redirect_url: urlVuelta(), psu_type: cfg.psu_type || "business" });
+  } catch (e) {
+    try { ventana?.close(); } catch { /* */ }
+    if (/redirect/i.test(String(e.message))) throw new Error(`El banco no reconoce la dirección de vuelta. Añade ${urlVuelta()} en «Redirect URLs» de tu aplicación en el panel de Enable Banking (enablebanking.com › Control panel) y vuelve a intentarlo.`);
+    throw e;
+  }
+  if (!r.url) throw new Error("El banco no devolvió la página de autorización.");
+  if (ventana && !ventana.closed) ventana.location.href = r.url; else window.open(r.url, "banco", "width=520,height=760");
+  onPaso("Autoriza la cuenta en la ventana del banco (entra con tus claves de Cajamar)…");
+  const code = await new Promise((ok, mal) => {
+    const canal = "BroadcastChannel" in window ? new BroadcastChannel("midespacho-banco") : null;
+    const fin = (f, v) => { clearTimeout(t); canal?.close(); removeEventListener("storage", alm); f(v); };
+    const recibir = (d) => { if (!d || d.state !== state) return; if (d.error) fin(mal, new Error(`El banco no dio el permiso: ${d.error}`)); else if (d.code) fin(ok, d.code); };
+    const alm = (e) => { if (e.key === "midespacho-banco") try { recibir(JSON.parse(e.newValue)); } catch { /* */ } };
+    if (canal) canal.onmessage = (e) => recibir(e.data);
+    addEventListener("storage", alm);
+    const t = setTimeout(() => fin(mal, new Error("Se acabó el tiempo (15 minutos) sin autorizar. Vuelve a pulsar «Renovar banco».")), 15 * 60000);
+  });
+  try { localStorage.removeItem("midespacho-banco"); } catch { /* */ }
+  onPaso("Guardando el permiso nuevo…");
+  const ses = await proxy("/sessions", tk, "POST", { code });
+  const cuentas = ses.accounts || [];
+  if (!cuentas.length) throw new Error("La autorización no devolvió ninguna cuenta.");
+  const ibanPrevio = (cfg._cuentas || []).find((c) => c.uid === cfg.account_uid)?.iban;
+  const elegida = cuentas.find((a) => ibanPrevio && (a.account_id || {}).iban === ibanPrevio) || cuentas[0];
+  const nuevo = { ...cfg, _anterior: { session_id: cfg.session_id, account_uid: cfg.account_uid, valid_until: cfg.valid_until }, session_id: ses.session_id || "", account_uid: elegida.uid, _cuentas: cuentas.map((a) => ({ uid: a.uid, iban: (a.account_id || {}).iban || "" })), valid_until: ses.access?.valid_until || hasta, renovado: new Date().toISOString() };
+  delete nuevo._auth_iniciada; delete nuevo._state;
+  await escribirJSON(raiz, "banco_api_config.json", nuevo);
+  return { hasta: nuevo.valid_until };
 }
 
 // Extractos descargados del banco en Excel/CSV (carpeta «extractos»): para lo que la conexión no alcanza (más de 90 días)

@@ -22,6 +22,15 @@ function guardarRegistro() {
   clearTimeout(_pendiente);
   _pendiente = setTimeout(async () => { const { escribirJSON } = await import("./datos.js"); await escribirJSON(_raizTextos, "textos_documentos.json", _textos); }, 1500);
 }
+// Ficha de un documento en el registro (por su huella: si se renombra o se mueve, se sigue reconociendo)
+export async function fichaRegistro(file) {
+  try { const reg = await registro(); const h = await huellaArchivo(file); return { h, ficha: reg[h] || null }; } catch { return { h: null, ficha: null }; }
+}
+// Anota en el registro lo que es el documento (lo que ha concluido la IA) para no volver a leerlo nunca
+export async function anotarRegistro(h, datos) {
+  if (!h) return;
+  try { const reg = await registro(); reg[h] = { ...(reg[h] || {}), ...datos, anotado: new Date().toISOString().slice(0, 10) }; guardarRegistro(); } catch { /* nada */ }
+}
 export async function huellaArchivo(file) {
   const h = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
   return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("");

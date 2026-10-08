@@ -131,7 +131,7 @@ export async function hacerTodo({ raiz, empresa, propia, datos, onPaso }) {
   const paso = (t) => onPaso?.(t);
   const { leerFactura } = await import("./leer.js");
   // 0) Traer del banco los movimientos nuevos (conexión que ya tenías en la app local)
-  try { const b = await import("./banco.js"); if (await b.bancoConfigurado(raiz)) { paso("Trayendo los movimientos nuevos del banco…"); const x = await b.sincronizarBanco(raiz); res.bancoNuevos = x.nuevos; } } catch (e) { res.errores.push("Banco: " + (e.message || e)); }
+  try { const b = await import("./banco.js"); if (await b.bancoConfigurado(raiz)) { paso("Trayendo los movimientos nuevos del banco…"); const x = await b.sincronizarBanco(raiz); res.bancoNuevos = x.nuevos; } } catch (e) { if (e.caducado) res.bancoCaducado = true; res.errores.push("Banco: " + (e.message || e)); }
 
   // 1) Facturas pendientes de leer
   for (const [lista, emitida] of [[datos.facturas, false], [datos.emitidas || [], true]]) {
