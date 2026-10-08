@@ -5,7 +5,6 @@
   const pedido = new URLSearchParams(location.search).get("a");
   const DESTINO = PERMITIDOS.includes(pedido) ? pedido : PERMITIDOS[0];
   const msg = (t) => { document.getElementById("estado").textContent = t; };
-  if (!window.opener) { msg("Abre esta página desde Mi Despacho (midespacho.vercel.app)."); return; }
   const ls = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -26,8 +25,18 @@
       db.close();
     }
   } catch (e) { /* sin carpetas guardadas */ }
-  const enviar = (conCarpetas) => window.opener.postMessage({ tipo: "md-migracion", ls, idb: conCarpetas ? idb : [] }, DESTINO);
-  try { enviar(true); msg("Datos enviados a la dirección nueva. Ya puedes cerrar esta ventana."); }
-  catch (e) { enviar(false); msg("Datos enviados (la carpeta de la empresa tendrás que elegirla otra vez). Ya puedes cerrar esta ventana."); }
-  setTimeout(() => window.close(), 2500);
+  // 1) Si la ventana de Mi Despacho sigue enlazada, se le mandan los datos directamente
+  if (window.opener) {
+    const enviar = (conCarpetas) => window.opener.postMessage({ tipo: "md-migracion", ls, idb: conCarpetas ? idb : [] }, DESTINO);
+    try { enviar(true); msg("Datos enviados a la dirección nueva. Ya puedes cerrar esta ventana."); }
+    catch (e) { enviar(false); msg("Datos enviados (la carpeta de la empresa tendrás que elegirla otra vez). Ya puedes cerrar esta ventana."); }
+    setTimeout(() => window.close(), 2500);
+    return;
+  }
+  // 2) Si no, se llevan en la propia dirección (comprimidos) a la página nueva, que los guarda
+  msg("Llevando tus datos a la dirección nueva…");
+  const texto = JSON.stringify({ ls });
+  const gz = await new Response(new Blob([texto]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+  let bin = ""; const b = new Uint8Array(gz); for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+  location.replace(DESTINO + "/#md-migracion=" + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
 })();

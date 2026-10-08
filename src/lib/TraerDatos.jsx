@@ -8,6 +8,24 @@ export default function TraerDatos() {
   const [estado, setEstado] = useState("");
   useEffect(() => {
     if (location.origin === ANTIGUA) return;
+    // Datos llegados en la dirección (cuando la ventana no puede enlazarse con la anterior)
+    if (location.hash.startsWith("#md-migracion=")) {
+      (async () => {
+        try {
+          const b64 = location.hash.slice(14).replace(/-/g, "+").replace(/_/g, "/");
+          const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+          const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+          const txt = await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+          const { ls = {} } = JSON.parse(txt);
+          let n = 0; for (const [k, v] of Object.entries(ls)) if (typeof v === "string" && !/md-sesion|^sb-/.test(k)) { try { Storage.prototype.setItem.call(localStorage, k, v); n++; } catch { /* nada */ } }
+          localStorage.setItem(HECHO, new Date().toISOString());
+          history.replaceState(null, "", location.pathname + "#/inicio");
+          setVer(true); setEstado(`Listo: ${n} ajustes recuperados. Si tenías otra pestaña de Mi Despacho abierta, recárgala. La carpeta de la empresa tendrás que elegirla otra vez.`);
+          setTimeout(() => location.reload(), 2500);
+        } catch { setVer(true); setEstado("No se han podido leer los datos. Vuelve a intentarlo."); }
+      })();
+      return;
+    }
     let hecho = false; try { hecho = !!localStorage.getItem(HECHO); } catch { /* nada */ }
     if (!hecho) setVer(true);
     const recibir = async (ev) => {
