@@ -25,13 +25,14 @@ const MENU = [
     hijos: [
       { ruta: "contabilidad", titulo: "Mi contabilidad" },
       { ruta: "contabilidad/carpeta", titulo: "Carpeta de contabilidad" },
+      { ruta: "empresa/carpeta", titulo: "Carpeta de la empresa (toda)" },
     ],
   },
   {
     app: "contratos", titulo: "Contratos", icono: "§",
     hijos: [
-      { grupo: "Crear", hijos: [{ ruta: "contratos/crear/cuentas-participacion", titulo: "Contrato de cuentas en participación" }, { ruta: "contratos/crear/encargo-tratamiento", titulo: "Contrato de encargo del tratamiento (RGPD)" }] },
-      { ruta: "contratos/carpeta", titulo: "Carpeta de la empresa" },
+      { ruta: "contratos/crear/cuentas-participacion", titulo: "Contrato de cuentas en participación" },
+      { ruta: "contratos/crear/encargo-tratamiento", titulo: "Contrato de encargo del tratamiento (RGPD)" },
     ],
   },
 ];
@@ -48,7 +49,7 @@ function Inicio({ config, ir }) {
   return (
     <div className="app">
       <header className="app-cab inicio-cab">
-        <Logo config={config} grande />
+        {!config.logo && <Logo config={config} grande />}
         <div>
           <div className="eyebrow">Mi despacho · {TIPOS[config.tipo]?.nombre}</div>
           <h1>{config.nombre || "Mi Despacho"}</h1>
@@ -150,8 +151,9 @@ export default function App() {
       vista = <ContratoCEP config={config} irAAjustes={irAAjustes} />; break;
     case "contratos/crear/encargo-tratamiento":
       vista = <div className="app"><ContratoEncargo /></div>; break;
+    case "empresa/carpeta":
     case "contratos/carpeta":
-      vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} config={config} />; break;
+      vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Documentación" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
     case "seguridad":
       vista = <Seguridad config={config} />; break;
     case "guias/asociaciones":
@@ -172,43 +174,58 @@ export default function App() {
       vista = <Inicio config={config} ir={ir} />;
   }
 
-  const Item = ({ r, children }) => (
-    <a href={"#/" + r} className={"menu-item" + (ruta === r ? " activo" : "")} aria-current={ruta === r ? "page" : undefined}>{children}</a>
+  const Enl = ({ r, children }) => (
+    <a href={"#/" + r} className={ruta === r ? "active" : ""} aria-current={ruta === r ? "page" : undefined} onClick={() => document.activeElement?.blur()}>{children}</a>
   );
+  // Desplegable estilo Patriam: el título del grupo y sus opciones debajo
+  const Despl = ({ titulo, items, insignia }) => {
+    const activo = items.some((x) => x && ruta === x.ruta);
+    return (
+      <div className="despl">
+        <button type="button" className={"despl-btn" + (activo ? " active" : "")} aria-haspopup="true">{titulo}{insignia > 0 && <span className="insignia">{insignia}</span>} <span aria-hidden>▾</span></button>
+        <div className="despl-menu">{items.filter(Boolean).map((x) => x.accion
+          ? <button key={x.titulo} type="button" onClick={() => { document.activeElement?.blur(); x.accion(); }}>{x.titulo}</button>
+          : <Enl key={x.ruta} r={x.ruta}>{x.titulo}{x.insignia > 0 && <span className="insignia">{x.insignia}</span>}</Enl>)}</div>
+      </div>
+    );
+  };
+  const apps = MENU.filter((m) => config.apps[m.app]);
 
   return (
-    <div className="marco" style={tema}>
-      <aside className={"lateral" + (menuAbierto ? " abierto" : "")}>
-        <div className="lateral-cab">
-          <a href="#/inicio" className={"marca" + (config.logo ? " con-logo" : "")}>{config.logo ? <><img className="logo-apilado" src={config.logo} alt={config.nombre || "Mi Despacho"} /><span className="marca-usuario">{yo.nombre || yo.email}</span></> : <><Logo config={config} /><span>{config.nombre || "Mi Despacho"}</span></>}</a>
-          <button className="btn-menu" type="button" aria-label="Menú" aria-expanded={menuAbierto} onClick={() => setMenuAbierto(!menuAbierto)}>☰</button>
+    <div className="sitio-app" style={tema}>
+      <header className="cabecera">
+        <div className="cabecera-in">
+          <a href="#/inicio" className="logo-cab" aria-label="Inicio">{config.logo ? <img src={config.logo} alt={config.nombre || "Mi Despacho"} /> : <><Logo config={config} /><span className="nombre-cab">{config.nombre || "Mi Despacho"}</span></>}</a>
+          <div className="cabecera-derecha">
+            {(empresas.length > 1 || yo.rol === "admin") && <button type="button" className="enlace-cuenta" title="Cambiar de empresa" onClick={() => { fijarEspacio(null); setEmpresa(null); }}>🏢 <span className="texto-cuenta">{empresa.nombre}</span></button>}
+            <span className="enlace-cuenta" title={yo.email}>
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0" /></svg>
+              <span className="texto-cuenta">{yo.nombre || yo.email}</span>
+            </span>
+            <button type="button" className="btn btn-cabecera" onClick={salir}>Salir</button>
+          </div>
         </div>
-        <nav className="menu">
-          <Item r="inicio">Inicio</Item>
-          <Item r="calendario">📅 Calendario</Item>
-          {MENU.filter((m) => config.apps[m.app]).map((m) => (
-            <div className="menu-grupo" key={m.app}>
-              <div className="menu-titulo"><span className="icono">{m.icono}</span>{m.titulo}</div>
-              {m.hijos.map((h) => h.grupo ? (
-                <div className="menu-sub" key={h.grupo}>
-                  <div className="menu-subtitulo">{h.grupo}</div>
-                  {h.hijos.map((x) => <Item key={x.ruta} r={x.ruta}>{x.titulo}</Item>)}
-                </div>
-              ) : <Item key={h.ruta} r={h.ruta}>{h.titulo}</Item>)}
-            </div>
-          ))}
-          <div className="menu-pie">
-            {yo.rol === "admin" && <Item r="usuarios">👤 Usuarios {pendientes > 0 && <span className="insignia" title="Solicitudes de acceso pendientes">{pendientes}</span>}</Item>}
-            <Item r="guias/asociaciones">📖 Guía: asociaciones</Item>
-            <Item r="carpetas">📁 Carpetas de la empresa</Item>
-            <Item r="ajustes">⚙ Ajustes</Item>
-            {(empresas.length > 1 || yo.rol === "admin") && <button className="menu-item salir" type="button" onClick={() => { fijarEspacio(null); setEmpresa(null); }}>🏢 Cambiar de empresa ({empresa.nombre})</button>}
-            <button className="menu-item salir" type="button" onClick={salir}>Salir ({yo.email})</button>
-            <div className="nube-actual">Documentos en {NUBES[config.nube].nombre}</div>
+        <nav className="menu-principal" aria-label="Menú principal">
+          <div className="menu-in">
+            <Enl r="inicio">Inicio</Enl>
+            <Enl r="calendario">Calendario</Enl>
+            {apps.map((m) => <Despl key={m.app} titulo={m.titulo} items={m.hijos} />)}
+            <Despl titulo="Utilidades" items={[
+              { ruta: "carpetas", titulo: "Organizar las carpetas de la empresa" },
+              { ruta: "guias/asociaciones", titulo: "Guía: contabilidad de asociaciones" },
+              { ruta: "seguridad", titulo: "Seguridad, datos e IA" },
+            ]} />
+            <Despl titulo="Administración" insignia={yo.rol === "admin" ? pendientes : 0} items={[
+              yo.rol === "admin" && { ruta: "usuarios", titulo: "Usuarios y empresas", insignia: pendientes },
+              { ruta: "ajustes", titulo: "Ajustes de la empresa" },
+              (empresas.length > 1 || yo.rol === "admin") && { titulo: "Cambiar de empresa", accion: () => { fijarEspacio(null); setEmpresa(null); } },
+              { titulo: "Salir", accion: salir },
+            ]} />
           </div>
         </nav>
-      </aside>
+      </header>
       <main className="principal">{vista}</main>
+      <footer className="pie-app">Documentos en {NUBES[config.nube].nombre} · {empresa.nombre} · Mi Despacho · bitini labs</footer>
     </div>
   );
 }

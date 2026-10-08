@@ -3,17 +3,17 @@ import { useState } from "react";
 import { NUBES, enlaceIncrustable, enlaceAbrir } from "../nube.js";
 import Explorador from "./Explorador.jsx";
 
-export default function VistaCarpeta({ titulo, eyebrow, enlace, nube = "onedrive", contabilidad = false, config }) {
+export default function VistaCarpeta({ titulo, eyebrow, enlace, nube = "onedrive", contabilidad = false, config, empezarEnPC = false }) {
   const incrustado = enlaceIncrustable(enlace);
   const abrir = enlaceAbrir(enlace);
-  const [vista, setVista] = useState(incrustado ? "nube" : "pc");
+  const [vista, setVista] = useState(incrustado && !empezarEnPC ? "nube" : "pc");
   const N = NUBES[nube] || NUBES.onedrive;
   return (
     <div>
       <div className="app vista-carpeta-barra">
         <nav className="cont-tabs" role="tablist">
           <button role="tab" aria-selected={vista === "nube"} className={vista === "nube" ? "on" : ""} onClick={() => setVista("nube")}>En {N.nombre}</button>
-          <button role="tab" aria-selected={vista === "pc"} className={vista === "pc" ? "on" : ""} onClick={() => setVista("pc")}>En mi ordenador</button>
+          <button role="tab" aria-selected={vista === "pc"} className={vista === "pc" ? "on" : ""} onClick={() => setVista("pc")}>{contabilidad ? "En mi ordenador" : "Toda la carpeta (OneDrive sincronizado)"}</button>
         </nav>
       </div>
       {vista === "pc" ? <Explorador titulo={titulo} eyebrow={eyebrow} contabilidad={contabilidad} config={config} /> : (

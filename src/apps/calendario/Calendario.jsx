@@ -59,10 +59,10 @@ export function ProximosAvisos({ config, ir }) {
   return (
     <section className="tarjeta avisos-inicio">
       <Hoy siguiente={pendientes[0]} />
-      {(prox.length > 0 || vencidos.length > 0) && <ul>
-        {vencidos.slice(-3).map((e) => <li key={e.id} className="vencido"><strong>{fmt(e.fecha)}</strong> · {e.titulo} <span className="etq-v">vencido</span>{e.tipo === "impuesto" && <> <button className="enlace" type="button" onClick={irAImpuestos}>¿ya presentado? regístralo</button></>}</li>)}
+      {prox.length > 0 && <ul>
         {prox.map((e) => <li key={e.id}><strong>{fmt(e.fecha)}</strong> · {e.titulo} <span className="muted">({faltan(diasHasta(e.fecha))})</span></li>)}
       </ul>}
+      {vencidos.length > 0 && <p className="pequeño muted">Hay {vencidos.length} plazo{vencidos.length > 1 ? "s" : ""} pasado{vencidos.length > 1 ? "s" : ""} sin marcar como hecho{vencidos.length > 1 ? "s" : ""}. <button className="enlace" type="button" onClick={() => ir("calendario")}>Revisarlos</button></p>}
       <button className="enlace" type="button" onClick={() => ir("calendario")}>Ver el calendario</button>
     </section>
   );
@@ -164,7 +164,14 @@ export default function Calendario({ config, guardar }) {
             <h3>{largo(dia)} <button className="enlace pequeño" type="button" onClick={() => setDia(null)}>ver todos</button></h3>
             {lista.length ? <ul>{lista.map((e) => <Ev key={e.id + e.fecha} e={e} />)}</ul> : <p className="muted">Nada este día.</p>}
           </>) : (<>
-            {vencidos.length > 0 && <><h3 className="error">Vencidos sin marcar ({vencidos.length})</h3><ul>{vencidos.map((e) => <Ev key={e.id + e.fecha} e={e} />)}</ul></>}
+            {vencidos.length > 0 && (
+              <details className="cal-vencidos">
+                <summary>{vencidos.length} plazo{vencidos.length > 1 ? "s" : ""} pasado{vencidos.length > 1 ? "s" : ""} sin marcar</summary>
+                <p className="pequeño muted">Ya han pasado. Si se presentaron, márcalos como hechos (o registra el impuesto en Contabilidad › Impuestos y se marca solo). Si no se presentaron, hay que hacerlo cuanto antes para evitar recargos.</p>
+                <button className="btn mini" type="button" onClick={() => { const x = { ...hechos }; vencidos.forEach((e) => (x[e.id] = true)); setHechos(x); escribir(HECHOS, x); }}>Ya están hechos: marcarlos todos</button>
+                <ul>{vencidos.map((e) => <Ev key={e.id + e.fecha} e={e} />)}</ul>
+              </details>
+            )}
             <h3>Próximos avisos</h3>
             <ul>{pendientes.slice(0, 12).map((e) => <Ev key={e.id + e.fecha} e={e} />)}</ul>
           </>)}

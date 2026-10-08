@@ -257,3 +257,54 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .marca.con-logo { display: flex; width: 100%; align-items: center; }
 .marca.con-logo .logo-apilado { width: 100%; min-width: 0; max-width: 220px; max-height: 130px; }
 .marca.con-logo > .marca-usuario { font: 400 13px var(--sans); color: var(--suave); max-width: 100%; }
+
+/* ===== Cabecera y menú superior (estilo Patriam) ===== */
+.sitio-app { min-height: 100vh; display: flex; flex-direction: column; background: var(--papel); color: var(--tinta); }
+.cabecera { background: var(--superficie); position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--linea); }
+.cabecera::after { content: ""; display: block; height: 3px; background: var(--brand); }
+.cabecera-in { max-width: 1280px; margin: 0 auto; padding: 0 24px; min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.logo-cab { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--tinta); }
+.logo-cab img { height: 58px; width: auto; max-width: 260px; object-fit: contain; display: block; }
+.nombre-cab { font: 600 20px var(--serif); }
+.cabecera-derecha { display: flex; align-items: center; gap: 1.1rem; }
+.enlace-cuenta { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--tinta); background: none; border: 0; font: 500 0.9rem var(--sans); cursor: default; padding: 0; }
+button.enlace-cuenta { cursor: pointer; }
+button.enlace-cuenta:hover { color: var(--brand); }
+.btn-cabecera { padding: 0.45rem 1rem; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.menu-principal { border-top: 1px solid var(--linea); background: var(--superficie); }
+.menu-in { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 0 2.2rem; min-height: 50px; }
+.menu-principal a, .menu-principal .despl-btn {
+  font: 600 0.78rem var(--sans); text-transform: uppercase; letter-spacing: 0.14em; color: var(--tinta);
+  text-decoration: none; padding: 0.95rem 0; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+.menu-principal a:hover, .menu-principal .despl-btn:hover { color: var(--brand); }
+.menu-principal a.active, .menu-principal .despl-btn.active { border-bottom-color: var(--brand); color: var(--brand); }
+.menu-principal .despl { position: relative; }
+.menu-principal .despl-btn > span[aria-hidden] { font-size: 0.6rem; }
+.menu-principal .despl-menu {
+  display: none; position: absolute; top: 100%; left: -1rem; background: var(--superficie); border: 1px solid var(--linea);
+  box-shadow: 0 12px 28px rgba(0,0,0,.10); min-width: 270px; padding: 0.4rem 0; z-index: 50; border-radius: 0 0 10px 10px;
+}
+.menu-principal .despl:hover .despl-menu, .menu-principal .despl:focus-within .despl-menu { display: block; }
+.menu-principal .despl-menu a, .menu-principal .despl-menu button {
+  display: flex; width: 100%; justify-content: space-between; padding: 0.65rem 1.2rem; border: 0; background: none; text-align: left;
+  text-transform: none; letter-spacing: 0.01em; font: 500 0.92rem var(--sans); color: var(--tinta); cursor: pointer;
+}
+.menu-principal .despl-menu a:hover, .menu-principal .despl-menu button:hover { background: var(--brand-suave); color: var(--brand); }
+.menu-principal .despl-menu a.active { background: var(--brand-suave); color: var(--brand); border: 0; }
+.menu-principal .insignia { margin-left: 6px; }
+.sitio-app .principal { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 8px 24px 40px; }
+.pie-app { border-top: 1px solid var(--linea); padding: 14px 24px; font-size: 12px; color: var(--suave); text-align: center; }
+@media (max-width: 760px) {
+  .cabecera { position: static; }
+  .cabecera-in { min-height: 66px; padding: 0 14px; }
+  .logo-cab img { height: 42px; max-width: 170px; }
+  .texto-cuenta { display: none; }
+  .menu-in { justify-content: flex-start; gap: 0 1.1rem; padding: 0 14px; overflow-x: auto; flex-wrap: nowrap; }
+  .menu-principal a, .menu-principal .despl-btn { padding: 0.7rem 0; font-size: 0.72rem; letter-spacing: 0.08em; white-space: nowrap; }
+  .menu-principal .despl { position: static; }
+  .menu-principal .despl-menu { left: 8px; right: 8px; min-width: 0; position: absolute; }
+  .menu-principal { position: relative; }
+  .sitio-app .principal { padding: 8px 14px 32px; }
+}
+@media print { .cabecera, .pie-app { display: none; } }

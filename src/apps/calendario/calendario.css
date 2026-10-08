@@ -61,3 +61,6 @@
 .cal-avisos .cal-ev { grid-template-columns: auto 1fr; }
 .cal-avisos .cal-fecha { flex-direction: row; gap: 6px; align-items: baseline; text-transform: capitalize; }
 @media (max-width: 900px) { .cal-layout { grid-template-columns: 1fr; } .cal-celda { min-height: 54px; } .cal-chip { font-size: 0; height: 6px; padding: 0; } .cal-avisos { position: static; max-height: none; } }
+.cal-vencidos { border: 1px solid color-mix(in srgb, var(--error) 30%, var(--linea)); border-radius: 10px; padding: 8px 10px; margin-bottom: 14px; }
+.cal-vencidos summary { cursor: pointer; font-weight: 600; color: var(--error); }
+.cal-vencidos ul { margin-top: 8px; }
