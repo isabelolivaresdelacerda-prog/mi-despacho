@@ -1,5 +1,5 @@
 // Pantalla de acceso: entrar (clave + doble factor), crear mi clave (con el código de la administradora) o pedir acceso.
-import { enviarCodigo, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { entrar, crearClave, enviarCodigo, pedirAcceso, estadoMFA, iniciarAltaMFA, verificarMFA, salir } from "./lib/cuentas.js";
 
