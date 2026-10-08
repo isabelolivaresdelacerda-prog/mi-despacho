@@ -43,3 +43,7 @@
   .col-tipo, .col-tam { display: none; }
   .expl-buscar { width: 120px; }
 }
+.celda-nombre { display: flex; align-items: center; gap: 6px; }
+.expl-ren { background: none; border: 0; cursor: pointer; opacity: 0; font-size: 13px; padding: 4px; border-radius: 6px; }
+.expl-tabla tr:hover .expl-ren, .expl-ren:focus { opacity: .8; }
+.expl-ren:hover { background: var(--brand-suave); opacity: 1; }

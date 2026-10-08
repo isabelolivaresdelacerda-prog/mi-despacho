@@ -70,6 +70,22 @@ export async function revisarCarpeta({ empresa, raiz, propia, onPaso }) {
     nuevos.push({ ...d, k, cambiado: !!prev });
   }
   const vinc = await leerVinculados(raiz);
+  // Documentos renombrados o movidos: mismo tamaño que uno que ya no está → se actualiza el registro y el vínculo
+  const actualesK = new Set(docs.map((d) => [...d.ruta, d.nombre].join("/")));
+  const desaparecidos = Object.entries(inv.docs).filter(([k]) => !actualesK.has(k));
+  let cambiosVinc = false;
+  for (const d of [...nuevos]) {
+    if (d.cambiado) continue;
+    const mismos = desaparecidos.filter(([, x]) => x.size === d.size);
+    const viejo = mismos.find(([, x]) => x.mtime === d.mtime) || (mismos.length === 1 ? mismos[0] : null);
+    if (!viejo) continue;
+    const [kv, xv] = viejo;
+    inv.docs[d.k] = { ...xv, ruta: d.ruta, nombre: d.nombre, mtime: d.mtime, renombradoDe: kv };
+    delete inv.docs[kv];
+    for (const v of vinc) if ([...v.ruta, v.archivo].join("/") === kv) { v.ruta = d.ruta; v.archivo = d.nombre; cambiosVinc = true; }
+    nuevos.splice(nuevos.indexOf(d), 1);
+    desaparecidos.splice(desaparecidos.indexOf(viejo), 1);
+  }
   const yaVinc = new Set(vinc.map((v) => [...v.ruta, v.archivo].join("/")));
   let n = 0, i = 0;
   for (const d of nuevos) {
@@ -94,7 +110,7 @@ export async function revisarCarpeta({ empresa, raiz, propia, onPaso }) {
   inv.actualizado = visto; inv.total = docs.length;
   inv.historial = [...(inv.historial || []).slice(-50), { fecha: visto, total: docs.length, nuevos: nuevos.length, vinculados: n }];
   await escribirJSON(raiz, ARCHIVO, inv);
-  if (n) await guardarVinculados(raiz, vinc);
+  if (n || cambiosVinc) await guardarVinculados(raiz, vinc);
   return { total: docs.length, nuevos, vinculados: n, inventario: inv };
 }
 

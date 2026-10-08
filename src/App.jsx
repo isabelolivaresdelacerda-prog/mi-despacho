@@ -151,7 +151,7 @@ export default function App() {
     case "contratos/crear/encargo-tratamiento":
       vista = <div className="app"><ContratoEncargo /></div>; break;
     case "contratos/carpeta":
-      vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} />; break;
+      vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} config={config} />; break;
     case "seguridad":
       vista = <Seguridad config={config} />; break;
     case "guias/asociaciones":
@@ -163,7 +163,7 @@ export default function App() {
     case "contabilidad":
       vista = <ContabilidadWeb config={config} guardar={guardar} />; break;
     case "contabilidad/carpeta":
-      vista = <VistaCarpeta titulo="Carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} contabilidad />; break;
+      vista = <VistaCarpeta titulo="Carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} contabilidad config={config} />; break;
     case "usuarios":
       vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
     case "ajustes":
