@@ -1,0 +1,56 @@
+// Lectura de facturas en el navegador: texto del PDF con pdf.js y extracción con la IA del ordenador.
+// Si la IA local no está encendida, se usa una lectura básica por patrones y la usuaria revisa.
+import * as pdfjs from "pdfjs-dist";
+import worker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { preguntarIA } from "../../ia-navegador.js";
+import { num, asignarCuenta } from "./datos.js";
+
+pdfjs.GlobalWorkerOptions.workerSrc = worker;
+
+export async function textoPDF(file, maxPaginas = 4) {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
+  let t = "";
+  for (let i = 1; i <= Math.min(doc.numPages, maxPaginas); i++) {
+    const c = await (await doc.getPage(i)).getTextContent();
+    t += c.items.map((x) => x.str + (x.hasEOL ? "\n" : " ")).join("") + "\n";
+  }
+  return t.replace(/[ \t]+/g, " ").trim();
+}
+
+const PROMPT = `Eres un extractor de facturas españolas. Lee el texto de la factura y responde SOLO con un JSON con esta estructura exacta:
+{"numero":"","fecha":"dd/mm/aaaa","proveedor":"","nif_proveedor":"","cliente":"","nif_cliente":"","base":0.0,"iva_pct":0.0,"iva_importe":0.0,"retencion_pct":0.0,"retencion_importe":0.0,"total":0.0,"concepto":""}
+Reglas: el proveedor es quien EMITE la factura; importes como número con punto decimal; si no aparece un dato, déjalo vacío o a 0. No inventes nada.
+
+TEXTO:
+`;
+
+function jsonDe(texto) {
+  const m = String(texto || "").match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch { return null; }
+}
+
+// Lectura básica por patrones (sin IA)
+export function lecturaBasica(t) {
+  const imp = (re) => { const m = t.match(re); return m ? num(m[1]) : 0; };
+  const nifs = [...t.matchAll(/\b([A-HJNP-SUVW]\d{7}[0-9A-J]|\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\b/g)].map((m) => m[1]);
+  const fecha = (t.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/) || [])[1] || "";
+  const total = imp(/total(?:\s+factura|\s+a\s+pagar)?\s*:?\s*([\d.]+,\d{2})/i) || imp(/([\d.]+,\d{2})\s*€?\s*$/m);
+  const base = imp(/base\s+imponible\s*:?\s*([\d.]+,\d{2})/i);
+  const iva = imp(/(?:cuota\s+)?i\.?v\.?a\.?[^\d\n]{0,20}([\d.]+,\d{2})/i);
+  return { numero: (t.match(/factura\s*(?:n[ºo°.]*|número)?\s*:?\s*([A-Z0-9][\w/-]{2,})/i) || [])[1] || "", fecha, nif_proveedor: nifs[0] || "", base, iva_importe: iva, total };
+}
+
+export async function leerFactura(file) {
+  const texto = await textoPDF(file);
+  if (texto.length < 30) return { datos: null, motivo: "El PDF no tiene texto (es una imagen escaneada). Rellena los datos a mano." };
+  const r = await preguntarIA(PROMPT + texto.slice(0, 6000), { maxTokens: 700 });
+  let d = r.estado === "ok" ? jsonDe(r.texto) : null;
+  const metodo = d ? `IA (${r.ia})` : "lectura básica — revísala";
+  if (!d) d = lecturaBasica(texto);
+  ["base", "iva_pct", "iva_importe", "retencion_pct", "retencion_importe", "total"].forEach((k) => (d[k] = num(d[k])));
+  d.cuenta_pgc = asignarCuenta((d.proveedor || "") + " " + (d.concepto || "") + " " + texto.slice(0, 300));
+  d.analizado_ia = metodo.startsWith("IA");
+  d.metodo = metodo;
+  return { datos: d, motivo: metodo };
+}

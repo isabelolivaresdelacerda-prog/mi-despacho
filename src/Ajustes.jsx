@@ -155,13 +155,6 @@ export default function Ajustes({ config, guardar }) {
         <section className="tarjeta"><PlantillasCorreo /></section>
 
         <section className="tarjeta">
-          <h2>Contabilidad</h2>
-          <label>Dirección de mi app de contabilidad<input value={datos.appContabilidad} onChange={(e) => cambiar({ appContabilidad: e.target.value })} placeholder="http://127.0.0.1:5000" /></label>
-          <p className="muted">Si tu app de contabilidad funciona en tu ordenador, tiene que estar abierta para verla aquí.</p>
-          <button className="btn" type="button" onClick={() => { guardar(datos); aviso("Guardado"); }}>Guardar</button>
-        </section>
-
-        <section className="tarjeta">
           <h2>Apps contratadas</h2>
           <ul className="contratadas">
             <li><span className={datos.apps.contabilidad ? "si" : "no"}>{datos.apps.contabilidad ? "✓" : "–"}</span> Contabilidad</li>

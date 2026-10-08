@@ -6,7 +6,7 @@ import Ajustes from "./Ajustes.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import Carpeta from "./apps/Carpeta.jsx";
-import Contabilidad from "./apps/Contabilidad.jsx";
+import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
 import Usuarios from "./Usuarios.jsx";
 import { sb, miFicha, salir, admin } from "./lib/cuentas.js";
@@ -113,7 +113,7 @@ export default function App() {
     case "contratos/carpeta":
       vista = <Carpeta titulo="Mi carpeta de contratos" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} irAAjustes={irAAjustes} />; break;
     case "contabilidad":
-      vista = <Contabilidad direccion={config.appContabilidad} irAAjustes={irAAjustes} />; break;
+      vista = <ContabilidadWeb config={config} />; break;
     case "contabilidad/carpeta":
       vista = <Carpeta titulo="Mi carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} irAAjustes={irAAjustes} />; break;
     case "usuarios":
