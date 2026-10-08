@@ -34,6 +34,7 @@ async function proxy(ruta, tk, metodo = "GET", cuerpo) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
     const t = JSON.stringify(j);
+    if (r.status === 429) throw Object.assign(new Error("El banco solo deja consultar los movimientos unas 4 veces al día (norma PSD2) y hoy ya se han usado. No pasa nada: el permiso sigue vigente y el extracto que tienes en «extractos» ya cubre hasta hoy. Vuelve a sincronizar mañana."), { limite: true });
     if (metodo === "GET" && (r.status === 401 || /expired|EXPIRED|session|consent|revoked/i.test(t))) throw new PermisoCaducado();
     throw new Error(`Banco ${r.status}: ${t.slice(0, 200)}`);
   }
@@ -76,13 +77,19 @@ export async function sincronizarBanco(raiz) {
   const desde = nuevos.map((m) => fechaOrden(m.fecha)).sort()[0] || "9999";
   const antiguos = (previo.movimientos || []).filter((m) => fechaOrden(m.fecha) < desde);
   const movimientos = [...antiguos, ...nuevos].sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
-  await escribirJSON(raiz, "extracto_api.json", { actualizado: new Date().toLocaleString("es-ES"), movimientos });
+  await escribirJSON(raiz, "extracto_api.json", { actualizado: new Date().toLocaleString("es-ES"), sincronizado: new Date().toISOString(), movimientos });
   try { await excelTodoElAnio(raiz, movimientos); } catch { /* el Excel es solo para consultar; si está abierto no se puede escribir */ }
   const dias = cfg.valid_until ? Math.floor((Date.parse(cfg.valid_until) - Date.now()) / 86400000) : null;
   return { nuevos: nuevos.length, total: movimientos.length, diasPermiso: dias };
 }
 
 // Días que le quedan al permiso del banco (lo que se sabe sin preguntar al banco)
+// Para no gastar las pocas consultas diarias que deja el banco: ¿se sincronizó hace menos de «horas»?
+export async function sincronizadoHace(raiz, horas = 6) {
+  const x = await leerJSON(raiz, "extracto_api.json", {});
+  return !!x.sincronizado && Date.now() - Date.parse(x.sincronizado) < horas * 3600000;
+}
+
 export async function diasPermiso(raiz) {
   const cfg = await leerJSON(raiz, "banco_api_config.json", {});
   return cfg.valid_until ? Math.floor((Date.parse(cfg.valid_until) - Date.now()) / 86400000) : null;
