@@ -3,16 +3,20 @@ import { useEffect, useMemo, useState } from "react";
 import { raizGuardada, buscarContabilidad, permiso as permisoRaiz } from "../../lib/carpetas.js";
 import {
   soportado, cargarTodo, CARPETAS, listar, abrir, subir,
-  guardarEdicion, guardarLectura, guardarVinculo, eur, fechaOrden, trimestre, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
+  guardarEdicion, guardarLectura, guardarVinculo, eur, fechaOrden, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
 } from "./datos.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
 import EnviarGestoria from "./EnviarGestoria.jsx";
 import Vinculados from "./Vinculados.jsx";
 import Libros from "./Libros.jsx";
+import { SelPeriodo, ResumenPeriodo, BancoPeriodo } from "./Periodo.jsx";
+import { rango, enRango } from "./periodo.js";
+import { generarDiario, usarPlan } from "./motor.js";
+import { leerVinculados, leerJSON, escribirJSON } from "./datos.js";
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
-const PESTANAS = [["resumen", "Resumen"], ["facturas", "Facturas recibidas"], ["banco", "Banco"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Para la gestoría"]];
+const PESTANAS = [["resumen", "Resumen"], ["facturas", "Facturas recibidas"], ["banco", "Banco y cierre"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Para la gestoría"]];
 
 export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
   const [raiz, setRaiz] = useState(null);
@@ -22,13 +26,35 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
   const [cargando, setCargando] = useState(false);
   const [aviso, nodoAviso] = useAviso();
   const [enviar, setEnviar] = useState(false);
+  const [subLibros, setSubLibros] = useState("diario");
+  // Periodo de trabajo: año + trimestre (1-4) o el año entero; se recuerda por usuario y empresa
+  const [per, setPer] = useState(() => {
+    try { const g = JSON.parse(localStorage.getItem("md-conta-periodo") || "null"); if (g?.anio) return g; } catch { /* nada */ }
+    const h = new Date(); return { anio: h.getFullYear(), tramo: String(Math.floor(h.getMonth() / 3) + 1) };
+  });
+  const cambiarPeriodo = (anio, tramo) => { const n = { anio, tramo }; setPer(n); try { localStorage.setItem("md-conta-periodo", JSON.stringify(n)); } catch { /* nada */ } };
+  const r = useMemo(() => rango(per.anio, per.tramo), [per]);
+  const irA = (t, sub) => { if (sub) setSubLibros(sub); setTab(t); };
+
+  // Escrituras/contratos vinculados, asientos manuales, banco aplicado a mano y cierres del extracto
+  const [extra, setExtra] = useState({ vinc: [], manuales: [], asig: {}, cierres: {} });
+  const ARCH = { vinc: "documentos_vinculados.json", manuales: "asientos_manuales.json", asig: "asignaciones_banco.json", cierres: "cierres_extracto.json" };
+  const cargarExtra = async (h = raiz) => {
+    if (!h) return;
+    const [vinc, manuales, asig, cierres] = await Promise.all([leerVinculados(h), leerJSON(h, ARCH.manuales, []), leerJSON(h, ARCH.asig, {}), leerJSON(h, ARCH.cierres, {})]);
+    setExtra({ vinc, manuales, asig, cierres });
+  };
+  const guardarExtra = async (k, v) => { await escribirJSON(raiz, ARCH[k], v); setExtra((e) => ({ ...e, [k]: v })); };
 
   const cargar = async (h = raiz) => {
     if (!h) return;
     setCargando(true);
-    try { setDatos(await cargarTodo(h)); } catch { aviso("No se pudo leer la carpeta."); }
+    try { const [d] = await Promise.all([cargarTodo(h), cargarExtra(h)]); setDatos(d); } catch { aviso("No se pudo leer la carpeta."); }
     setCargando(false);
   };
+  const tipoPlan = config?.planContable || "pymes";
+  usarPlan(tipoPlan);
+  const diario = useMemo(() => (datos ? generarDiario(datos, extra.vinc, extra.manuales, extra.asig) : { asientos: [], pendientes: [] }), [datos, extra.vinc, extra.manuales, extra.asig, tipoPlan]);
 
   const [empresa, setEmpresa] = useState(undefined); // carpeta raíz de la empresa
   const [sinConta, setSinConta] = useState(false);
@@ -81,14 +107,15 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
       <nav className="cont-tabs" role="tablist">
         {PESTANAS.map(([k, t]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t}</button>)}
       </nav>
+      {datos && ["resumen", "facturas", "banco", "libros", "exportar"].includes(tab) && <SelPeriodo anio={per.anio} tramo={per.tramo} cambiar={cambiarPeriodo} cierres={extra.cierres} />}
       {!datos ? <p className="muted">Leyendo la carpeta…</p> : <>
-        {tab === "resumen" && <Resumen d={datos} />}
-        {tab === "facturas" && <Facturas d={datos} raiz={raiz} recargar={cargar} aviso={aviso} />}
-        {tab === "banco" && <Banco d={datos} />}
-        {tab === "libros" && <Libros raiz={raiz} datos={datos} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
-        {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} />}
+        {tab === "resumen" && <ResumenPeriodo d={datos} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
+        {tab === "facturas" && <Facturas d={datos} r={r} raiz={raiz} recargar={cargar} aviso={aviso} />}
+        {tab === "banco" && <BancoPeriodo d={datos} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
+        {tab === "libros" && <Libros datos={datos} diario={diario} extra={extra} guardarExtra={guardarExtra} r={r} sub={subLibros} setSub={setSubLibros} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
+        {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} onCambio={() => cargarExtra()} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
-        {tab === "exportar" && <Exportar d={datos} config={config} />}
+        {tab === "exportar" && <Exportar d={datos} r={r} config={config} />}
       </>}
       {enviar && datos && <EnviarGestoria raiz={raiz} empresa={empresa} datos={datos} config={config} aviso={aviso} onCerrar={() => setEnviar(false)} />}
       {nodoAviso}
@@ -109,40 +136,16 @@ function Cabecera({ carpeta, acciones }) {
   );
 }
 
-function Resumen({ d }) {
-  const sinLeer = d.facturas.filter((f) => !f._leida).length;
-  const pendientes = d.facturas.filter((f) => f.total && !f._pago);
-  const totalGasto = d.facturas.reduce((s, f) => s + (f.base || 0), 0);
-  const ivaSop = d.facturas.reduce((s, f) => s + (f.iva_importe || 0), 0);
-  const ret = d.facturas.reduce((s, f) => s + (f.retencion_importe || 0), 0);
-  return (
-    <div className="cont-resumen">
-      <div className="kpis">
-        <Kpi t="Facturas recibidas" v={d.facturas.length} n={sinLeer ? `${sinLeer} sin leer` : "todas leídas"} />
-        <Kpi t="Pendientes de pago" v={pendientes.length} n={eur(pendientes.reduce((s, f) => s + f.total, 0))} />
-        <Kpi t="Gasto (base)" v={eur(totalGasto)} n={`IVA soportado ${eur(ivaSop)}`} />
-        <Kpi t="Retenciones practicadas" v={eur(ret)} n="a ingresar en el modelo 111" />
-      </div>
-      {pendientes.length > 0 && (
-        <section className="tarjeta">
-          <h2>Pendientes de pago</h2>
-          <table className="tabla"><thead><tr><th>Fecha</th><th>Proveedor</th><th>Número</th><th className="num">Total</th></tr></thead>
-            <tbody>{pendientes.map((f) => <tr key={f.archivo}><td>{f.fecha}</td><td>{f.proveedor}</td><td>{f.numero}</td><td className="num">{eur(f.total)}</td></tr>)}</tbody></table>
-        </section>
-      )}
-    </div>
-  );
-}
-const Kpi = ({ t, v, n }) => <div className="kpi"><span>{t}</span><strong>{v}</strong><small>{n}</small></div>;
 
 const CAMPOS = [["fecha", "Fecha"], ["numero", "Número"], ["proveedor", "Proveedor"], ["nif_proveedor", "NIF"], ["base", "Base"], ["iva_pct", "% IVA"], ["iva_importe", "IVA"], ["retencion_pct", "% Ret."], ["retencion_importe", "Retención"], ["total", "Total"], ["cuenta_pgc", "Cuenta"]];
 
-function Facturas({ d, raiz, recargar, aviso }) {
+function Facturas({ d, r, raiz, recargar, aviso }) {
   const [edit, setEdit] = useState(null);
   const [leyendo, setLeyendo] = useState("");
   const [filtro, setFiltro] = useState("");
-  const lista = useMemo(() => d.facturas.filter((f) => !filtro || JSON.stringify([f.proveedor, f.numero, f.archivo]).toLowerCase().includes(filtro.toLowerCase()))
-    .sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha))), [d, filtro]);
+  const [todas, setTodas] = useState(false);
+  const lista = useMemo(() => d.facturas.filter((f) => todas || enRango(f.fecha, r) || fechaOrden(f.fecha).startsWith("9999")).filter((f) => !filtro || JSON.stringify([f.proveedor, f.numero, f.archivo]).toLowerCase().includes(filtro.toLowerCase()))
+    .sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha))), [d, filtro, r, todas]);
   const sinLeer = d.facturas.filter((f) => !f._leida && /\.pdf$/i.test(f.archivo));
 
   const leerPendientes = async () => {
@@ -163,6 +166,7 @@ function Facturas({ d, raiz, recargar, aviso }) {
       <div className="acciones cont-barra">
         <input className="buscar" placeholder="Buscar proveedor, número…" value={filtro} onChange={(e) => setFiltro(e.target.value)} />
         {sinLeer.length > 0 && <button className="btn" type="button" disabled={!!leyendo} onClick={leerPendientes}>{leyendo ? `Leyendo ${leyendo}…` : `Leer ${sinLeer.length} facturas nuevas`}</button>}
+        <label className="check"><input type="checkbox" checked={todas} onChange={(e) => setTodas(e.target.checked)} /> Ver todos los periodos</label>
         <EstadoIALocal compacto />
       </div>
       <p className="muted pequeño">La IA solo propone los datos; revisa cada factura. Las correcciones se guardan en tu carpeta y valen también para la app de escritorio.</p>
@@ -212,22 +216,6 @@ function Facturas({ d, raiz, recargar, aviso }) {
   );
 }
 
-function Banco({ d }) {
-  const movs = [...d.movimientos].sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha)));
-  if (!movs.length) return <div className="vacio"><p>No hay movimientos del banco en la carpeta todavía.</p><p className="muted">Deja los extractos en la subcarpeta <code>extractos</code> o los justificantes en <code>documentos_banco</code>.</p></div>;
-  const entradas = movs.filter((m) => m.importe > 0).reduce((s, m) => s + m.importe, 0);
-  const salidas = movs.filter((m) => m.importe < 0).reduce((s, m) => s + m.importe, 0);
-  return (
-    <div>
-      <div className="kpis"><Kpi t="Entradas" v={eur(entradas)} n={`${movs.filter((m) => m.importe > 0).length} movimientos`} /><Kpi t="Salidas" v={eur(salidas)} n={`${movs.filter((m) => m.importe < 0).length} movimientos`} /><Kpi t="Sin factura" v={movs.filter((m) => m.importe < 0 && !m._factura).length} n="pagos sin factura asociada" /></div>
-      <div className="tabla-scroll"><table className="tabla">
-        <thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th><th>Factura</th></tr></thead>
-        <tbody>{movs.map((m) => <tr key={m._id}><td>{m.fecha}</td><td>{m.concepto}</td><td className={"num " + (m.importe < 0 ? "neg" : "pos")}>{eur(m.importe)}</td><td>{m._factura ? <span className="ok">{m._factura}</span> : m.importe < 0 ? <span className="pend">—</span> : ""}</td></tr>)}</tbody>
-      </table></div>
-    </div>
-  );
-}
-
 function Documentos({ raiz, aviso, recargar }) {
   const [carpeta, setCarpeta] = useState("facturas");
   const [archivos, setArchivos] = useState([]);
@@ -256,32 +244,21 @@ function Documentos({ raiz, aviso, recargar }) {
   );
 }
 
-function Exportar({ d, config }) {
-  const periodos = useMemo(() => {
-    const s = new Set(d.facturas.map((f) => trimestre(f.fecha)).filter(Boolean).map((p) => `${p.anio}-${p.t}`));
-    return [...s].sort().reverse();
-  }, [d]);
-  const [periodo, setPeriodo] = useState(periodos[0] || "");
+function Exportar({ d, r, config }) {
   const [correo, setCorreo] = useState(false);
-  const delPeriodo = d.facturas.filter((f) => { const p = trimestre(f.fecha); return periodo === "todo" || (p && `${p.anio}-${p.t}` === periodo); });
-  const etiqueta = periodo === "todo" ? "completo" : periodo.replace("-", " ") + "T";
+  const delPeriodo = d.facturas.filter((f) => enRango(f.fecha, r));
+  const etiqueta = r.corta;
   const sinRevisar = delPeriodo.filter((f) => !f._leida || (f.analizado_ia && !f._editada)).length;
   return (
     <div className="tarjeta">
-      <h2>Para la gestoría</h2>
-      <label>Periodo
-        <select value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
-          {periodos.map((p) => <option key={p} value={p}>{p.replace("-", " · ")}º trimestre</option>)}
-          <option value="todo">Todo</option>
-        </select>
-      </label>
+      <h2>Para la gestoría · {r.etiqueta}</h2>
       <p>{delPeriodo.length} facturas en el periodo.{sinRevisar > 0 && <span className="pend"> {sinRevisar} sin revisar por una persona.</span>}</p>
       <div className="acciones">
         <button className="btn" type="button" onClick={() => descargarTexto(libroFacturasCSV(delPeriodo), `Libro facturas recibidas ${etiqueta}.csv`)}>Libro de facturas recibidas (Excel / A3)</button>
         <button className="btn ghost" type="button" onClick={() => descargarTexto(diarioCSV(delPeriodo), `Libro diario ${etiqueta}.csv`)}>Libro diario (asientos)</button>
         <button className="btn ghost" type="button" onClick={() => setCorreo(true)}>Avisar a la gestoría por correo</button>
       </div>
-      <p className="muted pequeño">Los archivos se abren en Excel y la gestoría puede importarlos en A3. Los documentos ya los tiene en la carpeta compartida, así que no hace falta enviarlos.</p>
+      <p className="muted pequeño">Los archivos se abren en Excel y la gestoría puede importarlos en A3. Los documentos ya los tiene en la carpeta compartida, así que no hace falta enviarlos. El diario completo con todos los asientos, para A3 o Sage, está en Contabilidad › A3 / Sage.</p>
       {correo && <DialogoCorreo opciones={["contabilidad_lista", "documentacion_pendiente"]}
         vars={{ empresa: config?.nombre || "", periodo: etiqueta, remitente: config?.nombre || "", destinatario: "", enlace: "" }}
         adjuntos={[{ nombre: `Libro facturas recibidas ${etiqueta}.csv`, blob: new Blob([libroFacturasCSV(delPeriodo)], { type: "text/csv" }) }]}

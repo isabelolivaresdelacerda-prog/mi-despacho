@@ -28,7 +28,7 @@ function Selector({ empresa, onElegir, onCerrar }) {
   );
 }
 
-export default function Vinculados({ raiz, empresa, movimientos, aviso }) {
+export default function Vinculados({ raiz, empresa, movimientos, aviso, onCambio }) {
   const [lista, setLista] = useState([]);
   const [elegir, setElegir] = useState(false);
   const [edit, setEdit] = useState(null);
@@ -36,9 +36,9 @@ export default function Vinculados({ raiz, empresa, movimientos, aviso }) {
   useEffect(() => { cargar(); }, []);
   const guardar = async (v) => {
     const nueva = lista.some((x) => x.id === v.id) ? lista.map((x) => (x.id === v.id ? v : x)) : [...lista, v];
-    await guardarVinculados(raiz, nueva); setLista(nueva); setEdit(null); aviso?.("Guardado");
+    await guardarVinculados(raiz, nueva); setLista(nueva); setEdit(null); aviso?.("Guardado"); onCambio?.();
   };
-  const quitar = async (v) => { if (!window.confirm("¿Quitar el vínculo? El documento sigue en su carpeta.")) return; const n = lista.filter((x) => x.id !== v.id); await guardarVinculados(raiz, n); setLista(n); };
+  const quitar = async (v) => { if (!window.confirm("¿Quitar el vínculo? El documento sigue en su carpeta.")) return; const n = lista.filter((x) => x.id !== v.id); await guardarVinculados(raiz, n); setLista(n); onCambio?.(); };
   const t = edit && TIPOS_VINCULO[edit.tipo];
 
   return (

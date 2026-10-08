@@ -36,9 +36,9 @@ function subcuentas() {
 export function generarDiario({ facturas, movimientos }, vinculados = [], manuales = [], asignaciones = {}) {
   const sub = subcuentas();
   const A = [];
-  const asiento = (fecha, concepto, lineas, origen, doc) => {
+  const asiento = (fecha, concepto, lineas, origen, doc, mov = null) => {
     const l = lineas.filter((x) => r2(x.debe) || r2(x.haber)).map((x) => ({ ...x, debe: r2(x.debe), haber: r2(x.haber), titulo: x.titulo || titulo(x.cuenta) }));
-    if (l.length) A.push({ fecha, concepto, lineas: l, origen, doc });
+    if (l.length) A.push({ fecha, concepto, lineas: l, origen, doc, mov });
   };
   const usados = new Set();
 
@@ -56,7 +56,7 @@ export function generarDiario({ facturas, movimientos }, vinculados = [], manual
     if (f._pago) {
       const m = movimientos.find((x) => x._factura === f.archivo);
       if (m) usados.add(m._id);
-      asiento(f._pago.fecha || f.fecha, `Pago ${c}`, [{ cuenta: cta, titulo: f.proveedor, debe: f.total }, { cuenta: f._pago.manual ? "551" : "572", haber: f.total }], "pago", f.archivo);
+      asiento(f._pago.fecha || f.fecha, `Pago ${c}`, [{ cuenta: cta, titulo: f.proveedor, debe: f.total }, { cuenta: f._pago.manual ? "551" : "572", haber: f.total }], "pago", f.archivo, m ? m._id : null);
     }
   }
 
@@ -69,12 +69,12 @@ export function generarDiario({ facturas, movimientos }, vinculados = [], manual
       if (!num(v.importe)) continue;
       const mov = movimientos.find((x) => !usados.has(x._id) && Math.abs(Math.abs(x.importe) - num(v.importe)) < 0.011 && Math.sign(x.importe) === t.signo);
       if (mov) usados.add(mov._id);
-      asiento(v.fecha || mov?.fecha, c, t.signo > 0 ? [{ cuenta: "572", debe: v.importe }, { cuenta, haber: v.importe }] : [{ cuenta, debe: v.importe }, { cuenta: "572", haber: v.importe }], "documento", v.archivo);
+      asiento(v.fecha || mov?.fecha, c, t.signo > 0 ? [{ cuenta: "572", debe: v.importe }, { cuenta, haber: v.importe }] : [{ cuenta, debe: v.importe }, { cuenta: "572", haber: v.importe }], "documento", v.archivo, mov ? mov._id : null);
     } else {
       for (const q of vencimientos(v, movimientos)) {
         if (!q.mov) continue;
         usados.add(q.mov._id);
-        asiento(q.mov.fecha, `${c} (cuota)`, t.signo > 0 ? [{ cuenta: "572", debe: q.importe }, { cuenta, haber: q.importe }] : [{ cuenta, debe: q.importe }, { cuenta: "572", haber: q.importe }], "cuota", v.archivo);
+        asiento(q.mov.fecha, `${c} (cuota)`, t.signo > 0 ? [{ cuenta: "572", debe: q.importe }, { cuenta, haber: q.importe }] : [{ cuenta, debe: q.importe }, { cuenta: "572", haber: q.importe }], "cuota", v.archivo, q.mov._id);
       }
     }
   }
@@ -87,7 +87,7 @@ export function generarDiario({ facturas, movimientos }, vinculados = [], manual
     const cuenta = a?.cuenta || "555";
     if (!a) pendientes.push(m);
     const imp = Math.abs(m.importe);
-    asiento(m.fecha, a?.concepto || m.concepto, m.importe >= 0 ? [{ cuenta: "572", debe: imp }, { cuenta, haber: imp }] : [{ cuenta, debe: imp }, { cuenta: "572", haber: imp }], a ? "banco" : "banco-pendiente", "");
+    asiento(m.fecha, a?.concepto || m.concepto, m.importe >= 0 ? [{ cuenta: "572", debe: imp }, { cuenta, haber: imp }] : [{ cuenta, debe: imp }, { cuenta: "572", haber: imp }], a ? "banco" : "banco-pendiente", "", m._id);
   }
 
   // 4) Asientos manuales

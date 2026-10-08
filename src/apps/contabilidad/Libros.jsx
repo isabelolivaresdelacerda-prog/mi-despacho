@@ -1,8 +1,8 @@
 // Contabilidad completa dentro de Mi Despacho: diario, mayores, sumas y saldos, pérdidas y ganancias, balance,
 // banco por aplicar (con asistente para elegir la cuenta), asientos manuales y exportación a A3 / Sage.
 import { useEffect, useMemo, useState } from "react";
-import { generarDiario, filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov, usarPlan } from "./motor.js";
-import { leerVinculados, leerJSON, escribirJSON, eur, num, descargarTexto, fechaOrden } from "./datos.js";
+import { filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov } from "./motor.js";
+import { eur, num, descargarTexto, fechaOrden } from "./datos.js";
 import { plan, comprobarBOE, descargarDelBOE, aplicarActualizacion, fechaBOE, a8 } from "./pgc.js";
 import Asistente from "./Asistente.jsx";
 import { preguntarIA } from "../../ia-navegador.js";
@@ -10,44 +10,37 @@ import { preguntarIA } from "../../ia-navegador.js";
 const SUB = [["diario", "Libro diario"], ["mayor", "Mayores"], ["sumas", "Sumas y saldos"], ["pyg", "Pérdidas y ganancias"], ["balance", "Balance"], ["aplicar", "Banco por aplicar"], ["manual", "Asiento manual"], ["exportar", "A3 / Sage"], ["plan", "Plan contable"]];
 const e2 = (n) => (n ? eur(n) : "");
 
-export default function Libros({ raiz, datos, config, guardarConfig, aviso }) {
+export default function Libros({ datos, diario, extra, guardarExtra, r, sub, setSub, config, guardarConfig, aviso }) {
   const tipoPlan = config.planContable || "pymes";
-  usarPlan(tipoPlan);
-  const [sub, setSub] = useState("diario");
-  const [vinc, setVinc] = useState([]);
-  const [manuales, setManuales] = useState([]);
-  const [asig, setAsig] = useState({});
-  const anioActual = new Date().getFullYear();
-  const [anio, setAnio] = useState(anioActual);
-  const cargar = async () => { setVinc(await leerVinculados(raiz)); setManuales(await leerJSON(raiz, "asientos_manuales.json", [])); setAsig(await leerJSON(raiz, "asignaciones_banco.json", {})); };
-  useEffect(() => { cargar(); }, []);
-
-  const { asientos: todos, pendientes } = useMemo(() => generarDiario(datos, vinc, manuales, asig), [datos, vinc, manuales, asig, tipoPlan]);
-  const asientos = useMemo(() => filtrarPeriodo(todos, `${anio}-01-01`, `${anio}-12-31`), [todos, anio]);
+  const { asientos: todos, pendientes } = diario;
+  const asientos = useMemo(() => filtrarPeriodo(todos, r.desde, r.hasta), [todos, r]);
+  // El balance es una foto a una fecha: desde el 1 de enero del ejercicio hasta el final del periodo
+  const ejercicio = useMemo(() => filtrarPeriodo(todos, `${r.anio}-01-01`, r.hasta), [todos, r]);
+  const pendP = pendientes.filter((m) => { const f = fechaOrden(m.fecha); return f >= r.desde && f <= r.hasta; });
   const descuadrados = asientos.filter((a) => !a.cuadra).length;
+  const fin = `${r.hasta.slice(8, 10)}/${r.hasta.slice(5, 7)}/${r.hasta.slice(0, 4)}`;
 
   return (
     <div>
       <div className="acciones cont-barra">
-        <nav className="sub-tabs">{SUB.map(([k, t]) => <button key={k} className={sub === k ? "on" : ""} onClick={() => setSub(k)}>{t}{k === "aplicar" && pendientes.length > 0 && <span className="insignia">{pendientes.length}</span>}</button>)}</nav>
-        <label className="anio-sel">Ejercicio <select value={anio} onChange={(e) => setAnio(+e.target.value)}>{[anioActual - 2, anioActual - 1, anioActual, anioActual + 1].map((a) => <option key={a}>{a}</option>)}</select></label>
+        <nav className="sub-tabs">{SUB.map(([k, t]) => <button key={k} className={sub === k ? "on" : ""} onClick={() => setSub(k)}>{t}{k === "aplicar" && pendP.length > 0 && <span className="insignia">{pendP.length}</span>}</button>)}</nav>
       </div>
-      <p className="muted pequeño">La contabilidad se genera sola con las facturas, el banco y las escrituras y contratos vinculados. Lo propuesto por la IA debe revisarlo una persona.{descuadrados > 0 && <span className="pend"> Hay {descuadrados} asientos descuadrados: revisa esas facturas.</span>}</p>
+      <p className="muted pequeño">{r.etiqueta}. La contabilidad se genera sola con las facturas, el banco y las escrituras y contratos vinculados. Lo propuesto por la IA debe revisarlo una persona.{descuadrados > 0 && <span className="pend"> Hay {descuadrados} asientos descuadrados: revisa esas facturas.</span>}</p>
       {sub === "diario" && <Diario asientos={asientos} />}
       {sub === "mayor" && <Mayor asientos={asientos} />}
       {sub === "sumas" && <Sumas asientos={asientos} />}
-      {sub === "pyg" && <PyG asientos={asientos} anio={anio} />}
-      {sub === "balance" && <Balance asientos={asientos} anio={anio} />}
-      {sub === "aplicar" && <Aplicar pendientes={pendientes} asig={asig} plan={tipoPlan} guardar={async (n) => { await escribirJSON(raiz, "asignaciones_banco.json", n); setAsig(n); aviso?.("Movimiento contabilizado"); }} />}
-      {sub === "manual" && <Manual manuales={manuales} plan={tipoPlan} guardar={async (n) => { await escribirJSON(raiz, "asientos_manuales.json", n); setManuales(n); aviso?.("Asiento guardado"); }} />}
-      {sub === "exportar" && <Exportar asientos={asientos} anio={anio} />}
+      {sub === "pyg" && <PyG asientos={asientos} anio={r.etiqueta} acumulado={r.tramo !== "anio" ? ejercicio : null} />}
+      {sub === "balance" && <Balance asientos={ejercicio} anio={fin} />}
+      {sub === "aplicar" && <Aplicar pendientes={pendP} total={pendientes.length} asig={extra.asig} plan={tipoPlan} guardar={async (n) => { await guardarExtra("asig", n); aviso?.("Movimiento contabilizado"); }} />}
+      {sub === "manual" && <Manual manuales={extra.manuales} plan={tipoPlan} guardar={async (n) => { await guardarExtra("manuales", n); aviso?.("Asiento guardado"); }} />}
+      {sub === "exportar" && <Exportar asientos={asientos} anio={r.corta} />}
       {sub === "plan" && <PlanContable tipo={tipoPlan} cambiar={(p) => guardarConfig({ ...config, planContable: p })} aviso={aviso} />}
     </div>
   );
 }
 
 function Diario({ asientos }) {
-  if (!asientos.length) return <p className="muted">No hay asientos en este ejercicio.</p>;
+  if (!asientos.length) return <p className="muted">No hay asientos en este periodo.</p>;
   return (
     <div className="tabla-scroll"><table className="tabla libro">
       <thead><tr><th>Nº</th><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th className="num">Debe</th><th className="num">Haber</th></tr></thead>
@@ -93,20 +86,23 @@ function Sumas({ asientos }) {
   );
 }
 
-function PyG({ asientos, anio }) {
+function PyG({ asientos, anio, acumulado }) {
   const p = perdidasYGanancias(asientos);
-  const fila = (t, v, fuerte) => <tr className={fuerte ? "total" : ""}><td>{t}</td><td className={"num " + (v < 0 ? "neg" : "")}>{eur(v)}</td></tr>;
+  const q = acumulado ? perdidasYGanancias(acumulado) : null;
+  const fila = (t, v, w, fuerte) => <tr key={t} className={fuerte ? "total" : ""}><td>{t}</td><td className={"num " + (v < 0 ? "neg" : "")}>{eur(v)}</td>{q && <td className={"num " + (w < 0 ? "neg" : "")}>{eur(w)}</td>}</tr>;
   return (
     <div className="estado">
-      <h3>Cuenta de pérdidas y ganancias {anio} <span className="muted pequeño">(modelo abreviado PGC PYMES)</span></h3>
-      <table className="tabla"><tbody>
-        {p.lineas.map(([t, v]) => fila(t, v))}
-        {fila("A) RESULTADO DE EXPLOTACIÓN", p.explotacion, true)}
-        {p.financieras.map(([t, v]) => fila(t, v))}
-        {fila("B) RESULTADO FINANCIERO", p.financiero, true)}
-        {fila("C) RESULTADO ANTES DE IMPUESTOS", p.antesImpuestos, true)}
-        {fila("17. Impuesto sobre beneficios", p.impuesto)}
-        {fila("D) RESULTADO DEL EJERCICIO", p.resultado, true)}
+      <h3>Cuenta de pérdidas y ganancias · {anio} <span className="muted pequeño">(modelo abreviado PGC PYMES)</span></h3>
+      <table className="tabla">
+        {q && <thead><tr><th></th><th className="num">Trimestre</th><th className="num">Acumulado del año</th></tr></thead>}
+        <tbody>
+        {p.lineas.map(([t, v], i) => fila(t, v, q?.lineas[i][1]))}
+        {fila("A) RESULTADO DE EXPLOTACIÓN", p.explotacion, q?.explotacion, true)}
+        {p.financieras.map(([t, v], i) => fila(t, v, q?.financieras[i][1]))}
+        {fila("B) RESULTADO FINANCIERO", p.financiero, q?.financiero, true)}
+        {fila("C) RESULTADO ANTES DE IMPUESTOS", p.antesImpuestos, q?.antesImpuestos, true)}
+        {fila("17. Impuesto sobre beneficios", p.impuesto, q?.impuesto)}
+        {fila("D) RESULTADO DEL EJERCICIO", p.resultado, q?.resultado, true)}
       </tbody></table>
     </div>
   );
@@ -117,7 +113,7 @@ function Balance({ asientos, anio }) {
   const bloque = (t, filas, total) => (<><tr className="total"><td>{t}</td><td className="num">{total !== undefined ? eur(total) : ""}</td></tr>{filas.map(([x, v]) => <tr key={x}><td className="sangria">{x}</td><td className="num">{eur(v)}</td></tr>)}</>);
   return (
     <div className="estado">
-      <h3>Balance a 31/12/{anio} {b.cuadra ? <span className="ok pequeño">cuadra</span> : <span className="pend pequeño">no cuadra: revisa partidas pendientes</span>}</h3>
+      <h3>Balance a {anio} {b.cuadra ? <span className="ok pequeño">cuadra</span> : <span className="pend pequeño">no cuadra: revisa partidas pendientes</span>}</h3>
       <div className="dos-estados">
         <table className="tabla"><tbody>{bloque("ACTIVO", b.activo, b.totalActivo)}</tbody></table>
         <table className="tabla"><tbody>{bloque("PATRIMONIO NETO", b.pn, b.pn.reduce((t, x) => t + x[1], 0))}{bloque("PASIVO", b.pasivo, b.pasivo.reduce((t, x) => t + x[1], 0))}<tr className="total"><td>TOTAL PATRIMONIO NETO Y PASIVO</td><td className="num">{eur(b.totalPasivo)}</td></tr></tbody></table>
@@ -126,9 +122,9 @@ function Balance({ asientos, anio }) {
   );
 }
 
-function Aplicar({ pendientes, asig, guardar, plan: tipo }) {
+function Aplicar({ pendientes, total, asig, guardar, plan: tipo }) {
   const [mov, setMov] = useState(null);
-  if (!pendientes.length) return <div className="vacio"><p>✓ Todos los movimientos del banco están contabilizados.</p></div>;
+  if (!pendientes.length) return <div className="vacio"><p>✓ Todos los movimientos del banco de este periodo están contabilizados.</p>{total > 0 && <p className="muted">Quedan {total} sin documento en otros periodos.</p>}</div>;
   return (
     <div>
       <p className="muted pequeño">Estos movimientos del banco no tienen factura ni documento. Mientras no se les asigne cuenta van a «partidas pendientes de aplicación» (555). Pulsa «¿Dónde va?» y contesta unas preguntas sencillas.</p>
@@ -175,7 +171,7 @@ function Exportar({ asientos, anio }) {
   return (
     <div className="tarjeta">
       <h3>Llevar la contabilidad a A3 o Sage</h3>
-      <p>Se descarga el libro diario del ejercicio {anio}, un apunte por línea, con las subcuentas a 8 dígitos, y el plan de cuentas usado. La gestoría lo importa con la opción de importar asientos desde Excel o texto de su programa.</p>
+      <p>Se descarga el libro diario del periodo {anio}, un apunte por línea, con las subcuentas a 8 dígitos, y el plan de cuentas usado. La gestoría lo importa con la opción de importar asientos desde Excel o texto de su programa.</p>
       <div className="acciones">
         <button className="btn" type="button" onClick={() => descargarTexto(exportarApuntes(asientos, "a3"), `Diario ${anio} - A3.csv`)}>Diario para A3</button>
         <button className="btn" type="button" onClick={() => descargarTexto(exportarApuntes(asientos, "sage"), `Diario ${anio} - Sage.csv`)}>Diario para Sage / ContaPlus</button>
