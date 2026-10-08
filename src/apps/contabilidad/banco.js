@@ -166,7 +166,7 @@ export async function leerExtractos(raiz) {
           const importe = typeof f[cI] === "number" ? f[cI] : num(f[cI]);
           const concepto = String(f[cC] ?? "").replace(/\s+/g, " ").trim();
           if (!fecha || !importe || /apertura de cuenta/i.test(concepto)) continue;
-          out.push({ fecha, concepto: concepto.slice(0, 120), importe: Math.round(importe * 100) / 100, tercero: "", _origen: "extracto" });
+          out.push({ fecha, concepto: concepto.slice(0, 120), importe: Math.round(importe * 100) / 100, tercero: "", _origen: "extracto", _fuente: n });
         }
       }
     } catch { /* un Excel que no se entiende no para lo demás */ }
@@ -181,15 +181,26 @@ export async function leerExtractos(raiz) {
         const t = await textoPDF(await h.getFile(), 6, { ocr: false });
         for (const l of t.split(/\n/)) {
           const m = l.trim().match(/^(\d{2}\/\d{2}\/\d{4})\s+\d{2}\/\d{2}\s+(.+?)\s+([\d.]+,\d{2})([+-])$/);
-          if (m) out.push({ fecha: m[1], concepto: m[2].slice(0, 120), importe: (m[4] === "-" ? -1 : 1) * num(m[3]), tercero: "", _origen: "extracto-pdf" });
+          if (m) out.push({ fecha: m[1], concepto: m[2].slice(0, 120), importe: (m[4] === "-" ? -1 : 1) * num(m[3]), tercero: "", _origen: "extracto-pdf", _fuente: "pdf" });
         }
       } catch { /* sigue */ }
     }
   }
-  // El mismo movimiento puede venir en el Excel y en el PDF: se queda una sola vez por día e importe (respetando repeticiones reales)
-  const porFuente = {};
-  for (const m of out) { const k = `${m.fecha}|${num(m.importe).toFixed(2)}`; (porFuente[k] ||= { excel: 0, pdf: 0, lista: [] }); porFuente[k][m._origen === "extracto-pdf" ? "pdf" : "excel"]++; porFuente[k].lista.push(m); }
-  return Object.values(porFuente).flatMap((g) => { const n = Math.max(g.excel, g.pdf); const pref = g.lista.filter((m) => m._origen !== "extracto-pdf"); return [...pref, ...g.lista.filter((m) => m._origen === "extracto-pdf")].slice(0, n); });
+  // Varios extractos de la misma cuenta se solapan (marzo-junio, julio, marzo-octubre…) y además están los PDF: cada
+  // archivo es una copia de la misma cuenta, así que por día e importe se cuenta el máximo de veces que sale en UN archivo
+  // (no la suma). Así se respetan los cargos repetidos de verdad y no se duplica nada.
+  const grupos = {};
+  for (const m of out) {
+    const k = `${m.fecha}|${num(m.importe).toFixed(2)}`;
+    const g = (grupos[k] ||= { porFuente: {}, lista: [] });
+    g.porFuente[m._fuente] = (g.porFuente[m._fuente] || 0) + 1; g.lista.push(m);
+  }
+  return Object.values(grupos).flatMap((g) => {
+    const n = Math.max(...Object.values(g.porFuente));
+    // Se queda la copia del archivo más completo (el que más movimientos tiene ese día), y el Excel antes que el PDF
+    const mejor = Object.entries(g.porFuente).sort((a, b) => b[1] - a[1] || (a[0] === "pdf") - (b[0] === "pdf"))[0][0];
+    return [...g.lista.filter((m) => m._fuente === mejor), ...g.lista.filter((m) => m._fuente !== mejor)].slice(0, n).map(({ _fuente, ...m }) => m);
+  });
 }
 
 // Junta la conexión del banco y los extractos sin duplicar (mismo día e importe = el mismo movimiento)

@@ -205,14 +205,25 @@ export async function cargarTodo(raiz) {
   const datosB = (a) => { const c = cacheB[a.nombre] || cacheB["documentos_banco/" + a.nombre]; const x = c?.datos || c || {}; return { fecha: x.fecha || "", importe: Math.abs(num(x.importe ?? x.total ?? 0)) }; };
   const justif = archivosB.filter(esDoc).map((a) => ({ nombre: a.nombre, arch: a, ...datosB(a), enNombre: importeEnNombre(a.nombre) }));
   const usadosJ = new Set(Object.values(justManual));
+  // Se casan por cercanía: primero todas las parejas posibles (mismo importe y fecha a ≤5 días, o importe en el nombre del
+  // archivo y fecha a ≤10 días) y luego se asignan de la más cercana a la más lejana, para que un pago de abril no se
+  // quede con el justificante de uno de junio del mismo importe.
+  const dias = (a, b) => (a && b ? Math.abs((Date.parse(fechaOrden(a)) - Date.parse(fechaOrden(b))) / 86400000) : 99);
+  const fechaNombre = (n) => { const m = String(n).match(/^(\d{2})(\d{2})(\d{2})\s*-/); return m ? `${m[3]}/${m[2]}/20${m[1]}` : ""; };
+  const parejas = [];
   for (const m of movimientos) {
     const man = justManual[claveMovDatos(m)];
     if (man) { m._justificante = man === "__no__" ? { no: true } : { nombre: man, manual: true }; continue; }
     const imp = Math.abs(m.importe);
-    const dias = (f) => (f ? Math.abs((Date.parse(fechaOrden(f)) - Date.parse(fechaOrden(m.fecha))) / 86400000) : 0);
-    const j = justif.find((x) => !usadosJ.has(x.nombre) && ((x.importe && Math.abs(x.importe - imp) < 0.011 && dias(x.fecha) <= 5) || x.enNombre.some((v) => Math.abs(v - imp) < 0.011)));
-    if (j) { usadosJ.add(j.nombre); m._justificante = { nombre: j.nombre }; }
+    for (const x of justif) {
+      if (usadosJ.has(x.nombre)) continue;
+      const d = dias(x.fecha || fechaNombre(x.nombre), m.fecha);
+      if (x.importe && Math.abs(x.importe - imp) < 0.011 && d <= 5) parejas.push({ m, x, d });
+      else if (x.enNombre.some((v) => Math.abs(v - imp) < 0.011) && d <= 10) parejas.push({ m, x, d: d + 0.5 });
+    }
   }
+  parejas.sort((a, b) => a.d - b.d);
+  for (const { m, x } of parejas) { if (m._justificante || usadosJ.has(x.nombre)) continue; usadosJ.add(x.nombre); m._justificante = { nombre: x.nombre }; }
   // Compras con tarjeta, comisiones, recibos e impuestos no tienen documento individual: su justificante es el extracto
   // mensual del banco que los recoge (el primero con fecha igual o posterior al movimiento, como mucho 40 días después).
   const extractosDoc = archivosB.filter(esDoc).map((a) => { const c = cacheB[a.nombre]?.datos || {}; return { nombre: a.nombre, fecha: c.fecha || "", tipo: c.tipo || (/extracto/i.test(a.nombre) ? "extracto" : "") }; })

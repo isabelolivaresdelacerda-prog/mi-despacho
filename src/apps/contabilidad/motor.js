@@ -100,7 +100,10 @@ export function generarDiario({ facturas, emitidas = [], movimientos }, vinculad
     const suplidos = r2(f.total - (f.base + f.iva_importe - f.retencion_importe));
     // Inversión del sujeto pasivo (proveedor extranjero sin IVA español: Anthropic, Base44, Hostinger…): autorrepercusión 472/477
     const isp = f.isp ? r2(num(f.isp_importe) || f.base * (num(f.isp_pct) || 21) / 100) : 0;
-    asiento(f.fecha, `Factura ${c}`, [
+    // Factura mal sumada por el proveedor (total menor que base + IVA, por poco): se apunta lo que dice el total y la
+    // diferencia va a «diferencias» (778) para que el asiento cuadre; la app avisa para pedir una factura rectificada.
+    const errorSuma = suplidos < -0.009 && suplidos > -5 ? -suplidos : 0;
+    asiento(f.fecha, `Factura ${c}${errorSuma ? ` · ojo: la factura está mal sumada (${errorSuma.toFixed(2)} €): pedir rectificativa` : ""}`, [
       { cuenta: f.cuenta_pgc || "629", debe: f.base },
       { cuenta: f.cuenta_pgc || "629", titulo: "Suplidos", debe: suplidos > 0.009 ? suplidos : 0 },
       { cuenta: "472", debe: f.iva_importe },
@@ -108,6 +111,7 @@ export function generarDiario({ facturas, emitidas = [], movimientos }, vinculad
       { cuenta: "477", titulo: "IVA repercutido (inversión del sujeto pasivo)", haber: isp },
       { cuenta: "4751", haber: f.retencion_importe },
       { cuenta: cta, titulo: f.proveedor, nif: f.nif_proveedor, haber: f.total },
+      { cuenta: "778", titulo: "Diferencia por error de suma en la factura del proveedor", haber: errorSuma },
     ], "factura", f.archivo);
     pendFactura.set(f.archivo, cta);
     if (f._pago) {
@@ -210,8 +214,10 @@ export function generarDiario({ facturas, emitidas = [], movimientos }, vinculad
     }
     if (a?.tercero && a.esperaFactura) {
       // Pago (o cobro) a un tercero a la espera de su factura: va a su subcuenta de acreedor (410) o de cliente (430)
-      const cta = sub(m.importe < 0 ? "410" : "430", a.tercero);
-      const c = `${m.importe < 0 ? "Pago a" : "Cobro de"} ${a.tercero} (a falta de factura)`;
+      // Un ingreso de alguien a quien le compramos (devolución, transferencia anulada…) va a su cuenta de acreedor, no a cliente
+      const esProveedor = m.importe < 0 || proveedores.some((p) => claveTercero(p) === claveTercero(a.tercero)) || /DEVOLUCI|CANCELACI|ANULACI|RETROCES/i.test(m.concepto || "");
+      const cta = sub(esProveedor ? "410" : "430", a.tercero);
+      const c = m.importe < 0 ? `Pago a ${a.tercero} (a falta de factura)` : esProveedor ? `Devolución de ${a.tercero}` : `Cobro de ${a.tercero} (a falta de factura)`;
       asiento(m.fecha, c, m.importe >= 0 ? [{ cuenta: "572", debe: imp }, { cuenta: cta, titulo: a.tercero, haber: imp }] : [{ cuenta: cta, titulo: a.tercero, debe: imp }, { cuenta: "572", haber: imp }], "banco-tercero", "", m._id);
       continue;
     }

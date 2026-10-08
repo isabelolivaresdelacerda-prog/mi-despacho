@@ -62,6 +62,13 @@ const C = (cuenta, concepto) => ({ cuenta, concepto });
 function regla(m) {
   const c = String(m.concepto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(), cargo = m.importe < 0;
   if (cargo) {
+    // Impuestos pagados a la AEAT (el modelo va en el concepto): retenciones 111/115/123 → 4751; IVA 303 → 4750; IS 200/202 → 4709/473
+    if (/HACIENDA PUBLICA|AEAT|AGENCIA TRIBUTARIA/.test(c)) {
+      if (/\b(111|115|123|190|180)\b/.test(c)) return C("4751", "Pago de retenciones a Hacienda (modelo 111/115)");
+      if (/\b303\b/.test(c)) return C("4750", "Pago del IVA (modelo 303)");
+      if (/\b202\b/.test(c)) return C("473", "Pago fraccionado del Impuesto sobre Sociedades (modelo 202)");
+      if (/\b200\b/.test(c)) return C("4752", "Pago del Impuesto sobre Sociedades (modelo 200)");
+    }
     if (/ARRAS/.test(c)) return C("407", "Arras compra suelo Brunete");
     if (/COMPRA(VENTA)?\s+BRUNETE/.test(c)) return C(CTA_SUELO, "Compra suelo Brunete");
     if (/TRIBUTOS? COMUNIDAD|HACIENDA COMUNIDAD/.test(c)) return C(CTA_SUELO, "ITP compra suelo Brunete (mayor valor del suelo)");
