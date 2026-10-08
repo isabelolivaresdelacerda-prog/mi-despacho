@@ -225,3 +225,5 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .marca.con-logo > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .logo-apilado { display: block; width: 0; min-width: 100%; height: auto; max-height: 140px; object-fit: contain; }
 .vista-previa .marca.con-logo { font-size: 20px; }
+
+.mapa-doc summary { cursor: pointer; font-weight: 600; margin: 8px 0; }

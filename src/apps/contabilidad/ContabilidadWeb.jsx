@@ -7,10 +7,11 @@ import {
 } from "./datos.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
 import EnviarGestoria from "./EnviarGestoria.jsx";
+import Vinculados from "./Vinculados.jsx";
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
-const PESTANAS = [["resumen", "Resumen"], ["facturas", "Facturas recibidas"], ["banco", "Banco"], ["documentos", "Documentos"], ["exportar", "Para la gestoría"]];
+const PESTANAS = [["resumen", "Resumen"], ["facturas", "Facturas recibidas"], ["banco", "Banco"], ["vinculados", "Escrituras y contratos"], ["documentos", "Documentos"], ["exportar", "Para la gestoría"]];
 
 export default function ContabilidadWeb({ config }) {
   const [raiz, setRaiz] = useState(null);
@@ -83,10 +84,11 @@ export default function ContabilidadWeb({ config }) {
         {tab === "resumen" && <Resumen d={datos} />}
         {tab === "facturas" && <Facturas d={datos} raiz={raiz} recargar={cargar} aviso={aviso} />}
         {tab === "banco" && <Banco d={datos} />}
+        {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
         {tab === "exportar" && <Exportar d={datos} config={config} />}
       </>}
-      {enviar && datos && <EnviarGestoria raiz={raiz} datos={datos} config={config} aviso={aviso} onCerrar={() => setEnviar(false)} />}
+      {enviar && datos && <EnviarGestoria raiz={raiz} empresa={empresa} datos={datos} config={config} aviso={aviso} onCerrar={() => setEnviar(false)} />}
       {nodoAviso}
     </div>
   );

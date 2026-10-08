@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { estadoEncargo, marcarFirmadoFuera } from "../../lib/encargoEstado.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
-import { trimestre, eur, libroFacturasCSV, diarioCSV, leerJSON, escribirJSON } from "./datos.js";
+import { trimestre, eur, libroFacturasCSV, diarioCSV, leerJSON, escribirJSON, leerVinculados, TIPOS_VINCULO } from "./datos.js";
 
 async function escribirArchivo(raiz, ruta, nombre, texto) {
   let d = raiz;
@@ -12,7 +12,7 @@ async function escribirArchivo(raiz, ruta, nombre, texto) {
   await w.write(texto); await w.close();
 }
 
-export default function EnviarGestoria({ raiz, datos, config, onCerrar, aviso }) {
+export default function EnviarGestoria({ raiz, empresa, datos, config, onCerrar, aviso }) {
   const [enc, setEnc] = useState(estadoEncargo);
   const [seguir, setSeguir] = useState(false);
   const [fuera, setFuera] = useState({ abierto: false, gestoria: enc.gestoria || "", fecha: "" });
@@ -37,12 +37,28 @@ export default function EnviarGestoria({ raiz, datos, config, onCerrar, aviso })
       `Sin revisar por una persona: ${sinRevisar.length}`, ...sinRevisar.map((f) => `  - ${f.archivo}`), "",
       "Los documentos originales están en las carpetas «facturas», «documentos_banco» y «extractos» de esta misma carpeta compartida.",
       "Los datos marcados como leídos por IA son propuestas revisables (supervisión humana).",
+      "Escrituras, contratos y préstamos con efecto contable: carpeta «para la gestoria › escrituras y contratos» (copia; el original está en la carpeta de la empresa).",
     ].join("\r\n");
     await escribirArchivo(raiz, ruta, `Libro facturas recibidas ${etiqueta}.csv`, libroFacturasCSV(fact));
-    await escribirArchivo(raiz, ruta, `Libro diario ${etiqueta}.csv`, diarioCSV(fact));
+    const vinc = await leerVinculados(raiz);
+    const enPeriodo = vinc.filter((v) => TIPOS_VINCULO[v.tipo]?.periodico || periodo === "todo" || (trimestre(v.fecha) && `${trimestre(v.fecha).anio}-${trimestre(v.fecha).t}` === periodo));
+    await escribirArchivo(raiz, ruta, `Libro diario ${etiqueta}.csv`, diarioCSV(fact, enPeriodo.filter((v) => !TIPOS_VINCULO[v.tipo]?.periodico)));
+    // Copia de las escrituras y contratos vinculados que la gestoría aún no tiene (los originales siguen en su carpeta)
+    const previos = await leerJSON(raiz, "envios_gestoria.json", []);
+    const yaCopiados = new Set(previos.flatMap((e) => e.vinculados_copiados || []));
+    const copiados = [];
+    for (const v of vinc.filter((x) => !yaCopiados.has(x.id))) {
+      try {
+        let d = empresa; for (const p of v.ruta) d = await d.getDirectoryHandle(p);
+        const f = await (await d.getFileHandle(v.archivo)).getFile();
+        let dd = raiz; for (const p of ["para la gestoria", "escrituras y contratos"]) dd = await dd.getDirectoryHandle(p, { create: true });
+        const w = await (await dd.getFileHandle(v.archivo, { create: true })).createWritable(); await w.write(f); await w.close();
+        copiados.push(v.id);
+      } catch { /* si se ha movido el original, se avisa en el resumen */ }
+    }
     await escribirArchivo(raiz, ruta, `Resumen ${etiqueta}.txt`, "﻿" + resumen);
-    const reg = await leerJSON(raiz, "envios_gestoria.json", []);
-    reg.push({ periodo: etiqueta, fecha: new Date().toISOString(), facturas: fact.length, sin_revisar: sinRevisar.length, contrato_encargo: enc.estado, sin_contrato_aceptado: !firmado });
+    const reg = previos;
+    reg.push({ vinculados_copiados: copiados, periodo: etiqueta, fecha: new Date().toISOString(), facturas: fact.length, sin_revisar: sinRevisar.length, contrato_encargo: enc.estado, sin_contrato_aceptado: !firmado });
     await escribirJSON(raiz, "envios_gestoria.json", reg);
     setHecho(ruta.join(" › "));
     aviso?.("Paquete guardado en la carpeta compartida");

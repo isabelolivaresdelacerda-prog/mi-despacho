@@ -1,5 +1,6 @@
 // Asistente de carpetas: una sola carpeta por empresa en OneDrive / Google Drive, con su estructura fija.
 import { useEffect, useState } from "react";
+import { mapaDocumental } from "./documentos.js";
 import { SECTORES, QUE_VA, soportado, raizGuardada, elegirRaiz, olvidarRaiz, permiso, crearEstructura, crearProyecto, subcarpeta, buscarContabilidad } from "./carpetas.js";
 
 export function useRaiz() {
@@ -83,6 +84,14 @@ export default function CarpetasEmpresa({ config, guardar }) {
         </li>
       </ol>
       {msg && <p className="nota">{msg}</p>}
+      <details className="mapa-doc">
+        <summary>Qué documentos tiene una empresa de este tipo y cuáles necesita la contabilidad</summary>
+        <div className="tabla-scroll"><table className="tabla">
+          <thead><tr><th>Documento</th><th>Dónde va</th><th>Para la contabilidad</th><th>Conservar</th></tr></thead>
+          <tbody>{mapaDocumental(sector).map((d, i) => <tr key={i}><td><span className="muted pequeño">{d.grupo}</span><br />{d.nombre}</td><td className="pequeño">{d.carpeta.replace(/\//g, " › ")}</td><td className="pequeño">{d.conta || <span className="muted">—</span>}</td><td className="pequeño">{d.conservar}</td></tr>)}</tbody>
+        </table></div>
+        <p className="muted pequeño">Los documentos con efecto contable que no están en la carpeta de contabilidad (escrituras, contratos, préstamos…) se vinculan desde Contabilidad → Escrituras y contratos, sin duplicarlos.</p>
+      </details>
       <p className="muted pequeño">Comparte con tu gestoría solo la carpeta de contabilidad (en OneDrive: Compartir → Personas específicas). El resto de la carpeta de la empresa no lo necesita.</p>
     </section>
   );
