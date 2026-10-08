@@ -6,6 +6,7 @@ import Ajustes from "./Ajustes.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
+import Calendario, { ProximosAvisos } from "./apps/calendario/Calendario.jsx";
 import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
@@ -49,6 +50,7 @@ function Inicio({ config, ir }) {
           <p className="muted">Estas son las apps que tienes contratadas. También las tienes en el menú.</p>
         </div>
       </header>
+      <ProximosAvisos config={config} ir={ir} />
       <div className="tarjetas">
         {MENU.filter((m) => config.apps[m.app]).map((m) => (
           <section className="tarjeta app-tarjeta" key={m.app}>
@@ -113,6 +115,8 @@ export default function App() {
       vista = <div className="app"><ContratoEncargo /></div>; break;
     case "contratos/carpeta":
       vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Contratos" enlace={config.carpetas.contratos} nube={config.nube} />; break;
+    case "calendario":
+      vista = <Calendario config={config} guardar={guardar} />; break;
     case "carpetas":
       vista = <div className="app"><header className="app-cab"><div><div className="eyebrow">Mi empresa</div><h1>Carpetas de la empresa</h1></div></header><CarpetasEmpresa config={config} guardar={guardar} /></div>; break;
     case "contabilidad":
@@ -140,6 +144,7 @@ export default function App() {
         </div>
         <nav className="menu">
           <Item r="inicio">Inicio</Item>
+          <Item r="calendario">📅 Calendario</Item>
           {MENU.filter((m) => config.apps[m.app]).map((m) => (
             <div className="menu-grupo" key={m.app}>
               <div className="menu-titulo"><span className="icono">{m.icono}</span>{m.titulo}</div>
