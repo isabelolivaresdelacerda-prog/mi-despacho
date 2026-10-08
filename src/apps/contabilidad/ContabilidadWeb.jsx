@@ -97,7 +97,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
   // Datos de la propia empresa (Ajustes) para no confundir emisor y receptor
   const propia = useMemo(() => ({ nombre: config?.empresa?.razon_social || config?.nombre || "", cif: config?.empresa?.cif || "" }), [config]);
   const datosC = useMemo(() => (datos ? corregirPropia(datos, propia) : null), [datos, propia]);
-  const diario = useMemo(() => (datosC ? generarDiario(datosC, extra.vinc, extra.manuales, extra.asig, [...impuestosParaDiario(extra.presentados), ...otrosParaDiario(extra.otros)]) : { asientos: [], pendientes: [], sinPagar: new Set() }), [datosC, extra, tipoPlan]);
+  const diario = useMemo(() => (datosC ? generarDiario({ ...datosC, facturas: datosC.facturas.filter((f) => !f._duplicadoDe), emitidas: (datosC.emitidas || []).filter((f) => !f._duplicadoDe) }, extra.vinc, extra.manuales, extra.asig, [...impuestosParaDiario(extra.presentados), ...otrosParaDiario(extra.otros)]) : { asientos: [], pendientes: [], sinPagar: new Set() }), [datosC, extra, tipoPlan]);
   // Datos con el estado de pago calculado por saldo de cada tercero
   const dd = useMemo(() => (datosC ? { ...datosC, sinPagar: diario.sinPagar } : null), [datosC, diario]);
   const anios = useMemo(() => {
@@ -210,8 +210,8 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
   const [todas, setTodas] = useState(false);
   const lista = useMemo(() => fuente.filter((f) => todas || enRango(f.fecha, r) || fechaOrden(f.fecha).startsWith("9999")).filter((f) => !filtro || JSON.stringify([f[ter], f.numero, f.archivo]).toLowerCase().includes(filtro.toLowerCase()))
     .sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha))), [fuente, filtro, r, todas]);
-  const sinLeer = fuente.filter((f) => !f._leida && !f._sinTexto && /\.pdf$/i.test(f.archivo));
-  const escaneadas = fuente.filter((f) => f._sinTexto || (!f._leida && !/\.pdf$/i.test(f.archivo)));
+  const sinLeer = fuente.filter((f) => !f._leida && !f._sinTexto && !f._duplicadoDe && /\.(pdf|jpe?g|png)$/i.test(f.archivo));
+  const escaneadas = fuente.filter((f) => f._sinTexto && !f._duplicadoDe);
 
   const leerPendientes = async () => {
     let ok = 0, escan = 0, fallo = 0, basica = 0;
@@ -248,7 +248,7 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
           <tbody>{lista.map((f) => (
             <tr key={f.archivo} className={!f._leida ? "sin-leer" : undefined}>
               <td>{f.fecha || "—"}</td>
-              <td>{f[ter] || <em className="muted">{f.archivo}</em>}{f.analizado_ia && !f._editada && <span className="etq" title="Datos propuestos por IA, sin revisar">IA</span>}{f._papelesCambiados && !f._editada && <span className="etq aviso" title="La IA puso a tu empresa como emisora: se han cambiado los papeles. Revísala.">emisor corregido</span>}{f._proveedorPropio && <span className="etq aviso" title="Sale tu propia empresa como proveedor: corrígela">¿tu empresa como proveedor?</span>}{f._sinTexto && <span className="etq aviso" title="PDF escaneado: no tiene texto que leer">escaneada · rellenar</span>}</td>
+              <td>{f[ter] || <em className="muted">{f.archivo}</em>}{f.analizado_ia && !f._editada && <span className="etq" title="Datos propuestos por IA, sin revisar">IA</span>}{f._papelesCambiados && !f._editada && <span className="etq aviso" title="La IA puso a tu empresa como emisora: se han cambiado los papeles. Revísala.">emisor corregido</span>}{f._proveedorPropio && <span className="etq aviso" title="Sale tu propia empresa como proveedor: corrígela">¿tu empresa como proveedor?</span>}{f._sinTexto && <span className="etq aviso" title="Ni con OCR se ha podido leer: rellénala a mano">ilegible · rellenar</span>}{f._duplicadoDe && <span className="etq aviso" title={`Es la misma factura que «${f._duplicadoDe}». No entra en los libros; puedes borrar esta copia.`}>duplicada</span>}</td>
               <td>{f.numero}</td><td className="num">{eur(f.base)}</td><td className="num">{eur(f.iva_importe)}</td><td className="num">{f.retencion_importe ? eur(f.retencion_importe) : ""}</td>
               <td className="num"><strong>{eur(f.total)}</strong></td><td title={TITULOS_PGC[f.cuenta_pgc]}>{f.cuenta_pgc}</td>
               <td>{!f.total ? "" : !noPagada(f, d) ? <span className="ok" title={(f._pago || f._cobro)?.texto}>{emitidas ? "Cobrada" : "Pagada"}{(f._pago || f._cobro)?.fecha ? " " + (f._pago || f._cobro).fecha : ""}</span> : <span className="pend">Pendiente</span>}</td>

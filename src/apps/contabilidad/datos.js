@@ -151,11 +151,11 @@ export async function cargarTodo(raiz) {
     leerJSON(raiz, "empresa.json", {}), leerJSON(raiz, "capital_social.json", null), leerJSON(raiz, "justificantes_banco.json", {}),
   ]);
   const [archivosF, archivosE, archivosB] = await Promise.all([listar(raiz, "facturas"), listar(raiz, "facturas_emitidas"), listar(raiz, "documentos_banco")]);
-  const facturas = archivosF.filter(esDoc).map((a) => { const d = prepararFactura(a, cacheF["facturas/" + a.nombre]?.datos || cacheIA["factura:" + a.nombre]?.datos || null, editsF[a.nombre] || {}, (d) => asignarCuenta((d.proveedor || "") + " " + a.nombre), "proveedor"); d._sinTexto = !d._leida && !!cacheF["facturas/" + a.nombre]?.sin_texto; return d; });
+  const facturas = archivosF.filter(esDoc).map((a) => { const d = prepararFactura(a, cacheF["facturas/" + a.nombre]?.datos || cacheIA["factura:" + a.nombre]?.datos || null, editsF[a.nombre] || {}, (d) => asignarCuenta((d.proveedor || "") + " " + a.nombre), "proveedor"); d._sinTexto = !d._leida && !!cacheF["facturas/" + a.nombre]?.ocr; return d; });
   const emitidas = archivosE.filter(esDoc).map((a) => {
     const d = prepararFactura(a, cacheF["facturas_emitidas/" + a.nombre]?.datos || null, editsE[a.nombre] || {}, () => "705", "cliente");
     d.emitida = true;
-    d._sinTexto = !d._leida && !!cacheF["facturas_emitidas/" + a.nombre]?.sin_texto;
+    d._sinTexto = !d._leida && !!cacheF["facturas_emitidas/" + a.nombre]?.ocr;
     return d;
   });
   const movimientos = (extractoApi.movimientos || []).map((m, i) => ({ ...m, importe: num(m.importe), _id: i }));
@@ -191,17 +191,47 @@ export async function cargarTodo(raiz) {
 // Facturas en las que la IA ha confundido emisor y receptor: si el «proveedor» de una factura recibida es la propia empresa
 // (o el «cliente» de una emitida), se intercambian los papeles y se marca para revisar.
 const sinSignos = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\b(S\.?L\.?U?|S\.?A\.?)\b/g, "").replace(/[^A-Z0-9]/g, "");
+// Distancia de edición (para nombres mal escritos: «BEATRIZ INVERIOSNES» = «BEATRIZ INVERSIONES»)
+function distancia(a, b) {
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  const d = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) { let prev = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; } }
+  return d[b.length];
+}
 export function esPropia(nombre, nif, propia) {
   if (!propia) return false;
   const n = sinSignos(nombre), p = sinSignos(propia.nombre), c = sinSignos(propia.cif);
-  return (!!c && sinSignos(nif) === c) || (!!p && p.length >= 4 && !!n && (n.includes(p) || p.includes(n) && n.length >= 6));
+  return (!!c && sinSignos(nif).replace(/^([A-Z])(\d{8})$/, "$1$2") === c) || (!!p && p.length >= 4 && !!n && (n.includes(p) || p.includes(n) && n.length >= 6 || (p.length >= 10 && distancia(n.slice(0, p.length + 2), p) <= 3)));
 }
+const ibanN = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 export function corregirPropia(datos, propia) {
   if (!propia || !datos) return datos;
   const swap = (f, a, na, b, nb) => ({ ...f, [a]: f[b] || "", [na]: f[nb] || "", [b]: f[a], [nb]: f[na], _papelesCambiados: true });
-  const facturas = datos.facturas.map((f) => (esPropia(f.proveedor, f.nif_proveedor, propia) ? (f.cliente && !esPropia(f.cliente, f.nif_cliente, propia) ? swap(f, "proveedor", "nif_proveedor", "cliente", "nif_cliente") : { ...f, _proveedorPropio: true }) : f));
-  const emitidas = (datos.emitidas || []).map((f) => (esPropia(f.cliente, f.nif_cliente, propia) ? (f.proveedor && !esPropia(f.proveedor, f.nif_proveedor, propia) ? swap(f, "cliente", "nif_cliente", "proveedor", "nif_proveedor") : { ...f, _proveedorPropio: true }) : f));
+  // IBAN de cobro → proveedor, aprendido de las facturas bien leídas (sirve para las que no ponen el nombre del emisor, como las de Solve)
+  const porIban = {};
+  for (const f of datos.facturas) if (f.iban_proveedor && f.proveedor && !esPropia(f.proveedor, f.nif_proveedor, propia)) porIban[ibanN(f.iban_proveedor)] = { proveedor: f.proveedor, nif_proveedor: f.nif_proveedor || "" };
+  let facturas = datos.facturas.map((f) => {
+    if (!esPropia(f.proveedor, f.nif_proveedor, propia)) return f;
+    const k = porIban[ibanN(f.iban_proveedor)];
+    if (k) return { ...f, ...k, cliente: propia.nombre, nif_cliente: propia.cif || "", _papelesCambiados: true };
+    return f.cliente && !esPropia(f.cliente, f.nif_cliente, propia) ? swap(f, "proveedor", "nif_proveedor", "cliente", "nif_cliente") : { ...f, _proveedorPropio: true };
+  });
+  facturas = marcarDuplicadas(facturas, "proveedor");
+  const emitidas = marcarDuplicadas((datos.emitidas || []).map((f) => (esPropia(f.cliente, f.nif_cliente, propia) ? (f.proveedor && !esPropia(f.proveedor, f.nif_proveedor, propia) ? swap(f, "cliente", "nif_cliente", "proveedor", "nif_proveedor") : { ...f, _proveedorPropio: true }) : f)), "cliente");
   return { ...datos, facturas, emitidas };
+}
+// La misma factura guardada dos veces (mismo número e importe, o mismo archivo con otro nombre): se queda la que tiene
+// el nombre con formato de fecha y la otra se marca como duplicada y no entra en los libros.
+function marcarDuplicadas(lista, ter) {
+  const orden = [...lista].sort((a, b) => (/^\d{6,8} - /.test(b.archivo) - /^\d{6,8} - /.test(a.archivo)) || a.archivo.localeCompare(b.archivo));
+  const vistos = new Map(), dup = new Map();
+  for (const f of orden) {
+    const numero = String(f.numero || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const claves = [numero && f.total ? `n|${numero}|${Math.round(f.total * 100)}` : null, f._arch?.tam ? `s|${f._arch.tam}` : null].filter(Boolean);
+    const ya = claves.map((k) => vistos.get(k)).find(Boolean);
+    if (ya && ya !== f.archivo) dup.set(f.archivo, ya); else claves.forEach((k) => vistos.set(k, f.archivo));
+  }
+  return lista.map((f) => (dup.has(f.archivo) ? { ...f, _duplicadoDe: dup.get(f.archivo) } : f));
 }
 
 // Misma clave que el motor (fecha|importe|concepto) para guardar asociaciones a mano
@@ -216,7 +246,7 @@ export async function guardarJustificante(raiz, m, nombre) {
 // PDF escaneado sin texto: se anota para no volver a ofrecer leerlo; hay que rellenarlo a mano
 export async function marcarSinTexto(raiz, archivo, mtime, emitida = false) {
   const c = await leerJSON(raiz, "cache_facturas.json", {});
-  c[(emitida ? "facturas_emitidas/" : "facturas/") + archivo] = { _mtime: mtime / 1000, _parser_version: "web-v1", sin_texto: true, datos: null };
+  c[(emitida ? "facturas_emitidas/" : "facturas/") + archivo] = { _mtime: mtime / 1000, _parser_version: "web-ocr-v1", sin_texto: true, ocr: true, datos: null };
   await escribirJSON(raiz, "cache_facturas.json", c);
 }
 export async function guardarEdicion(raiz, archivo, cambios, emitida = false) {
