@@ -23,6 +23,9 @@ const GROQ = "https://api.groq.com/openai/v1/chat/completions";
 export const PROVEEDORES = [
   { id: "gemini",     nombre: "Google (Gemma 4 y Gemini)", gratis: true,  conseguir: "https://aistudio.google.com/apikey", ejemplo: "AIza..." },
   { id: "groq",       nombre: "Groq (gpt-oss y Llama)",    gratis: true,  conseguir: "https://console.groq.com/keys",      ejemplo: "gsk_..." },
+  { id: "cerebras",   nombre: "Cerebras (gpt-oss, Qwen, Llama) — muy rápida", gratis: true, conseguir: "https://cloud.cerebras.ai/platform/", ejemplo: "csk-..." },
+  { id: "mistral",    nombre: "Mistral (europea; plan gratis «Experiment»)", gratis: true, conseguir: "https://console.mistral.ai/api-keys", ejemplo: "clave de Mistral" },
+  { id: "github",     nombre: "GitHub Models (GPT-4.1 mini, DeepSeek…)", gratis: true, conseguir: "https://github.com/settings/personal-access-tokens/new", ejemplo: "github_pat_..." },
   { id: "openrouter", nombre: "OpenRouter (modelos free)", gratis: true,  conseguir: "https://openrouter.ai/keys",         ejemplo: "sk-or-..." },
   { id: "anthropic",  nombre: "Claude (de pago)",          gratis: false, conseguir: "https://console.anthropic.com/settings/keys", ejemplo: "sk-ant-..." },
 ];
@@ -32,6 +35,10 @@ const PIRAMIDE = [
   { nombre: "Gemini Flash",      clave: "gemini",     url: GOOGLE, modelo: "gemini-2.5-flash" },
   { nombre: "gpt-oss (Groq)",    clave: "groq",       url: GROQ,   modelo: "openai/gpt-oss-120b" },
   { nombre: "Llama 3.3 (Groq)",  clave: "groq",       url: GROQ,   modelo: "llama-3.3-70b-versatile" },
+  { nombre: "gpt-oss (Cerebras)", clave: "cerebras",   url: "https://api.cerebras.ai/v1/chat/completions", modelo: "gpt-oss-120b" },
+  { nombre: "Qwen 3 (Cerebras)", clave: "cerebras",    url: "https://api.cerebras.ai/v1/chat/completions", modelo: "qwen-3-235b-a22b-instruct-2507" },
+  { nombre: "Mistral Small",     clave: "mistral",    url: "https://api.mistral.ai/v1/chat/completions", modelo: "mistral-small-latest" },
+  { nombre: "GPT-4.1 mini (GitHub)", clave: "github", url: "https://models.github.ai/inference/chat/completions", modelo: "openai/gpt-4.1-mini" },
   { nombre: "OpenRouter (free)", clave: "openrouter", url: "https://openrouter.ai/api/v1/chat/completions", modelo: "openrouter/free" },
 ];
 const MODELO_CLAUDE = "claude-haiku-5-5";

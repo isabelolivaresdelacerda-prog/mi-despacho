@@ -97,13 +97,13 @@ export function FormIA() {
       {modo !== "nube" && <p className="muted pequeño">Las claves solo se usan si eliges «En mi ordenador y, si no está, en la nube». Puedes dejarlas puestas igualmente.</p>}
       {(<>
         <p className="nota"><strong>Ojo con los datos personales:</strong> en la nube el texto sale de tu ordenador, y en los planes gratuitos el proveedor puede usarlo para mejorar sus productos. No lo uses con contratos con datos reales de clientes.</p>
-        <p className="muted">Orden en la nube: Gemma 4 → Gemini Flash → gpt-oss → Llama → OpenRouter y, solo si se agotan todas, Claude (de pago, siempre te pregunta antes). Tus claves se guardan solo en este navegador.</p>
+        <p className="muted">Orden en la nube: Google (Gemma 4, Gemini) → Groq → Cerebras → Mistral → GitHub → OpenRouter y, solo si se agotan todas, Claude (de pago, siempre te pregunta antes). Tus claves se guardan solo en este navegador.</p>
         <details className="pasos-clave" open={!Object.values(claves).some(Boolean)}><summary><strong>Cómo conseguir una clave gratis (2 minutos)</strong></summary>
           <ol>
             <li>Pulsa <strong>«Conseguir clave»</strong> en Google (la primera de la lista). Se abre la web de Google AI Studio: entra con tu cuenta de Gmail.</li>
             <li>Pulsa <strong>«Create API key»</strong> (Crear clave de API) y acepta.</li>
             <li>Pulsa el botón de copiar que aparece junto a la clave (empieza por <code>AIza</code>).</li>
-            <li>Vuelve aquí, pégala en su casilla y pulsa <strong>«Guardar claves»</strong>. Con esa basta; Groq y OpenRouter son de reserva, por si Google se agota ese día.</li>
+            <li>Vuelve aquí, pégala en su casilla y pulsa <strong>«Guardar claves»</strong>. Con esa basta. Las demás son de reserva, por si Google se agota ese día; ninguna pide tarjeta (Mistral pide verificar el móvil; en GitHub crea un «token» con el permiso «Models»).</li>
           </ol>
         </details>
         {PROVEEDORES.map((p) => (
