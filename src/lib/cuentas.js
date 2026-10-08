@@ -12,11 +12,35 @@ const traducir = (m = "") =>
   /rate|too many/i.test(m) ? "Demasiados intentos. Espera unos minutos." :
   /network|fetch/i.test(m) ? "No hay conexión. Revisa internet." : "No se ha podido entrar. Inténtalo de nuevo.";
 
+// Paso 1: usuario y clave. Devuelve qué falta del doble factor.
 export async function entrar(email, clave) {
   const { error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: clave });
   if (error) throw new Error(traducir(error.message));
+  return estadoMFA();
+}
+
+// Doble factor (código de la app del móvil: Google Authenticator, Microsoft Authenticator…)
+export async function estadoMFA() {
+  const { data: s } = await sb.auth.getSession();
+  if (!s.session) return { sesion: false };
+  const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: f } = await sb.auth.mfa.listFactors();
+  const totp = (f?.totp || []).filter((x) => x.status === "verified");
+  return { sesion: true, nivel: aal?.currentLevel, inscrito: totp.length > 0, factor: totp[0]?.id };
+}
+export async function iniciarAltaMFA() {
+  const { data: f } = await sb.auth.mfa.listFactors();
+  for (const x of (f?.all || []).filter((x) => x.status !== "verified")) await sb.auth.mfa.unenroll({ factorId: x.id });
+  const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "Mi Despacho " + new Date().toISOString().slice(0, 10) });
+  if (error) throw new Error("No se pudo preparar el doble factor.");
+  return { id: data.id, uri: data.totp.uri, secreto: data.totp.secret };
+}
+export async function verificarMFA(factorId, codigo) {
+  const { error } = await sb.auth.mfa.challengeAndVerify({ factorId, code: String(codigo).replace(/\s/g, "") });
+  if (error) throw new Error("El código no es correcto o ha caducado. Prueba con el siguiente.");
   const yo = await miFicha();
   if (!yo || yo.estado !== "activo") { await sb.auth.signOut(); throw new Error("Tu acceso no está activo. Habla con la administradora."); }
+  sb.rpc("registrar_entrada").then(() => {}, () => {});
   return yo;
 }
 
@@ -31,6 +55,7 @@ export async function miFicha() {
 }
 
 export async function crearClave(email, codigo, clave) {
+  // (tras crear la clave, la persona entra y configura su doble factor)
   const r = await fetch(`${SUPABASE_URL}/functions/v1/crear-clave`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY },

@@ -233,3 +233,7 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .marca.con-logo { gap: 8px; }
 .marca.con-logo > span { font-size: 17px; }
 .logo-apilado { max-height: 120px; }
+.pasos-mfa { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.qr { display: block; width: 200px; height: 200px; margin: 10px 0; border-radius: 8px; background: #fff; padding: 6px; }
+.secreto { word-break: break-all; font-size: 13px; }
+.otp { font-size: 22px; letter-spacing: .3em; text-align: center; font-family: ui-monospace, Consolas, monospace; }
