@@ -98,7 +98,11 @@ export default function App() {
 
   if (yo === undefined) return <div className="bienvenida" />;
   if (!yo) return <Acceso onDentro={setYo} />;
-  if (!config.configurado) return <Bienvenida config={config} guardar={guardar} />;
+  if (!config.configurado) {
+    // Primera vez: se rellena con los datos de la cuenta (nombre de la organización y tipo)
+    const base = config.nombre ? config : { ...config, nombre: yo.organizacion || "", tipo: yo.tipo_cuenta === "gestoria" ? "gestoria" : "empresa" };
+    return <Bienvenida config={base} guardar={guardar} />;
+  }
 
   let vista;
   switch (ruta) {

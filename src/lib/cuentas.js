@@ -26,7 +26,7 @@ export async function miFicha() {
   const { data: s } = await sb.auth.getSession();
   const email = s.session?.user?.email;
   if (!email) return null;
-  const { data } = await sb.from("usuarios_permitidos").select("email,nombre,rol,estado").eq("email", email.toLowerCase()).maybeSingle();
+  const { data } = await sb.from("usuarios_permitidos").select("email,nombre,rol,estado,organizacion,tipo_cuenta").eq("email", email.toLowerCase()).maybeSingle();
   return data;
 }
 
@@ -48,11 +48,12 @@ export async function pedirAcceso(nombre, email) {
 
 // ---- administración (solo funciona si quien llama es administradora; lo comprueba la base de datos) ----
 export const admin = {
-  async usuarios() { const { data, error } = await sb.from("usuarios_permitidos").select("email,nombre,rol,estado,codigo_expira,creado,autorizado_por").order("creado"); if (error) throw error; return data; },
+  async usuarios() { const { data, error } = await sb.from("usuarios_permitidos").select("email,nombre,rol,estado,organizacion,tipo_cuenta,codigo_expira,creado,autorizado_por").order("creado"); if (error) throw error; return data; },
   async solicitudes() { const { data, error } = await sb.from("solicitudes_alta").select("*").eq("estado", "pendiente").order("creada"); if (error) throw error; return data; },
   async autorizar(id, rol = "usuario") { const { data, error } = await sb.rpc("admin_autorizar", { p_solicitud: id, p_rol: rol }); if (error) throw error; return data; },
   async rechazar(id) { const { error } = await sb.rpc("admin_rechazar", { p_solicitud: id }); if (error) throw error; },
   async codigo(email) { const { data, error } = await sb.rpc("admin_generar_codigo", { p_email: email }); if (error) throw error; return data; },
   async estado(email, estado) { const { error } = await sb.rpc("admin_estado", { p_email: email, p_estado: estado }); if (error) throw error; },
+  async ficha(email, nombre, organizacion, tipo) { const { error } = await sb.rpc("admin_ficha", { p_email: email, p_nombre: nombre, p_organizacion: organizacion, p_tipo: tipo }); if (error) throw error; },
   async registro() { const { data, error } = await sb.from("registro").select("*").order("en", { ascending: false }).limit(100); if (error) throw error; return data; },
 };

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { admin } from "./lib/cuentas.js";
 
+export const TIPOS_CUENTA = { administracion: "Administración", empresa: "Empresa", gestoria: "Gestoría", despacho: "Despacho" };
 const ESTADOS = { pendiente_clave: "Pendiente de crear clave", activo: "Activo", bloqueado: "Bloqueado" };
 
 export default function Usuarios({ yo, onCambio }) {
@@ -10,6 +11,7 @@ export default function Usuarios({ yo, onCambio }) {
   const [reg, setReg] = useState([]);
   const [codigo, setCodigo] = useState(null); // { email, nombre, codigo }
   const [error, setError] = useState("");
+  const [edit, setEdit] = useState(null); // { email, nombre, organizacion, tipo_cuenta }
 
   const cargar = async () => {
     try { const [a, b, c] = await Promise.all([admin.solicitudes(), admin.usuarios(), admin.registro()]); setSol(a); setUs(b); setReg(c); onCambio?.(a.length); }
@@ -69,11 +71,23 @@ export default function Usuarios({ yo, onCambio }) {
       <section className="tarjeta">
         <h2>Personas con acceso</h2>
         <table className="tabla">
-          <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Correo</th><th>Organización</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
           <tbody>{us.map((u) => (
+            edit?.email === u.email ? (
             <tr key={u.email}>
-              <td>{u.nombre || "—"}</td><td>{u.email}</td><td>{u.rol === "admin" ? "Administradora" : "Usuario"}</td><td>{ESTADOS[u.estado]}</td>
+              <td><input value={edit.nombre} onChange={(e) => setEdit({ ...edit, nombre: e.target.value })} /></td><td>{u.email}</td>
+              <td><input value={edit.organizacion} onChange={(e) => setEdit({ ...edit, organizacion: e.target.value })} /></td>
+              <td><select value={edit.tipo_cuenta} onChange={(e) => setEdit({ ...edit, tipo_cuenta: e.target.value })}>{Object.entries(TIPOS_CUENTA).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></td>
+              <td>{ESTADOS[u.estado]}</td>
               <td className="acciones">
+                <button className="btn" type="button" onClick={() => hacer(async () => { await admin.ficha(u.email, edit.nombre, edit.organizacion, edit.tipo_cuenta); setEdit(null); })}>Guardar</button>
+                <button className="btn ghost" type="button" onClick={() => setEdit(null)}>Cancelar</button>
+              </td>
+            </tr>) : (
+            <tr key={u.email}>
+              <td>{u.nombre || "—"}{u.rol === "admin" && <small className="muted"> · administradora</small>}</td><td>{u.email}</td><td>{u.organizacion || "—"}</td><td>{TIPOS_CUENTA[u.tipo_cuenta]}</td><td>{ESTADOS[u.estado]}</td>
+              <td className="acciones">
+                <button className="btn ghost" type="button" onClick={() => setEdit({ email: u.email, nombre: u.nombre, organizacion: u.organizacion, tipo_cuenta: u.tipo_cuenta })}>Editar</button>
                 {u.email !== yo?.email && <>
                   <button className="btn ghost" type="button" onClick={() => hacer(async () => setCodigo({ email: u.email, nombre: u.nombre, codigo: await admin.codigo(u.email) }))}>{u.estado === "pendiente_clave" ? "Generar código" : "Código para cambiar clave"}</button>
                   {u.estado === "bloqueado"
@@ -81,7 +95,7 @@ export default function Usuarios({ yo, onCambio }) {
                     : u.estado === "activo" && <button className="btn ghost" type="button" onClick={() => window.confirm(`¿Bloquear el acceso de ${u.email}?`) && hacer(() => admin.estado(u.email, "bloqueado"))}>Bloquear</button>}
                 </>}
               </td>
-            </tr>))}</tbody>
+            </tr>)))}</tbody>
         </table>
       </section>
 
