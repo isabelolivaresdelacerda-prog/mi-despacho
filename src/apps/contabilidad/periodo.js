@@ -159,7 +159,7 @@ export { mayores };
 
 // ---- Modelos de impuestos del año: calculados, presentados y pagados ----
 // Clave: "2026-2|111" (trimestre) o "2026-anio|390" (anual)
-export const NOMBRE_MODELO = { "303": "IVA", "111": "Retenciones de profesionales y nóminas (IRPF)", "115": "Retenciones de alquileres", "202": "Pago fraccionado de Sociedades", "390": "Resumen anual de IVA", "190": "Resumen anual de retenciones", "180": "Resumen anual de retenciones de alquileres", "347": "Operaciones con terceros", "200": "Impuesto sobre Sociedades" };
+export const NOMBRE_MODELO = { "182": "Declaración informativa de donativos", "303": "IVA", "111": "Retenciones de profesionales y nóminas (IRPF)", "115": "Retenciones de alquileres", "202": "Pago fraccionado de Sociedades", "390": "Resumen anual de IVA", "190": "Resumen anual de retenciones", "180": "Resumen anual de retenciones de alquileres", "347": "Operaciones con terceros", "200": "Impuesto sobre Sociedades" };
 export const claveModelo = (anio, tramo, modelo) => `${anio}-${tramo}|${modelo}`;
 
 // Id del aviso en el calendario (ver calendario/obligaciones.js)
@@ -174,17 +174,18 @@ export function modelosDelAnio(anio, todos, d, pendientes, opciones = {}) {
   const out = [];
   for (const t of ["1", "2", "3", "4"]) {
     const r = rango(anio, t), c = cifras(todos, d.movimientos, pendientes, r, d), p = plazos(r);
-    out.push({ anio, tramo: t, modelo: "303", r, plazo: p.iva.fecha, calculado: c.iva303, ivaRep: c.ivaRep, ivaSop: c.ivaSop, siempre: true });
+    out.push({ anio, tramo: t, modelo: "303", r, plazo: p.iva.fecha, calculado: c.iva303, ivaRep: c.ivaRep, ivaSop: c.ivaSop, siempre: !(opciones.esfl && opciones.ivaExenta) });
     out.push({ anio, tramo: t, modelo: "111", r, plazo: p.ret.fecha, calculado: c.ret111, siempre: opciones.profesionales || opciones.empleados || c.ret111 > 0 });
     out.push({ anio, tramo: t, modelo: "115", r, plazo: p.ret.fecha, calculado: c.ret115, siempre: opciones.alquileres || c.ret115 > 0 });
-    if (p.is) out.push({ anio, tramo: t, modelo: "202", r, plazo: p.is.fecha, calculado: 0, siempre: !!opciones.pagosFraccionados, nota: "lo calcula la gestoría" });
+    if (p.is && !opciones.esfl) out.push({ anio, tramo: t, modelo: "202", r, plazo: p.is.fecha, calculado: 0, siempre: !!opciones.pagosFraccionados, nota: "lo calcula la gestoría" });
   }
   const ra = rango(anio, "anio"), ca = cifras(todos, d.movimientos, pendientes, ra, d), pa = plazos(ra);
-  out.push({ anio, tramo: "anio", modelo: "390", r: ra, plazo: pa.iva.fecha, calculado: ca.iva303, siempre: true, informativo: true });
+  out.push({ anio, tramo: "anio", modelo: "390", r: ra, plazo: pa.iva.fecha, calculado: ca.iva303, siempre: !(opciones.esfl && opciones.ivaExenta), informativo: true });
+  if (opciones.esfl && opciones.ley49) out.push({ anio, tramo: "anio", modelo: "182", r: ra, plazo: habil(iso(anio + 1, 1, 31)), calculado: 0, siempre: true, informativo: true, nota: "donativos recibidos (cuenta 726/131)" });
   out.push({ anio, tramo: "anio", modelo: "190", r: ra, plazo: pa.ret.fecha, calculado: ca.ret111, siempre: ca.ret111 > 0, informativo: true });
   out.push({ anio, tramo: "anio", modelo: "180", r: ra, plazo: pa.ret.fecha, calculado: ca.ret115, siempre: ca.ret115 > 0, informativo: true });
   out.push({ anio, tramo: "anio", modelo: "347", r: ra, plazo: habil(iso(anio + 1, 2, new Date(Date.UTC(anio + 1, 2, 0)).getUTCDate())), calculado: 0, siempre: true, informativo: true });
-  out.push({ anio, tramo: "anio", modelo: "200", r: ra, plazo: pa.is.fecha, calculado: ca.isEstimado, siempre: true });
+  out.push({ anio, tramo: "anio", modelo: "200", r: ra, plazo: pa.is.fecha, calculado: opciones.esfl ? 0 : ca.isEstimado, siempre: true, ...(opciones.esfl ? { nota: opciones.ley49 ? "obligatorio con la Ley 49/2002 (rentas exentas)" : "no obligatorio si ingresos ≤ 75.000 €, no exentos ≤ 2.000 € y con retención" } : {}) });
   return out.filter((m) => m.siempre).map((m) => ({ ...m, clave: claveModelo(m.anio, m.tramo, m.modelo), etiqueta: m.tramo === "anio" ? `${anio}` : `${m.tramo}T ${anio}`, idCal: idCalendario(m.anio, m.tramo, m.modelo) }));
 }
 

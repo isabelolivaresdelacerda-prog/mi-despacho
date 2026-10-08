@@ -32,6 +32,10 @@ export const domicilioCompleto = (e) => [e.domicilio, [e.cp, e.municipio].filter
 // Pie mercantil obligatorio (art. 24 del Reglamento del Registro Mercantil)
 export function pieMercantil(e) {
   if (!e?.razon_social) return "";
+  if (["asociacion", "fundacion"].includes(e.forma)) {
+    const ins = e.registro || e.inscripcion ? `Inscrita en el ${e.registro ? (e.forma === "asociacion" ? "Registro de Asociaciones " : "Registro de Fundaciones ") + e.registro : "registro"}${e.inscripcion ? ` con el número ${e.inscripcion}` : ""}` : "";
+    return [e.razon_social, e.cif && `NIF ${e.cif.toUpperCase()}`, domicilioCompleto(e) && `Domicilio: ${domicilioCompleto(e)}`, ins].filter(Boolean).join(" · ");
+  }
   const ins = e.registro ? [`Inscrita en el Registro Mercantil de ${e.registro}`, e.tomo && `tomo ${e.tomo}`, e.folio && `folio ${e.folio}`, e.hoja && `hoja ${e.hoja}`, e.inscripcion && `inscripción ${e.inscripcion}`].filter(Boolean).join(", ") : "";
   return [e.razon_social, e.cif && `CIF ${e.cif.toUpperCase()}`, domicilioCompleto(e) && `Domicilio social: ${domicilioCompleto(e)}`, ins].filter(Boolean).join(" · ");
 }

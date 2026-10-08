@@ -1,5 +1,6 @@
 // Ajustes → Datos de la empresa (para la papelería corporativa, facturas y contratos)
 import { useState } from "react";
+import { FORMAS, OPCIONES_ESFL } from "./entidad.js";
 import { EMPRESA_VACIA, nifValido, ibanValido, pieMercantil } from "./empresa.js";
 
 export default function DatosEmpresa({ config, guardar }) {
@@ -14,10 +15,19 @@ export default function DatosEmpresa({ config, guardar }) {
 
   return (
     <section className="tarjeta">
-      <h2>Datos de la empresa</h2>
+      <h2>Datos de la entidad</h2>
       <p className="muted">Salen en las facturas, la hoja de carta, los informes y los contratos.</p>
+      <label>Forma jurídica
+        <select value={e.forma || "sl"} onChange={(ev) => setE({ ...e, forma: ev.target.value })}>{Object.entries(FORMAS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
+      </label>
+      {["asociacion", "fundacion"].includes(e.forma) && (
+        <div className="nota">
+          <p><strong>{e.forma === "asociacion" ? "Asociación" : "Fundación"}:</strong> la contabilidad usará el plan de entidades sin fines lucrativos (fondo social, cuotas de asociados, donativos, subvenciones, excedente), los impuestos de una entidad sin ánimo de lucro y el calendario de asamblea y rendición de cuentas. Tienes una guía en el menú: «Guía: asociaciones».</p>
+          {OPCIONES_ESFL.map(([k, t]) => <label key={k} className="check"><input type="checkbox" checked={!!e.esfl?.[k]} onChange={(ev) => setE({ ...e, esfl: { ...(e.esfl || {}), [k]: ev.target.checked } })} /> {t}</label>)}
+        </div>
+      )}
       <div className="rejilla-2">
-        {c("razon_social", "Razón social", { placeholder: "Beatriz Inversiones, S.L.", ancho: true })}
+        {c("razon_social", ["asociacion", "fundacion"].includes(e.forma) ? "Denominación" : "Razón social", { placeholder: "Beatriz Inversiones, S.L.", ancho: true })}
         {c("cif", "CIF")}
         {c("email", "Correo", { type: "email" })}
         {c("domicilio", "Domicilio social", { placeholder: "Calle, número, piso", ancho: true })}
@@ -28,14 +38,22 @@ export default function DatosEmpresa({ config, guardar }) {
         {c("web", "Web")}
         {c("iban", "IBAN (para las facturas)")}
       </div>
-      <p className="ce-sub">Inscripción en el Registro Mercantil</p>
-      <div className="rejilla-2">
-        {c("registro", "Registro Mercantil de", { placeholder: "Madrid" })}
-        {c("tomo", "Tomo")}
-        {c("folio", "Folio")}
-        {c("hoja", "Hoja", { placeholder: "M-000000" })}
-        {c("inscripcion", "Inscripción", { placeholder: "1ª" })}
-      </div>
+      {["asociacion", "fundacion"].includes(e.forma) ? (<>
+        <p className="ce-sub">Inscripción en el registro</p>
+        <div className="rejilla-2">
+          {c("registro", e.forma === "asociacion" ? "Registro de Asociaciones" : "Registro de Fundaciones", { placeholder: e.forma === "asociacion" ? "Nacional / de la Comunidad de Madrid" : "Estatal / autonómico" })}
+          {c("inscripcion", "Número de inscripción")}
+        </div>
+      </>) : (<>
+        <p className="ce-sub">Inscripción en el Registro Mercantil</p>
+        <div className="rejilla-2">
+          {c("registro", "Registro Mercantil de", { placeholder: "Madrid" })}
+          {c("tomo", "Tomo")}
+          {c("folio", "Folio")}
+          {c("hoja", "Hoja", { placeholder: "M-000000" })}
+          {c("inscripcion", "Inscripción", { placeholder: "1ª" })}
+        </div>
+      </>)}
       {pieMercantil(e) && <p className="nota"><strong>Pie de documentos:</strong> {pieMercantil(e)}</p>}
       {errores.length > 0 && <p className="nota error">{errores.join(" ")}</p>}
       {msg && <p className="muted">{msg}</p>}

@@ -71,10 +71,32 @@ const ARBOL = {
   ] },
 };
 
+// En asociaciones y fundaciones se pregunta primero por lo propio de una entidad sin fines lucrativos
+const ESFL = {
+  entra: { p: "¿Por qué entra ese dinero?", o: [
+    ["Cuota de un asociado", { c: "720", e: "Cuotas de asociados y afiliados." }],
+    ["Donativo de una persona o empresa", { c: "726", e: "Donaciones para actividades. Si es para comprar algo duradero, 131. Con la Ley 49/2002, va al modelo 182." }],
+    ["Subvención pública para la actividad del año", { c: "725", e: "Subvenciones oficiales a la actividad propia. Si es para comprar algo duradero o para varios años, 130." }],
+    ["Patrocinio a cambio de publicidad (lleva factura con IVA)", { c: "723", e: "Ingresos de patrocinadores y colaboraciones." }],
+    ["Pago de un usuario por participar en una actividad", { c: "721", e: "Cuotas de usuarios." }],
+    ["Rifa, lotería, cena benéfica, mercadillo", { c: "722", e: "Promociones para captación de recursos." }],
+    ["Venta de un producto o servicio con precio (actividad económica)", { c: "705", e: "Prestaciones de servicios / ventas: pueden llevar IVA y tributar en Sociedades." }],
+    ["Aportación al fondo social", { c: "101", e: "Fondo social: patrimonio de la asociación." }],
+    ["Un préstamo o un banco nos presta dinero", { c: "520", e: "Deudas a corto plazo con entidades de crédito (a más de un año, 170)." }],
+    ["Intereses del banco", { c: "769", e: "Otros ingresos financieros." }],
+  ] },
+  saleExtra: [
+    ["Una ayuda o beca a un beneficiario", { c: "650", e: "Ayudas monetarias de la actividad propia." }],
+    ["Gastos de un voluntario que se le reembolsan", { c: "653", e: "Compensación de gastos por prestaciones de colaboración." }],
+    ["Gastos de la junta directiva que se le devuelven", { c: "654", e: "Reembolsos de gastos al órgano de gobierno." }],
+  ],
+};
+
 export default function Asistente({ plan = "pymes", onElegir, onCerrar, contexto }) {
   const [camino, setCamino] = useState(["inicio"]);
   const [fin, setFin] = useState(null);
-  const nodo = ARBOL[camino[camino.length - 1]];
+  const clave = camino[camino.length - 1];
+  const nodo = plan === "esfl" && clave === "entra" ? ESFL.entra : plan === "esfl" && clave === "sale" ? { ...ARBOL.sale, o: [...ESFL.saleExtra, ...ARBOL.sale.o.filter(([t]) => !/socio o administrador/.test(t))] } : ARBOL[clave];
   const elegir = (dest) => (typeof dest === "string" ? setCamino([...camino, dest]) : setFin(dest));
   const atras = () => (fin ? setFin(null) : camino.length > 1 && setCamino(camino.slice(0, -1)));
 

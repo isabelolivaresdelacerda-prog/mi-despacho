@@ -15,6 +15,7 @@ import { generarDiario, usarPlan } from "./motor.js";
 import Impuestos, { impuestosParaDiario, otrosParaDiario } from "./Impuestos.jsx";
 import ExportarTodo from "./ExportarTodo.jsx";
 import { revisarCarpeta } from "./inventario.js";
+import { planPorDefecto, opcionesFiscales, esESFL } from "../../lib/entidad.js";
 import { noPagada } from "./periodo.js";
 import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.js";
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
@@ -66,7 +67,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
     try { const [d] = await Promise.all([cargarTodo(h), cargarExtra(h)]); setDatos(d); } catch { aviso("No se pudo leer la carpeta."); }
     setCargando(false);
   };
-  const tipoPlan = config?.planContable || "pymes";
+  const tipoPlan = planPorDefecto(config);
   usarPlan(tipoPlan);
   // Datos de la propia empresa (Ajustes) para no confundir emisor y receptor
   const propia = useMemo(() => ({ nombre: config?.empresa?.razon_social || config?.nombre || "", cif: config?.empresa?.cif || "" }), [config]);
@@ -133,10 +134,10 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
       </nav>
       {datos && ["resumen", "facturas", "banco", "libros", "exportar"].includes(tab) && <SelPeriodo anio={per.anio} tramo={per.tramo} cambiar={cambiarPeriodo} cierres={extra.cierres} anios={anios} />}
       {!datos ? <p className="muted">Leyendo la carpeta…</p> : <>
-        {tab === "resumen" && <ResumenPeriodo d={dd} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
+        {tab === "resumen" && <ResumenPeriodo esfl={esESFL(config)} d={dd} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
         {tab === "facturas" && <Facturas d={dd} propia={propia} r={r} raiz={raiz} recargar={cargar} aviso={aviso} emitidas={verEmitidas} setEmitidas={setVerEmitidas} />}
         {tab === "banco" && <BancoPeriodo d={dd} raiz={raiz} recargar={cargar} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
-        {tab === "impuestos" && <Impuestos raiz={raiz} d={dd} todos={diario.asientos} pendientes={diario.pendientes} anio={per.anio} anios={anios} cambiarAnio={(a) => cambiarPeriodo(a, per.tramo)} presentados={extra.presentados} guardar={(n) => guardarExtra("presentados", n)} otros={extra.otros} guardarOtros={(n) => guardarExtra("otros", n)} opciones={config?.calendario || {}} entidad={config?.empresa?.forma || "sl"} aviso={aviso} />}
+        {tab === "impuestos" && <Impuestos raiz={raiz} d={dd} todos={diario.asientos} pendientes={diario.pendientes} anio={per.anio} anios={anios} cambiarAnio={(a) => cambiarPeriodo(a, per.tramo)} presentados={extra.presentados} guardar={(n) => guardarExtra("presentados", n)} otros={extra.otros} guardarOtros={(n) => guardarExtra("otros", n)} opciones={opcionesFiscales(config)} aviso={aviso} />}
         {tab === "libros" && <Libros datos={dd} diario={diario} extra={extra} guardarExtra={guardarExtra} r={r} sub={subLibros} setSub={setSubLibros} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
         {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} onCambio={() => cargarExtra()} propia={propia} revisionAuto={revAuto} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}

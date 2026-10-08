@@ -249,9 +249,17 @@ export function mayores(asientos) {
 
 // Cuenta de pérdidas y ganancias (modelo abreviado PGC PYMES)
 const g = (saldos, prefijos, signo) => r2(saldos.filter((s) => prefijos.some((p) => s.cuenta.startsWith(p))).reduce((t, s) => t + (s.debe - s.haber) * signo, 0));
-export function perdidasYGanancias(asientos) {
+export function perdidasYGanancias(asientos, esfl = PLAN === "esfl") {
   const s = mayores(asientos);
-  const L = [
+  const L = esfl ? [
+    ["1. Ingresos de la actividad propia (cuotas, donativos, subvenciones, patrocinios)", g(s, ["72", "74"], -1)],
+    ["2. Ventas y otros ingresos de la actividad mercantil", g(s, ["70", "75"], -1)],
+    ["3. Gastos por ayudas y otros", g(s, ["65"], -1)],
+    ["6. Aprovisionamientos", g(s, ["60", "61"], -1)],
+    ["8. Gastos de personal", g(s, ["64"], -1)],
+    ["9. Otros gastos de la actividad", g(s, ["62", "631", "634", "639"], -1)],
+    ["10. Amortización del inmovilizado", g(s, ["68"], -1)],
+  ] : [
     ["1. Importe neto de la cifra de negocios", g(s, ["70"], -1)],
     ["4. Aprovisionamientos", g(s, ["60", "61"], -1)],
     ["5. Otros ingresos de explotación", g(s, ["74", "75"], -1)],
@@ -268,9 +276,9 @@ export function perdidasYGanancias(asientos) {
 }
 
 // Balance de situación (simplificado por grupos del PGC)
-export function balance(asientos) {
+export function balance(asientos, esfl = PLAN === "esfl") {
   const s = mayores(asientos);
-  const pyg = perdidasYGanancias(asientos).resultado;
+  const pyg = perdidasYGanancias(asientos, esfl).resultado;
   const sal = (pref) => s.filter((x) => pref.some((p) => x.cuenta.startsWith(p)));
   const neto = (arr) => r2(arr.reduce((t, x) => t + x.debe - x.haber, 0));
   // Grupo 4 y 5: según saldo deudor (activo) o acreedor (pasivo)
@@ -285,9 +293,10 @@ export function balance(asientos) {
   ];
   const ap = -neto(sal(["118"]));
   const pn = [
-    ["Capital y reservas (10, 11, 12)", r2(-neto(sal(["10", "11", "12"])) - ap)],
-    ["Aportaciones de socios (118)", r2(ap)],
-    ["Resultado del ejercicio", pyg],
+    [esfl ? "Fondo social y reservas (10, 11, 12)" : "Capital y reservas (10, 11, 12)", r2(-neto(sal(["10", "11", "12"])) - ap)],
+    [esfl ? "Aportaciones (118)" : "Aportaciones de socios (118)", r2(ap)],
+    ["Subvenciones, donaciones y legados de capital (13)", r2(-neto(sal(["13"])))],
+    [esfl ? "Excedente del ejercicio" : "Resultado del ejercicio", pyg],
   ];
   const pasivo = [
     ["Deudas a largo plazo (17, 18)", -neto(sal(["17", "18"]))],

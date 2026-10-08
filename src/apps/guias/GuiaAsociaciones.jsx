@@ -11,7 +11,7 @@ export default function GuiaAsociaciones() {
     <div className="app pagina-doc">
       <header className="app-cab no-imprimir">
         <div><div className="eyebrow">Guías</div><h1>Contabilidad de una asociación</h1>
-          <p className="muted">Explicado para quien no sabe contabilidad. En Mi Despacho elige el plan «Entidades sin fines lucrativos» en Contabilidad → Plan contable.</p></div>
+          <p className="muted">Explicado para quien no sabe contabilidad. En Mi Despacho elige «Asociación» en Ajustes → Datos de la entidad: la contabilidad, los impuestos y el calendario se adaptan solos.</p></div>
         <div className="acciones"><button className="btn" type="button" onClick={() => window.print()}>Imprimir / PDF</button></div>
       </header>
       <article className="doc">

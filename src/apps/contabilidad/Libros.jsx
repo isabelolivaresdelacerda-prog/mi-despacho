@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov, adivinarTercero, claveTercero } from "./motor.js";
 export { adivinarTercero };
+import { planPorDefecto } from "../../lib/entidad.js";
 import { eur, num, descargarTexto, fechaOrden } from "./datos.js";
 import { plan, comprobarBOE, descargarDelBOE, aplicarActualizacion, fechaBOE, a8 } from "./pgc.js";
 import Asistente from "./Asistente.jsx";
@@ -12,7 +13,7 @@ const SUB = [["diario", "Libro diario"], ["mayor", "Mayores"], ["sumas", "Sumas 
 const e2 = (n) => (n ? eur(n) : "");
 
 export default function Libros({ datos, diario, extra, guardarExtra, r, sub, setSub, config, guardarConfig, aviso }) {
-  const tipoPlan = config.planContable || "pymes";
+  const tipoPlan = planPorDefecto(config);
   const { asientos: todos, pendientes } = diario;
   const asientos = useMemo(() => filtrarPeriodo(todos, r.desde, r.hasta), [todos, r]);
   // El balance es una foto a una fecha: desde el 1 de enero del ejercicio hasta el final del periodo
@@ -30,8 +31,8 @@ export default function Libros({ datos, diario, extra, guardarExtra, r, sub, set
       {sub === "diario" && <Diario asientos={asientos} />}
       {sub === "mayor" && <Mayor asientos={asientos} />}
       {sub === "sumas" && <Sumas asientos={asientos} />}
-      {sub === "pyg" && <PyG asientos={asientos} anio={r.etiqueta} acumulado={r.tramo !== "anio" ? ejercicio : null} />}
-      {sub === "balance" && <Balance asientos={ejercicio} anio={fin} />}
+      {sub === "pyg" && <PyG esfl={tipoPlan === "esfl"} asientos={asientos} anio={r.etiqueta} acumulado={r.tramo !== "anio" ? ejercicio : null} />}
+      {sub === "balance" && <Balance esfl={tipoPlan === "esfl"} asientos={ejercicio} anio={fin} />}
       {sub === "aplicar" && <Aplicar pendientes={pendP} total={pendientes.length} asig={extra.asig} plan={tipoPlan} guardar={async (n) => { await guardarExtra("asig", n); aviso?.("Movimiento contabilizado"); }} />}
       {sub === "manual" && <Manual manuales={extra.manuales} plan={tipoPlan} guardar={async (n) => { await guardarExtra("manuales", n); aviso?.("Asiento guardado"); }} />}
       {sub === "exportar" && <Exportar asientos={asientos} anio={r.corta} />}
@@ -87,30 +88,30 @@ function Sumas({ asientos }) {
   );
 }
 
-function PyG({ asientos, anio, acumulado }) {
-  const p = perdidasYGanancias(asientos);
-  const q = acumulado ? perdidasYGanancias(acumulado) : null;
+function PyG({ asientos, anio, acumulado, esfl }) {
+  const p = perdidasYGanancias(asientos, esfl);
+  const q = acumulado ? perdidasYGanancias(acumulado, esfl) : null;
   const fila = (t, v, w, fuerte) => <tr key={t} className={fuerte ? "total" : ""}><td>{t}</td><td className={"num " + (v < 0 ? "neg" : "")}>{eur(v)}</td>{q && <td className={"num " + (w < 0 ? "neg" : "")}>{eur(w)}</td>}</tr>;
   return (
     <div className="estado">
-      <h3>Cuenta de pérdidas y ganancias · {anio} <span className="muted pequeño">(modelo abreviado PGC PYMES)</span></h3>
+      <h3>{esfl ? "Cuenta de resultados" : "Cuenta de pérdidas y ganancias"} · {anio} <span className="muted pequeño">({esfl ? "modelo abreviado de entidades sin fines lucrativos" : "modelo abreviado PGC PYMES"})</span></h3>
       <table className="tabla">
         {q && <thead><tr><th></th><th className="num">Trimestre</th><th className="num">Acumulado del año</th></tr></thead>}
         <tbody>
         {p.lineas.map(([t, v], i) => fila(t, v, q?.lineas[i][1]))}
-        {fila("A) RESULTADO DE EXPLOTACIÓN", p.explotacion, q?.explotacion, true)}
+        {fila(esfl ? "A) EXCEDENTE DE LA ACTIVIDAD" : "A) RESULTADO DE EXPLOTACIÓN", p.explotacion, q?.explotacion, true)}
         {p.financieras.map(([t, v], i) => fila(t, v, q?.financieras[i][1]))}
-        {fila("B) RESULTADO FINANCIERO", p.financiero, q?.financiero, true)}
-        {fila("C) RESULTADO ANTES DE IMPUESTOS", p.antesImpuestos, q?.antesImpuestos, true)}
+        {fila(esfl ? "B) EXCEDENTE DE LAS OPERACIONES FINANCIERAS" : "B) RESULTADO FINANCIERO", p.financiero, q?.financiero, true)}
+        {fila(esfl ? "C) EXCEDENTE ANTES DE IMPUESTOS" : "C) RESULTADO ANTES DE IMPUESTOS", p.antesImpuestos, q?.antesImpuestos, true)}
         {fila("17. Impuesto sobre beneficios", p.impuesto, q?.impuesto)}
-        {fila("D) RESULTADO DEL EJERCICIO", p.resultado, q?.resultado, true)}
+        {fila(esfl ? "D) EXCEDENTE DEL EJERCICIO" : "D) RESULTADO DEL EJERCICIO", p.resultado, q?.resultado, true)}
       </tbody></table>
     </div>
   );
 }
 
-function Balance({ asientos, anio }) {
-  const b = balance(asientos);
+function Balance({ asientos, anio, esfl }) {
+  const b = balance(asientos, esfl);
   const bloque = (t, filas, total) => (<><tr className="total"><td>{t}</td><td className="num">{total !== undefined ? eur(total) : ""}</td></tr>{filas.map(([x, v]) => <tr key={x}><td className="sangria">{x}</td><td className="num">{eur(v)}</td></tr>)}</>);
   return (
     <div className="estado">

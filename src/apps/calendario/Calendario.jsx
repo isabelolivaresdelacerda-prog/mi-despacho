@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { obligaciones, ics } from "./obligaciones.js";
 import "./calendario.css";
+import { opcionesFiscales, esESFL } from "../../lib/entidad.js";
 
 const HECHOS = "md-cal-hechos", PROPIOS = "md-cal-propios";
 const leer = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
@@ -20,7 +21,7 @@ const OPCIONES = [
 ];
 
 export function useEventos(config, anio) {
-  const op = config.calendario || { profesionales: true };
+  const op = { profesionales: true, ...opcionesFiscales(config) };
   return useMemo(() => {
     const propios = leer(PROPIOS, []).filter((e) => e.fecha.startsWith(String(anio)));
     return [...obligaciones(anio, op), ...propios].sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -123,7 +124,7 @@ export default function Calendario({ config, guardar }) {
         <div>
           <div className="eyebrow">Calendario</div>
           <h1>Obligaciones de la empresa</h1>
-          <p className="muted">Impuestos, libros, junta y cuentas anuales. Plazos generales: confírmalos con tu gestoría.</p>
+          <p className="muted">{esESFL(config) ? "Impuestos, asamblea, cuentas anuales y rendición de cuentas de la entidad." : "Impuestos, libros, junta y cuentas anuales."} Plazos generales: confírmalos con tu gestoría. La forma jurídica se cambia en Ajustes.</p>
         </div>
         <div className="acciones"><button className="btn" type="button" onClick={exportar}>Añadir a Outlook</button></div>
       </header>
@@ -173,7 +174,7 @@ export default function Calendario({ config, guardar }) {
       <details className="tarjeta cal-opciones">
         <summary>Ajustar a mi empresa</summary>
         {OPCIONES.map(([k, t]) => <label key={k} className="opcion"><input type="checkbox" checked={!!op[k]} onChange={(e) => cambiarOp(k, e.target.checked)} /> {t}</label>)}
-        <label>Fecha prevista de la Junta General Ordinaria<input type="date" value={op.fechaJunta || ""} onChange={(e) => cambiarOp("fechaJunta", e.target.value)} /></label>
+        <label>{esESFL(config) ? "Fecha prevista de la asamblea general" : "Fecha prevista de la Junta General Ordinaria"}<input type="date" value={op.fechaJunta || ""} onChange={(e) => cambiarOp("fechaJunta", e.target.value)} /></label>
       </details>
 
       <section className="tarjeta">
