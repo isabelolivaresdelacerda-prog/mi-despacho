@@ -73,11 +73,13 @@ export async function estadoLocal() {
   }
 }
 
-async function preguntarLocal(modelo, sistema, msgs, maxTokens) {
+async function preguntarLocal(modelo, sistema, msgs, maxTokens, json = false) {
   const r = await fetch(LOCAL + "/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: modelo, messages: mensajesPara({ sinSistema: true }, sistema, msgs), max_tokens: maxTokens, stream: false }),
+    // Sin «pensar» en voz alta (más rápido) y, si se pide JSON, la respuesta sale solo como JSON válido
+    body: JSON.stringify({ model: modelo, messages: mensajesPara({ sinSistema: true }, sistema, msgs), max_tokens: maxTokens, stream: false, temperature: 0.1,
+      chat_template_kwargs: { enable_thinking: false }, ...(json ? { response_format: { type: "json_object" } } : {}) }),
   });
   if (!r.ok) throw new Error("error " + r.status);
   const texto = (await r.json()).choices?.[0]?.message?.content;
@@ -111,7 +113,7 @@ function mensajesPara(nivel, sistema, mensajes) {
 }
 
 // --- Funcion principal ---
-export async function preguntarIA(pregunta, { sistema, mensajes, permitirPago = false, maxTokens = 2048 } = {}) {
+export async function preguntarIA(pregunta, { sistema, mensajes, permitirPago = false, maxTokens = 2048, json = false } = {}) {
   const claves = leerClaves();
   const msgs = mensajes || [{ role: "user", content: pregunta }];
   const intentos = [];
@@ -121,7 +123,7 @@ export async function preguntarIA(pregunta, { sistema, mensajes, permitirPago = 
   const local = await estadoLocal();
   if (local.ok) {
     try {
-      const texto = await preguntarLocal(local.modelo, sistema, msgs, maxTokens);
+      const texto = await preguntarLocal(local.modelo, sistema, msgs, maxTokens, json);
       return { estado: "ok", texto, ia: "Gemma 4 en tu ordenador", modelo: local.modelo, dePago: false, local: true, intentos };
     } catch (e) {
       intentos.push("IA local: " + e.message);

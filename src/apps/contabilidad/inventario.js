@@ -50,7 +50,7 @@ async function analizar(doc, propia) {
     const { textoPDF } = await import("./leer.js");
     const texto = await textoPDF(await doc.h.getFile(), 6);
     if (texto.length < 40) return { sinTexto: true };
-    const r = await preguntarIA(PROMPT(propia) + texto.slice(0, 9000), { maxTokens: 500 });
+    const r = await preguntarIA(PROMPT(propia) + texto.slice(0, 9000), { maxTokens: 450, json: true });
     if (r.estado !== "ok") return { sinIA: true };
     const m = String(r.texto).match(/\{[\s\S]*\}/);
     return m ? { ...JSON.parse(m[0]), ia: r.ia } : null;

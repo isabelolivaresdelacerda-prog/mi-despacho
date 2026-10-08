@@ -41,7 +41,7 @@ export async function proponerNombre(file, nombreActual, { propia, prefijo } = {
       const { textoPDF } = await import("../apps/contabilidad/leer.js");
       const texto = await textoPDF(file, 4);
       if (texto.length > 40) {
-        const r = await preguntarIA(PROMPT(propia) + texto.slice(0, 7000), { maxTokens: 300 });
+        const r = await preguntarIA(PROMPT(propia) + texto.slice(0, 7000), { maxTokens: 300, json: true });
         const m = r.estado === "ok" && String(r.texto).match(/\{[\s\S]*\}/);
         if (m) { info = JSON.parse(m[0]); metodo = `IA (${r.ia})`; }
       }

@@ -46,7 +46,7 @@ export async function leerFactura(file, { propia, emitida = false } = {}) {
   const texto = await textoPDF(file);
   if (texto.length < 30) return { datos: null, motivo: "El PDF no tiene texto (es una imagen escaneada). Rellena los datos a mano." };
   const quien = propia?.nombre ? `\nIMPORTANTE: nuestra empresa es «${propia.nombre}»${propia.cif ? ` (NIF ${propia.cif})` : ""}. ${emitida ? "Esta factura la EMITE nuestra empresa: proveedor = nuestra empresa; cliente = el otro." : "Esta factura la RECIBE nuestra empresa: cliente = nuestra empresa; proveedor = el otro (quien la emite y cobra)."}\n` : "";
-  const r = await preguntarIA(PROMPT.replace("TEXTO:", quien + "TEXTO:") + texto.slice(0, 6000), { maxTokens: 700 });
+  const r = await preguntarIA(PROMPT.replace("TEXTO:", quien + "TEXTO:") + texto.slice(0, 6000), { maxTokens: 450, json: true });
   let d = r.estado === "ok" ? jsonDe(r.texto) : null;
   const metodo = d ? `IA (${r.ia})` : "lectura básica — revísala";
   if (!d) d = lecturaBasica(texto);

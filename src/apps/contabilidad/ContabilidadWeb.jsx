@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { raizGuardada, buscarContabilidad, permiso as permisoRaiz } from "../../lib/carpetas.js";
 import {
   soportado, cargarTodo, CARPETAS, listar, abrir, subir,
-  guardarEdicion, guardarLectura, guardarVinculo, eur, fechaOrden, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
+  guardarEdicion, guardarLectura, guardarVinculo, marcarSinTexto, eur, fechaOrden, TITULOS_PGC, libroFacturasCSV, diarioCSV, descargarTexto,
 } from "./datos.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
 import EnviarGestoria from "./EnviarGestoria.jsx";
@@ -14,6 +14,7 @@ import { rango, enRango } from "./periodo.js";
 import { generarDiario, usarPlan } from "./motor.js";
 import Impuestos, { impuestosParaDiario, otrosParaDiario } from "./Impuestos.jsx";
 import ExportarTodo from "./ExportarTodo.jsx";
+import Bandeja, { CARPETA_ENTRADA } from "./Bandeja.jsx";
 import { revisarCarpeta } from "./inventario.js";
 import { planPorDefecto, opcionesFiscales, esESFL } from "../../lib/entidad.js";
 import { noPagada } from "./periodo.js";
@@ -21,7 +22,7 @@ import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
-const PESTANAS = [["resumen", "Resumen"], ["facturas", "Facturas"], ["banco", "Banco y cierre"], ["impuestos", "Impuestos"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Exportar A3 / Sage"]];
+const PESTANAS = [["resumen", "Resumen"], ["bandeja", "Bandeja de entrada"], ["facturas", "Facturas"], ["banco", "Banco y cierre"], ["impuestos", "Impuestos"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Exportar A3 / Sage"]];
 
 export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
   const [raiz, setRaiz] = useState(null);
@@ -60,6 +61,11 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
   useEffect(() => { if (!datos || !empresa || !raiz || revisado.current) return; revisado.current = true;
     revisarCarpeta({ empresa, raiz, propia }).then((x) => { setRevAuto((n) => n + 1); if (x.vinculados) { cargarExtra(); aviso(`La app ha leído ${x.nuevos.length} documentos nuevos de la carpeta de la empresa y ha vinculado ${x.vinculados} a la contabilidad. Revísalos en «Escrituras y contratos».`); } }).catch(() => {});
   }, [datos]);
+
+  // Documentos esperando en la bandeja de entrada (llegados por correo o arrastrados)
+  const [nEntrada, setNEntrada] = useState(0);
+  const contarEntrada = async (h = raiz) => { if (!h) return; try { setNEntrada((await listar(h, CARPETA_ENTRADA)).filter((x) => !/^_/.test(x.nombre)).length); } catch { setNEntrada(0); } };
+  useEffect(() => { contarEntrada(); }, [raiz]);
 
   const cargar = async (h = raiz) => {
     if (!h) return;
@@ -130,7 +136,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
         <a className="btn ghost" href="#/carpetas">Carpetas</a>
       </>} />
       <nav className="cont-tabs" role="tablist">
-        {PESTANAS.map(([k, t]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t}</button>)}
+        {PESTANAS.map(([k, t]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t}{k === "bandeja" && nEntrada > 0 && <span className="insignia">{nEntrada}</span>}</button>)}
       </nav>
       {datos && ["resumen", "facturas", "banco", "libros", "exportar"].includes(tab) && <SelPeriodo anio={per.anio} tramo={per.tramo} cambiar={cambiarPeriodo} cierres={extra.cierres} anios={anios} />}
       {!datos ? <p className="muted">Leyendo la carpeta…</p> : <>
@@ -139,6 +145,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
         {tab === "banco" && <BancoPeriodo d={dd} raiz={raiz} recargar={cargar} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
         {tab === "impuestos" && <Impuestos raiz={raiz} d={dd} todos={diario.asientos} pendientes={diario.pendientes} anio={per.anio} anios={anios} cambiarAnio={(a) => cambiarPeriodo(a, per.tramo)} presentados={extra.presentados} guardar={(n) => guardarExtra("presentados", n)} otros={extra.otros} guardarOtros={(n) => guardarExtra("otros", n)} opciones={opcionesFiscales(config)} aviso={aviso} />}
         {tab === "libros" && <Libros datos={dd} diario={diario} extra={extra} guardarExtra={guardarExtra} r={r} sub={subLibros} setSub={setSubLibros} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
+        {tab === "bandeja" && <Bandeja raiz={raiz} empresa={empresa} propia={propia} aviso={aviso} recargar={cargar} onCambio={() => { cargarExtra(); contarEntrada(); }} />}
         {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} onCambio={() => cargarExtra()} propia={propia} revisionAuto={revAuto} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
         {tab === "exportar" && <ExportarTodo d={dd} diario={diario} extra={extra} r={r} config={config} guardarConfig={guardarConfig} raiz={raiz} aviso={aviso} />}
@@ -184,19 +191,24 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
   const [todas, setTodas] = useState(false);
   const lista = useMemo(() => fuente.filter((f) => todas || enRango(f.fecha, r) || fechaOrden(f.fecha).startsWith("9999")).filter((f) => !filtro || JSON.stringify([f[ter], f.numero, f.archivo]).toLowerCase().includes(filtro.toLowerCase()))
     .sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha))), [fuente, filtro, r, todas]);
-  const sinLeer = fuente.filter((f) => !f._leida && /\.pdf$/i.test(f.archivo));
+  const sinLeer = fuente.filter((f) => !f._leida && !f._sinTexto && /\.pdf$/i.test(f.archivo));
+  const escaneadas = fuente.filter((f) => f._sinTexto || (!f._leida && !/\.pdf$/i.test(f.archivo)));
 
   const leerPendientes = async () => {
+    let ok = 0, escan = 0, fallo = 0, basica = 0;
     for (const f of sinLeer) {
       setLeyendo(f.archivo);
       try {
         const file = await f._arch.h.getFile();
         const { leerFactura } = await import("./leer.js");
         const r = await leerFactura(file, { propia, emitida: emitidas });
-        if (r.datos) await guardarLectura(raiz, f.archivo, file.lastModified, { archivo: f.archivo, ...r.datos, ...(emitidas ? { cuenta_pgc: "705" } : {}) }, emitidas);
-      } catch { /* sigue con la siguiente */ }
+        if (r.datos) { await guardarLectura(raiz, f.archivo, file.lastModified, { archivo: f.archivo, ...r.datos, ...(emitidas ? { cuenta_pgc: "705" } : {}) }, emitidas); ok++; if (!r.datos.analizado_ia) basica++; }
+        else { await marcarSinTexto(raiz, f.archivo, file.lastModified, emitidas); escan++; }
+      } catch { fallo++; }
     }
-    setLeyendo(""); aviso("Facturas leídas. Revisa las marcadas como «lectura básica»."); recargar();
+    setLeyendo("");
+    aviso([ok && `${ok} leídas${basica ? ` (${basica} con lectura básica porque la IA local no está encendida: revísalas)` : ""}`, escan && `${escan} escaneadas sin texto: rellénalas a mano con «Corregir»`, fallo && `${fallo} no se han podido abrir`].filter(Boolean).join(" · ") || "Nada que leer");
+    recargar();
   };
 
   return (
@@ -206,6 +218,7 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
         <label className="btn ghost">Subir facturas<input type="file" multiple hidden accept=".pdf,image/*" onChange={async (e) => { const f = [...e.target.files]; e.target.value = ""; if (!f.length) return; await subir(raiz, emitidas ? "facturas_emitidas" : "facturas", f); aviso(`Guardadas en «${emitidas ? "facturas_emitidas" : "facturas"}»`); recargar(); }} /></label>
         <input className="buscar" placeholder={emitidas ? "Buscar cliente, número…" : "Buscar proveedor, número…"} value={filtro} onChange={(e) => setFiltro(e.target.value)} />
         {sinLeer.length > 0 && <button className="btn" type="button" disabled={!!leyendo} onClick={leerPendientes}>{leyendo ? `Leyendo ${leyendo}…` : `Leer ${sinLeer.length} facturas nuevas`}</button>}
+        {escaneadas.length > 0 && <span className="pend pequeño">{escaneadas.length} escaneada{escaneadas.length > 1 ? "s" : ""}: rellénala{escaneadas.length > 1 ? "s" : ""} con «Corregir»</span>}
         <label className="check"><input type="checkbox" checked={todas} onChange={(e) => setTodas(e.target.checked)} /> Ver todos los periodos</label>
         <EstadoIALocal compacto />
       </div>
@@ -216,7 +229,7 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
           <tbody>{lista.map((f) => (
             <tr key={f.archivo} className={!f._leida ? "sin-leer" : undefined}>
               <td>{f.fecha || "—"}</td>
-              <td>{f[ter] || <em className="muted">{f.archivo}</em>}{f.analizado_ia && !f._editada && <span className="etq" title="Datos propuestos por IA, sin revisar">IA</span>}{f._papelesCambiados && !f._editada && <span className="etq aviso" title="La IA puso a tu empresa como emisora: se han cambiado los papeles. Revísala.">emisor corregido</span>}{f._proveedorPropio && <span className="etq aviso" title="Sale tu propia empresa como proveedor: corrígela">¿tu empresa como proveedor?</span>}</td>
+              <td>{f[ter] || <em className="muted">{f.archivo}</em>}{f.analizado_ia && !f._editada && <span className="etq" title="Datos propuestos por IA, sin revisar">IA</span>}{f._papelesCambiados && !f._editada && <span className="etq aviso" title="La IA puso a tu empresa como emisora: se han cambiado los papeles. Revísala.">emisor corregido</span>}{f._proveedorPropio && <span className="etq aviso" title="Sale tu propia empresa como proveedor: corrígela">¿tu empresa como proveedor?</span>}{f._sinTexto && <span className="etq aviso" title="PDF escaneado: no tiene texto que leer">escaneada · rellenar</span>}</td>
               <td>{f.numero}</td><td className="num">{eur(f.base)}</td><td className="num">{eur(f.iva_importe)}</td><td className="num">{f.retencion_importe ? eur(f.retencion_importe) : ""}</td>
               <td className="num"><strong>{eur(f.total)}</strong></td><td title={TITULOS_PGC[f.cuenta_pgc]}>{f.cuenta_pgc}</td>
               <td>{!f.total ? "" : !noPagada(f, d) ? <span className="ok" title={(f._pago || f._cobro)?.texto}>{emitidas ? "Cobrada" : "Pagada"}{(f._pago || f._cobro)?.fecha ? " " + (f._pago || f._cobro).fecha : ""}</span> : <span className="pend">Pendiente</span>}</td>

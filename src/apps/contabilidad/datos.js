@@ -26,6 +26,7 @@ export async function permiso(h, pedir = true) {
 
 // Carpetas de documentos que entiende la app
 export const CARPETAS = [
+  { id: "entrada", nombre: "Bandeja de entrada (correo)" },
   { id: "facturas", nombre: "Facturas recibidas" },
   { id: "facturas_emitidas", nombre: "Facturas emitidas" },
   { id: "documentos_banco", nombre: "Justificantes de banco" },
@@ -150,10 +151,11 @@ export async function cargarTodo(raiz) {
     leerJSON(raiz, "empresa.json", {}), leerJSON(raiz, "capital_social.json", null), leerJSON(raiz, "justificantes_banco.json", {}),
   ]);
   const [archivosF, archivosE, archivosB] = await Promise.all([listar(raiz, "facturas"), listar(raiz, "facturas_emitidas"), listar(raiz, "documentos_banco")]);
-  const facturas = archivosF.filter(esDoc).map((a) => prepararFactura(a, cacheF["facturas/" + a.nombre]?.datos || cacheIA["factura:" + a.nombre]?.datos || null, editsF[a.nombre] || {}, (d) => asignarCuenta((d.proveedor || "") + " " + a.nombre), "proveedor"));
+  const facturas = archivosF.filter(esDoc).map((a) => { const d = prepararFactura(a, cacheF["facturas/" + a.nombre]?.datos || cacheIA["factura:" + a.nombre]?.datos || null, editsF[a.nombre] || {}, (d) => asignarCuenta((d.proveedor || "") + " " + a.nombre), "proveedor"); d._sinTexto = !d._leida && !!cacheF["facturas/" + a.nombre]?.sin_texto; return d; });
   const emitidas = archivosE.filter(esDoc).map((a) => {
     const d = prepararFactura(a, cacheF["facturas_emitidas/" + a.nombre]?.datos || null, editsE[a.nombre] || {}, () => "705", "cliente");
     d.emitida = true;
+    d._sinTexto = !d._leida && !!cacheF["facturas_emitidas/" + a.nombre]?.sin_texto;
     return d;
   });
   const movimientos = (extractoApi.movimientos || []).map((m, i) => ({ ...m, importe: num(m.importe), _id: i }));
@@ -211,6 +213,12 @@ export async function guardarJustificante(raiz, m, nombre) {
 }
 
 // Guarda una corrección manual (compatible con la app de escritorio)
+// PDF escaneado sin texto: se anota para no volver a ofrecer leerlo; hay que rellenarlo a mano
+export async function marcarSinTexto(raiz, archivo, mtime, emitida = false) {
+  const c = await leerJSON(raiz, "cache_facturas.json", {});
+  c[(emitida ? "facturas_emitidas/" : "facturas/") + archivo] = { _mtime: mtime / 1000, _parser_version: "web-v1", sin_texto: true, datos: null };
+  await escribirJSON(raiz, "cache_facturas.json", c);
+}
 export async function guardarEdicion(raiz, archivo, cambios, emitida = false) {
   const n = emitida ? "edits_emitidas.json" : "edits_facturas.json";
   const e = await leerJSON(raiz, n, {});

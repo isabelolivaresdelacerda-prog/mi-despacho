@@ -1,5 +1,5 @@
 // Contabilidad por trimestre y por año: cifras clave, impuestos, lo que queda por gestionar y cierre del extracto.
-import { mayores, perdidasYGanancias, filtrarPeriodo, claveMov } from "./motor.js";
+import { mayores, perdidasYGanancias, filtrarPeriodo, claveMov, claveTercero as claveT } from "./motor.js";
 import { fechaOrden, vencimientos, TIPOS_VINCULO, num } from "./datos.js";
 
 export const TRAMOS = [["1", "1T"], ["2", "2T"], ["3", "3T"], ["4", "4T"], ["anio", "Año"]];
@@ -83,6 +83,23 @@ export function porGestionar(d, todos, pendientes, vinculados, r, hoy = new Date
     pend.filter((m) => m.importe < 0).map((m) => ({ fecha: m.fecha, texto: m.concepto, importe: m.importe })));
   add("cobros-sin-factura", "Cobros en el banco sin factura emitida", "Ha entrado dinero y no hay ninguna factura emitida por ese importe. Si es una venta o un servicio, falta la factura: súbela a «Facturas emitidas». Si es otra cosa (aportación de un socio, préstamo, devolución…), dilo con «¿Dónde va?».", { tab: "facturas", sub: "emitidas", texto: "Subir factura emitida" },
     pend.filter((m) => m.importe > 0).map((m) => ({ fecha: m.fecha, texto: m.concepto, importe: m.importe })));
+
+  // Proveedores que facturan todos los meses (Anthropic, Wix, alquiler…): meses sin su factura
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const porProv = {};
+  for (const f of facturas) { const o = fechaOrden(f.fecha); if (o.startsWith("9999") || !f.proveedor) continue; const k = claveT(f.proveedor); (porProv[k] ||= { nombre: f.proveedor, meses: new Set(), importes: [] }).meses.add(o.slice(0, 7)); porProv[k].importes.push(f.total || 0); }
+  const mesActual = hoy.slice(0, 7), faltan = [];
+  for (const p of Object.values(porProv)) {
+    const ms = [...p.meses].sort(); if (ms.length < 3) continue;
+    const [y0, m0] = ms[0].split("-").map(Number);
+    for (let y = y0, m = m0; `${y}-${String(m).padStart(2, "0")}` < mesActual; m === 12 ? (y++, m = 1) : m++) {
+      const k = `${y}-${String(m).padStart(2, "0")}`;
+      if (p.meses.has(k) || k < r.desde.slice(0, 7) || k > r.hasta.slice(0, 7)) continue;
+      const med = p.importes.sort((a, b) => a - b)[Math.floor(p.importes.length / 2)];
+      faltan.push({ fecha: `01/${k.slice(5)}/${k.slice(0, 4)}`, texto: `${p.nombre} · ${MESES[m - 1]} ${y}`, importe: med ? -med : undefined });
+    }
+  }
+  add("facturas-periodicas", "Facturas que faltan de proveedores habituales", "Estos proveedores facturan cada mes y no está la factura de ese mes. Descárgala de su web (o mándala al correo de contabilidad) y súbela.", { tab: "bandeja", texto: "Subir facturas" }, faltan);
 
   const fP = facturas.filter((f) => enP(f.fecha));
   add("facturas-sin-pago", "Facturas sin pago en el banco", "No se ha encontrado en el extracto un pago por el mismo importe. Puede estar pendiente de pagar, pagada por otra vía o con otro importe.", { tab: "facturas", texto: "Revisar" },

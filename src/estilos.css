@@ -308,3 +308,5 @@ button.enlace-cuenta:hover { color: var(--brand); }
   .sitio-app .principal { padding: 8px 14px 32px; }
 }
 @media print { .cabecera, .pie-app { display: none; } }
+.traer-datos { position: fixed; z-index: 100; left: 50%; top: 16px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); background: var(--superficie, #fff); border: 2px solid var(--brand, #7a1f2b); border-radius: 14px; padding: 14px 16px; box-shadow: 0 12px 32px rgba(0,0,0,.18); font-size: 14px; }
+.traer-datos p { margin: 0 0 10px; }
