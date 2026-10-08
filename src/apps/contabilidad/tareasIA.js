@@ -99,6 +99,29 @@ async function moverClaves(raiz, viejo, nuevo, emitida) {
   }
 }
 
+// «260424 - PIRAMIDE ARQUITECTOS, S.L. F2026 14.568,40.pdf»
+const aammdd = (f) => aaaammdd(f).slice(2);
+export const nombreFactura = (d, ter, extension) => `${aammdd(d.fecha)} - ${limpio(d[ter]).toUpperCase().slice(0, 60)}${d.numero ? " " + limpio(String(d.numero).replace(/[\\/]+/g, "-")).replace(/\s+/g, "").slice(0, 25) : ""} ${eurNombre(d.total)}${extension}`.replace(/\s+(?=\.)/, "");
+export const formatoFactura = (n) => /^\d{6} - .+ \d{1,3}(\.\d{3})*,\d{2}\.[a-z0-9]+$/i.test(n);
+export async function renombrarFacturas(raiz, emitida = false, errores = []) {
+  const carpeta = emitida ? "facturas_emitidas" : "facturas", ter = emitida ? "cliente" : "proveedor";
+  const cache = await leerJSON(raiz, "cache_facturas.json", {});
+  const edits = await leerJSON(raiz, emitida ? "edits_emitidas.json" : "edits_facturas.json", {});
+  const dir = await sub(raiz, carpeta);
+  if (!dir) return 0;
+  const lista = [];
+  for await (const [n, h] of dir.entries()) if (h.kind === "file" && /\.(pdf|jpe?g|png)$/i.test(n)) lista.push(n);
+  let k = 0;
+  for (const n of lista) {
+    const d = { ...(cache[carpeta + "/" + n]?.datos || {}), ...(edits[n] || {}) };
+    if (d.noFactura || !d[ter] || !aammdd(d.fecha) || !num(d.total)) continue;
+    const nuevo = nombreFactura({ ...d, total: num(d.total) }, ter, ext(n));
+    if (nuevo === n) continue;
+    try { const final = await renombrarArchivo(dir, n, nuevo); await moverClaves(raiz, n, final, emitida); k++; } catch (e) { errores.push(`${n}: ${e.message || e}`); }
+  }
+  return k;
+}
+
 export async function hacerTodo({ raiz, empresa, propia, datos, onPaso }) {
   const res = { facturas: 0, ocr: 0, ilegibles: 0, banco: 0, renombrados: 0, punteables: 0, inventario: null, errores: [] };
   const paso = (t) => onPaso?.(t);
@@ -144,18 +167,9 @@ export async function hacerTodo({ raiz, empresa, propia, datos, onPaso }) {
     await escribirJSON(raiz, "cache_banco.json", cacheB);
   }
 
-  // 3) Nombre con formato para las facturas que no lo tienen: «AAAAMMDD - Proveedor - Número.pdf»
-  paso("3/5 · Poniendo nombre con formato a las facturas…");
-  const cache = await leerJSON(raiz, "cache_facturas.json", {});
-  const edits = await leerJSON(raiz, "edits_facturas.json", {});
-  const dirF = await sub(raiz, "facturas");
-  if (dirF) for await (const [n, h] of dirF.entries()) {
-    if (h.kind !== "file" || FORMATO.test(n) || !/\.(pdf|jpe?g|png)$/i.test(n)) continue;
-    const d = { ...(cache["facturas/" + n]?.datos || {}), ...(edits[n] || {}) };
-    if (d.noFactura || !d.proveedor || !aaaammdd(d.fecha)) continue;
-    const nuevo = `${aaaammdd(d.fecha)} - ${limpio(d.proveedor).slice(0, 60)}${d.numero ? " - " + limpio(d.numero).slice(0, 25) : ""}${ext(n)}`;
-    try { const final = await renombrarArchivo(dirF, n, nuevo); await moverClaves(raiz, n, final, false); res.renombrados++; } catch (e) { res.errores.push(`${n}: ${e.message || e}`); }
-  }
+  // 3) Nombre de las facturas con tu formato: «AAMMDD - PROVEEDOR NºFACTURA IMPORTE.pdf» (en emitidas, el cliente)
+  paso("3/5 · Poniendo a las facturas tu formato de nombre…");
+  for (const emitida of [false, true]) { try { res.renombrados += await renombrarFacturas(raiz, emitida, res.errores); } catch (e) { res.errores.push(String(e.message || e)); } }
 
   // 4) Puntear el banco: cada movimiento sin factura emparejada va a su proveedor (para cuadrar por saldo) o a su cuenta
   paso("4/5 · Punteando el banco con sus documentos…");
