@@ -12,6 +12,7 @@ import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
 import Usuarios from "./Usuarios.jsx";
 import { sb, miFicha, salir, admin } from "./lib/cuentas.js";
+import { recortarLogo } from "./lib/logo.js";
 
 // Apps del despacho. "app" es la clave de contratación (de momento, todas activas).
 const MENU = [
@@ -95,6 +96,12 @@ export default function App() {
 
   const ir = (r) => { window.location.hash = "/" + r; };
   const guardar = (c) => { setConfig(c); guardarConfig(c); };
+  // El logo se recorta (sin márgenes blancos) una vez, para que ocupe todo su espacio
+  useEffect(() => {
+    if (config.logo && config.logoRecortado !== config.logo.length) {
+      recortarLogo(config.logo).then((l) => guardar({ ...config, logo: l, logoRecortado: l.length }));
+    }
+  }, [config.logo]);
   const irAAjustes = () => ir("ajustes");
 
   const tema = { "--brand": config.color, "--fondo": config.fondo };

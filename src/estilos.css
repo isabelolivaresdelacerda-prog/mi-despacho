@@ -227,3 +227,9 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .vista-previa .marca.con-logo { font-size: 20px; }
 
 .mapa-doc summary { cursor: pointer; font-weight: 600; margin: 8px 0; }
+
+/* Logo del menú: más presencia */
+.lateral-cab { padding-top: 6px; }
+.marca.con-logo { gap: 8px; }
+.marca.con-logo > span { font-size: 17px; }
+.logo-apilado { max-height: 120px; }
