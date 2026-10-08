@@ -11,8 +11,10 @@ import CarpetasEmpresa from "./lib/CarpetasUI.jsx";
 import ContabilidadWeb from "./apps/contabilidad/ContabilidadWeb.jsx";
 import Acceso from "./Acceso.jsx";
 import Usuarios from "./Usuarios.jsx";
-import { sb, miFicha, salir, admin } from "./lib/cuentas.js";
+import { sb, miFicha, salir as salirCuenta, admin, misEmpresas } from "./lib/cuentas.js";
+import { fijarEspacio, hayDatosAntiguos, moverDatosAntiguos, borrarDatosAntiguos } from "./lib/espacio.js";
 import { recortarLogo } from "./lib/logo.js";
+import { migrarRaizAntigua, borrarRaizAntigua } from "./lib/carpetas.js";
 
 // Apps del despacho. "app" es la clave de contratación (de momento, todas activas).
 const MENU = [
@@ -74,10 +76,33 @@ export default function App() {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [yo, setYo] = useState(undefined); // undefined = comprobando; null = sin sesión
   const [pendientes, setPendientes] = useState(0);
+  const [empresas, setEmpresas] = useState(null);   // empresas a las que tiene acceso
+  const [empresa, setEmpresa] = useState(null);     // empresa elegida
+  const [antiguos, setAntiguos] = useState(false);  // datos de este navegador de antes de las cuentas
+
+  const salir = async () => { fijarEspacio(null); setEmpresa(null); setEmpresas(null); await salirCuenta(); };
+  const elegirEmpresa = (e) => {
+    fijarEspacio(yo.email, e.id);
+    try { localStorage.setItem("md-ultima-empresa:" + yo.email, e.id); } catch { /* nada */ }
+    const c = leerConfig();
+    setConfig(c.nombre ? c : { ...c, nombre: e.nombre, tipo: e.tipo === "gestoria" ? "gestoria" : "empresa", empresa: { ...(c.empresa || {}), razon_social: e.nombre, cif: e.cif || "" } });
+    setEmpresa(e);
+    setAntiguos(yo.rol === "admin" && hayDatosAntiguos());
+    window.location.hash = "/inicio";
+  };
+  useEffect(() => {
+    if (!yo) return;
+    misEmpresas().then((l) => {
+      setEmpresas(l);
+      let ult = null; try { ult = localStorage.getItem("md-ultima-empresa:" + yo.email); } catch { /* nada */ }
+      if (l.length === 1) elegirEmpresa(l[0]);
+      else if (ult && l.length > 1 && yo.rol !== "admin") { const e = l.find((x) => x.id === ult); if (e) elegirEmpresa(e); }
+    }).catch(() => setEmpresas([]));
+  }, [yo]);
 
   useEffect(() => {
     miFicha().then((f) => setYo(f && f.estado === "activo" ? f : null)).catch(() => setYo(null));
-    const { data } = sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT") setYo(null); });
+    const { data } = sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT") { fijarEspacio(null); setYo(null); } });
     return () => data.subscription.unsubscribe();
   }, []);
   useEffect(() => {
@@ -108,6 +133,9 @@ export default function App() {
 
   if (yo === undefined) return <div className="bienvenida" />;
   if (!yo) return <Acceso onDentro={setYo} />;
+  if (empresas === null) return <div className="bienvenida" />;
+  if (!empresa) return <SelectorEmpresa yo={yo} empresas={empresas} elegir={elegirEmpresa} salir={salir} />;
+  if (antiguos) return <DatosAntiguos empresa={empresa} usar={async () => { moverDatosAntiguos(); await migrarRaizAntigua(); setConfig(leerConfig()); setAntiguos(false); }} descartar={() => { borrarDatosAntiguos(); borrarRaizAntigua(); setAntiguos(false); }} />;
   if (!config.configurado) {
     // Primera vez: se rellena con los datos de la cuenta (nombre de la organización y tipo)
     const base = config.nombre ? config : { ...config, nombre: yo.organizacion || "", tipo: yo.tipo_cuenta === "gestoria" ? "gestoria" : "empresa" };
@@ -167,12 +195,58 @@ export default function App() {
             {yo.rol === "admin" && <Item r="usuarios">👤 Usuarios {pendientes > 0 && <span className="insignia" title="Solicitudes de acceso pendientes">{pendientes}</span>}</Item>}
             <Item r="carpetas">📁 Carpetas de la empresa</Item>
             <Item r="ajustes">⚙ Ajustes</Item>
+            {(empresas.length > 1 || yo.rol === "admin") && <button className="menu-item salir" type="button" onClick={() => { fijarEspacio(null); setEmpresa(null); }}>🏢 Cambiar de empresa ({empresa.nombre})</button>}
             <button className="menu-item salir" type="button" onClick={salir}>Salir ({yo.email})</button>
             <div className="nube-actual">Documentos en {NUBES[config.nube].nombre}</div>
           </div>
         </nav>
       </aside>
       <main className="principal">{vista}</main>
+    </div>
+  );
+}
+
+function SelectorEmpresa({ yo, empresas, elegir, salir }) {
+  return (
+    <div className="bienvenida">
+      <div className="bienvenida-caja">
+        <div className="eyebrow">Mi Despacho</div>
+        <h1>Elige la empresa</h1>
+        {empresas.length === 0 ? (
+          <><p className="muted">Tu cuenta todavía no tiene ninguna empresa asignada. Pide a la administradora que te dé acceso.</p>
+            <button className="btn ghost" type="button" onClick={salir}>Salir</button></>
+        ) : (
+          <>
+            <p className="muted">Cada empresa tiene sus datos, carpetas y documentos por separado.</p>
+            <div className="lista-empresas">
+              {empresas.map((e) => (
+                <button key={e.id} type="button" className="empresa-tarjeta" onClick={() => elegir(e)}>
+                  <span className="logo-letra">{e.nombre.trim()[0]}</span>
+                  <span><strong>{e.nombre}</strong><small>{e.cif || ({ empresa: "Empresa", gestoria: "Gestoría", despacho: "Despacho", asociacion: "Asociación" }[e.tipo])}</small></span>
+                </button>
+              ))}
+            </div>
+            <p className="muted pequeño">Entraste como {yo.email}. <button className="enlace" type="button" onClick={salir}>Salir</button></p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DatosAntiguos({ empresa, usar, descartar }) {
+  return (
+    <div className="bienvenida">
+      <div className="bienvenida-caja">
+        <div className="eyebrow">Una sola vez</div>
+        <h1>Datos guardados en este navegador</h1>
+        <p>En este navegador hay datos de Mi Despacho de antes de las cuentas de usuario (logo, colores, contratos, calendario…).</p>
+        <p>¿Son de <strong>{empresa.nombre}</strong>? Si lo son, pásalos a esta empresa. Si no, bórralos: así nadie que entre en este ordenador con otra cuenta podrá verlos.</p>
+        <div className="acciones">
+          <button className="btn" type="button" onClick={usar}>Sí, pasarlos a {empresa.nombre}</button>
+          <button className="btn ghost" type="button" onClick={descartar}>No, borrarlos</button>
+        </div>
+      </div>
     </div>
   );
 }

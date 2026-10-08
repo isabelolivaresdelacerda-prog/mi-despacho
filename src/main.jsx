@@ -1,3 +1,4 @@
+import "./lib/espacio.js"; // primero: aísla los datos de cada usuario y empresa
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import "./estilos.css";

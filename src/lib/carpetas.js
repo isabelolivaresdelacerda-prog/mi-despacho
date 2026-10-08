@@ -103,11 +103,13 @@ export async function crearProyecto(sector, nombre) {
   return [raiz.name, ...cfg.padre.split("/"), limpio].join(" › ");
 }
 
-const DB = "md-carpetas", STORE = "h", KEY = "raiz";
+import { espacioActual } from "./espacio.js";
+const STORE = "h", KEY = "raiz";
+const nombreDB = () => "md-carpetas" + (espacioActual() ? ":" + espacioActual() : "");
 
 function idb(modo, fn) {
   return new Promise((ok, ko) => {
-    const r = indexedDB.open(DB, 1);
+    const r = indexedDB.open(nombreDB(), 1);
     r.onupgradeneeded = () => r.result.createObjectStore(STORE);
     r.onerror = () => ko(r.error);
     r.onsuccess = () => {
@@ -204,3 +206,20 @@ export const QUE_VA = {
   "007 COMPRAS": "Proveedores, materias primas y logística.",
   "007 PROYECTOS": "Una carpeta por proyecto.",
 };
+
+// Pasa la carpeta elegida antes de las cuentas de usuario al espacio actual (y la quita de donde estaba)
+export async function migrarRaizAntigua() {
+  const abrir = (n) => new Promise((ok, ko) => { const r = indexedDB.open(n, 1); r.onupgradeneeded = () => r.result.createObjectStore(STORE); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); });
+  try {
+    const vieja = await abrir("md-carpetas");
+    const h = await new Promise((ok) => { const q = vieja.transaction(STORE, "readonly").objectStore(STORE).get(KEY); q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); });
+    if (h) {
+      await idb("readwrite", (s) => s.put(h, KEY));
+      await new Promise((ok) => { const tx = vieja.transaction(STORE, "readwrite"); tx.objectStore(STORE).delete(KEY); tx.oncomplete = ok; tx.onerror = ok; });
+    }
+    vieja.close();
+  } catch { /* nada */ }
+}
+export async function borrarRaizAntigua() {
+  try { indexedDB.deleteDatabase("md-carpetas"); } catch { /* nada */ }
+}

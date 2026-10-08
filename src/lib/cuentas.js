@@ -82,3 +82,15 @@ export const admin = {
   async ficha(email, nombre, organizacion, tipo) { const { error } = await sb.rpc("admin_ficha", { p_email: email, p_nombre: nombre, p_organizacion: organizacion, p_tipo: tipo }); if (error) throw error; },
   async registro() { const { data, error } = await sb.from("registro").select("*").order("en", { ascending: false }).limit(100); if (error) throw error; return data; },
 };
+
+// Empresas a las que tiene acceso el usuario (la base de datos solo devuelve las suyas; a la administradora, todas)
+export async function misEmpresas() {
+  const { data, error } = await sb.from("empresas").select("id,nombre,cif,tipo").order("nombre");
+  if (error) throw error;
+  return data || [];
+}
+export const empresasAdmin = {
+  async accesos() { const { data, error } = await sb.from("empresa_usuarios").select("empresa_id,email,rol,activo"); if (error) throw error; return data; },
+  async crear(nombre, cif, tipo) { const { data, error } = await sb.rpc("admin_empresa_crear", { p_nombre: nombre, p_cif: cif, p_tipo: tipo }); if (error) throw error; return data; },
+  async asignar(empresa, email, rol, activo = true) { const { error } = await sb.rpc("admin_empresa_asignar", { p_empresa: empresa, p_email: email, p_rol: rol, p_activo: activo }); if (error) throw new Error(error.message); },
+};

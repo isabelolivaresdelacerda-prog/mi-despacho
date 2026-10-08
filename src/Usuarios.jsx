@@ -1,6 +1,7 @@
 // Usuarios (solo administradora): solicitudes de alta, personas con acceso y registro de actividad.
 import { useEffect, useState } from "react";
 import { admin } from "./lib/cuentas.js";
+import EmpresasAdmin from "./EmpresasAdmin.jsx";
 
 export const TIPOS_CUENTA = { administracion: "Administración", empresa: "Empresa", gestoria: "Gestoría", despacho: "Despacho" };
 const ESTADOS = { pendiente_clave: "Pendiente de crear clave", activo: "Activo", bloqueado: "Bloqueado" };
@@ -98,6 +99,8 @@ export default function Usuarios({ yo, onCambio }) {
             </tr>)))}</tbody>
         </table>
       </section>
+
+      <EmpresasAdmin usuarios={us} />
 
       <section className="tarjeta">
         <h2>Actividad reciente</h2>

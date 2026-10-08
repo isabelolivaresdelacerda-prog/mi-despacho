@@ -237,3 +237,15 @@ fieldset.opciones.columna { flex-direction: column; gap: 10px; }
 .qr { display: block; width: 200px; height: 200px; margin: 10px 0; border-radius: 8px; background: #fff; padding: 6px; }
 .secreto { word-break: break-all; font-size: 13px; }
 .otp { font-size: 22px; letter-spacing: .3em; text-align: center; font-family: ui-monospace, Consolas, monospace; }
+
+.lista-empresas { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.empresa-tarjeta { display: flex; align-items: center; gap: 12px; text-align: left; background: var(--superficie); border: 1px solid var(--linea); border-radius: 12px; padding: 12px 14px; cursor: pointer; font: inherit; color: var(--tinta); }
+.empresa-tarjeta:hover { border-color: var(--brand); }
+.empresa-tarjeta small { display: block; color: var(--suave); font-size: 13px; }
+
+.empresa-admin { border: 1px solid var(--linea); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.empresa-admin-cab { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.miembros { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.miembros li { display: flex; gap: 10px; align-items: center; }
+.etq-rol { font-size: 12px; border: 1px solid var(--linea); border-radius: 6px; padding: 0 6px; color: var(--suave); }
+.empresa-nueva { border-top: 1px dashed var(--linea); padding-top: 10px; }
