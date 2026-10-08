@@ -173,6 +173,10 @@ export default function App() {
       vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Documentación" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
     case "vincular":
       vista = <VincularEmpresa onHecho={() => misEmpresas().then(setEmpresas)} />; break;
+    case "prompts":
+      vista = <Proximamente titulo="Prompts y skills" texto="Biblioteca de prompts y skills de IA preparados para tu despacho o empresa (contratos, contabilidad, cumplimiento…). Será un servicio adicional." />; break;
+    case "papeleria":
+      vista = <Proximamente titulo="Papelería corporativa" texto="Facturas, hoja de carta e informes con el logo, los colores y los datos legales de la empresa (CIF, domicilio, inscripción registral)." />; break;
     case "seguridad":
       vista = <Seguridad config={config} />; break;
     case "guias/asociaciones":
@@ -208,6 +212,10 @@ export default function App() {
     ajustes: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z",
     empresa: "M4 21V5a1 1 0 011-1h9a1 1 0 011 1v16M15 9h4a1 1 0 011 1v11M8 8h3M8 12h3M8 16h3M3 21h18",
     salir: "M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4M10 17l5-5-5-5M15 12H3",
+    punto: "M12 12h.01",
+    chispa: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z",
+    papel: "M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4",
+    ia: "M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2M7 7h10v10H7zM10 10h4v4h-4z",
   };
   const Ico = ({ n }) => <svg className="ico-menu" viewBox="0 0 24 24" aria-hidden><path d={I[n]} /></svg>;
   const Item = ({ r, icono, children, insignia }) => (
@@ -242,14 +250,22 @@ export default function App() {
             <Item r="empresa/carpeta" icono="carpeta">Carpeta de la empresa</Item>
             <Item r="carpetas" icono="carpetas">Organizar carpetas</Item>
           </Seccion>
-          {tiene("contratos") && <Seccion titulo="Contratos">
-            <Item r="contratos/crear/cuentas-participacion" icono="contrato">Cuentas en participación</Item>
-            <Item r="contratos/crear/encargo-tratamiento" icono="contrato">Encargo del tratamiento</Item>
-          </Seccion>}
+          <Seccion titulo="Aplicaciones">
+            {tiene("contratos") && <>
+              <div className="menu-grupo-t"><Ico n="contrato" /><span>Contratos</span></div>
+              <div className="menu-sub">
+                <Item r="contratos/crear/cuentas-participacion" icono="punto">Cuentas en participación</Item>
+                <Item r="contratos/crear/encargo-tratamiento" icono="punto">Encargo del tratamiento</Item>
+              </div>
+            </>}
+            <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>
+            <Item r="papeleria" icono="papel">Papelería corporativa <em className="pronto">pronto</em></Item>
+          </Seccion>
           <Seccion titulo="Ayuda">
             <Item r="guias/asociaciones" icono="guia">Guía: asociaciones</Item>
             <Item r="seguridad" icono="escudo">Seguridad, datos e IA</Item>
           </Seccion>
+          <IaMenu />
           <div className="menu-pie">
             {yo.rol === "admin" && <Item r="usuarios" icono="usuarios" insignia={pendientes}>Usuarios y empresas</Item>}
             <Item r="vincular" icono="enlace">Vincular una empresa</Item>
@@ -262,6 +278,25 @@ export default function App() {
       <div className="velo" onClick={() => setMenuAbierto(false)} aria-hidden />
       <main className="principal">{vista}<footer className="pie-app">Documentos en {NUBES[config.nube].nombre} · {empresa.nombre} · Mi Despacho · bitini labs</footer></main>
     </div>
+  );
+}
+
+function Proximamente({ titulo, texto }) {
+  return (
+    <div className="app"><header className="app-cab"><div><div className="eyebrow">Aplicaciones · próximamente</div><h1>{titulo}</h1><p className="muted">{texto}</p></div></header>
+      <section className="tarjeta"><p>Estamos preparándola. Si quieres que esté activa en tu cuenta en cuanto salga, díselo a la administradora.</p></section></div>
+  );
+}
+
+// Estado de la IA del ordenador, siempre a la vista en el menú
+function IaMenu() {
+  const [e, setE] = useState(null);
+  const mirar = () => import("./ia-navegador.js").then((m) => m.estadoLocal()).then(setE).catch(() => setE({ ok: false }));
+  useEffect(() => { mirar(); const t = setInterval(mirar, 30000); return () => clearInterval(t); }, []);
+  return (
+    <button type="button" className={"ia-menu " + (e?.ok ? "ok" : e ? "no" : "")} onClick={mirar} title={e?.ok ? `IA de tu ordenador lista (${e.modelo})` : "La IA de tu ordenador no responde. Abre «IA local de Mi Despacho» en el escritorio; si Chrome pregunta por la red local, pulsa Permitir."}>
+      <span className="ia-punto" />{e == null ? "Comprobando la IA…" : e.ok ? "IA de tu ordenador lista" : "IA del ordenador apagada"}
+    </button>
   );
 }
 

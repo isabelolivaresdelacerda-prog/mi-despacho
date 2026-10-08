@@ -351,3 +351,15 @@ button.enlace-cuenta:hover { color: var(--brand); }
 .marco .principal { background: radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 60%), var(--papel); }
 .marco .tarjeta { box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04); border-radius: 16px; }
 .lateral { box-shadow: 1px 0 0 var(--linea), 6px 0 24px rgba(0,0,0,.03); }
+.menu-grupo-t { display: flex; align-items: center; gap: 11px; padding: 9px 12px 4px; font: 600 14.5px var(--sans); color: var(--tinta); }
+.menu-sub { margin-left: 21px; padding-left: 10px; border-left: 2px solid var(--linea); display: flex; flex-direction: column; gap: 1px; }
+.menu-sub .menu-item { font-size: 13.5px; padding: 7px 10px; }
+.menu-sub .ico-menu { width: 8px; height: 8px; stroke-width: 6; }
+.pronto { margin-left: auto; font-style: normal; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); border: 1px solid var(--linea); border-radius: 999px; padding: 1px 7px; }
+.menu-item.activo .pronto { color: var(--sobre-brand); border-color: currentColor; }
+.ia-menu { display: flex; align-items: center; gap: 8px; margin: 4px 4px 0; padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--linea); background: none; font: 500 12.5px var(--sans); color: var(--suave); cursor: pointer; text-align: left; }
+.ia-menu .ia-punto { width: 9px; height: 9px; border-radius: 50%; background: #bbb; flex: none; }
+.ia-menu.ok { color: #1d7a46; border-color: color-mix(in srgb, #1d7a46 35%, var(--linea)); }
+.ia-menu.ok .ia-punto { background: #1d9a56; box-shadow: 0 0 0 3px color-mix(in srgb, #1d9a56 25%, transparent); }
+.ia-menu.no { color: var(--aviso); }
+.ia-menu.no .ia-punto { background: var(--aviso); }
