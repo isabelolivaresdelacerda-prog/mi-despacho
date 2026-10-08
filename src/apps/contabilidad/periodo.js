@@ -1,6 +1,6 @@
 // Contabilidad por trimestre y por año: cifras clave, impuestos, lo que queda por gestionar y cierre del extracto.
 import { mayores, perdidasYGanancias, filtrarPeriodo, claveMov } from "./motor.js";
-import { fechaOrden, vencimientos, TIPOS_VINCULO } from "./datos.js";
+import { fechaOrden, vencimientos, TIPOS_VINCULO, num } from "./datos.js";
 
 export const TRAMOS = [["1", "1T"], ["2", "2T"], ["3", "3T"], ["4", "4T"], ["anio", "Año"]];
 const r2 = (x) => Math.round((+x || 0) * 100) / 100;
@@ -101,6 +101,9 @@ export function porGestionar(d, todos, pendientes, vinculados, r, hoy = new Date
     eP.filter((f) => f.total && noPagada(f, d)).map((f) => ({ fecha: f.fecha, texto: `${f.cliente || f.archivo} ${f.numero || ""}`, importe: f.total })));
   add("emitidas-sin-leer", "Facturas emitidas sin leer", "Están en la carpeta pero todavía no se han leído sus datos.", { tab: "facturas", sub: "emitidas", texto: "Leer" },
     emitidas.filter((f) => !f._leida && (enP(f.fecha) || sinFecha(f.fecha))).map((f) => ({ fecha: f.fecha, texto: f.archivo })));
+
+  add("vinculados-ia", "Escrituras y contratos leídos por la IA sin revisar", "La app los ha encontrado en la carpeta de la empresa y los ha vinculado a la contabilidad. Comprueba fecha, importe y tipo con el documento.", { tab: "vinculados", texto: "Revisar" },
+    vinculados.filter((v) => v.propuestoIA && !v.revisado).map((v) => ({ fecha: v.fecha || v.inicio || "", texto: `${(TIPOS_VINCULO[v.tipo] || {}).nombre || v.tipo} · ${v.archivo}`, importe: num(v.importe) || undefined })));
 
   const cuotas = [];
   for (const v of vinculados) {

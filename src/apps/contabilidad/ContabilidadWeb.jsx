@@ -1,5 +1,5 @@
 // Mi contabilidad: la app vive en Mi Despacho y los documentos se quedan en la carpeta de la empresa (OneDrive / Drive).
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { raizGuardada, buscarContabilidad, permiso as permisoRaiz } from "../../lib/carpetas.js";
 import {
   soportado, cargarTodo, CARPETAS, listar, abrir, subir,
@@ -14,6 +14,7 @@ import { rango, enRango } from "./periodo.js";
 import { generarDiario, usarPlan } from "./motor.js";
 import Impuestos, { impuestosParaDiario, otrosParaDiario } from "./Impuestos.jsx";
 import ExportarTodo from "./ExportarTodo.jsx";
+import { revisarCarpeta } from "./inventario.js";
 import { noPagada } from "./periodo.js";
 import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.js";
 import { EstadoIALocal, useAviso } from "../../comunes.jsx";
@@ -51,6 +52,13 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
     setExtra({ vinc, manuales, asig, cierres, presentados, otros });
   };
   const guardarExtra = async (k, v) => { await escribirJSON(raiz, ARCH[k], v); setExtra((e) => ({ ...e, [k]: v })); };
+
+  // Al abrir la contabilidad, la app revisa sola la carpeta de la empresa (solo lee lo nuevo)
+  const [revAuto, setRevAuto] = useState(0);
+  const revisado = useRef(false);
+  useEffect(() => { if (!datos || !empresa || !raiz || revisado.current) return; revisado.current = true;
+    revisarCarpeta({ empresa, raiz, propia }).then((x) => { setRevAuto((n) => n + 1); if (x.vinculados) { cargarExtra(); aviso(`La app ha leído ${x.nuevos.length} documentos nuevos de la carpeta de la empresa y ha vinculado ${x.vinculados} a la contabilidad. Revísalos en «Escrituras y contratos».`); } }).catch(() => {});
+  }, [datos]);
 
   const cargar = async (h = raiz) => {
     if (!h) return;
@@ -130,7 +138,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig }) {
         {tab === "banco" && <BancoPeriodo d={dd} raiz={raiz} recargar={cargar} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
         {tab === "impuestos" && <Impuestos raiz={raiz} d={dd} todos={diario.asientos} pendientes={diario.pendientes} anio={per.anio} anios={anios} cambiarAnio={(a) => cambiarPeriodo(a, per.tramo)} presentados={extra.presentados} guardar={(n) => guardarExtra("presentados", n)} otros={extra.otros} guardarOtros={(n) => guardarExtra("otros", n)} opciones={config?.calendario || {}} entidad={config?.empresa?.forma || "sl"} aviso={aviso} />}
         {tab === "libros" && <Libros datos={dd} diario={diario} extra={extra} guardarExtra={guardarExtra} r={r} sub={subLibros} setSub={setSubLibros} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
-        {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} onCambio={() => cargarExtra()} />}
+        {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} onCambio={() => cargarExtra()} propia={propia} revisionAuto={revAuto} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
         {tab === "exportar" && <ExportarTodo d={dd} diario={diario} extra={extra} r={r} config={config} raiz={raiz} aviso={aviso} />}
       </>}
