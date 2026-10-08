@@ -72,7 +72,9 @@ export function cifras(todos, movimientos, pendientes, r, d = null) {
 
 // Lo que queda por gestionar en el periodo (más lo que no tiene fecha y por eso no cae en ningún periodo)
 export function porGestionar(d, todos, pendientes, vinculados, r, hoy = new Date().toISOString().slice(0, 10)) {
-  const { facturas, emitidas = [], movimientos } = d;
+  const { movimientos } = d;
+  // Copias y documentos que no son factura no cuentan para nada
+  const facturas = d.facturas.filter((f) => !f._duplicadoDe && !f.noFactura), emitidas = (d.emitidas || []).filter((f) => !f._duplicadoDe && !f.noFactura);
   const enP = (f) => enRango(f, r);
   const sinFecha = (f) => fechaOrden(f).startsWith("9999");
   const L = [];
@@ -108,11 +110,14 @@ export function porGestionar(d, todos, pendientes, vinculados, r, hoy = new Date
     facturas.filter((f) => !f._leida && (enP(f.fecha) || sinFecha(f.fecha))).map((f) => ({ fecha: f.fecha, texto: f.archivo })));
   add("sin-fecha", "Facturas sin fecha o sin importe", "No se pueden colocar en ningún trimestre hasta completarlas.", { tab: "facturas", texto: "Corregir" },
     facturas.filter((f) => f._leida && (sinFecha(f.fecha) || !f.total)).map((f) => ({ fecha: f.fecha || "—", texto: `${f.proveedor || ""} ${f.archivo}`.trim(), importe: f.total ? -f.total : undefined })));
-  add("ia-sin-revisar", "Propuestas de la IA sin revisar", "Datos leídos por la IA que ninguna persona ha comprobado todavía.", { tab: "facturas", texto: "Revisar" },
-    fP.filter((f) => f.analizado_ia && !f._editada).map((f) => ({ fecha: f.fecha, texto: `${f.proveedor || f.archivo} ${f.numero || ""}`, importe: f.total ? -f.total : undefined })));
+  // Solo las lecturas de la IA que no cuadran (falta proveedor o fecha, o la base + IVA − retención supera el total): las que cuadran se dan por buenas
+  const dudosa = (f) => !f.proveedor || sinFecha(f.fecha) || !f.total || (f.base || 0) + (f.iva_importe || 0) - (f.retencion_importe || 0) > f.total + 0.02 || (f.iva_pct && f.base && Math.abs(f.base * f.iva_pct / 100 - (f.iva_importe || 0)) > 0.06);
+  add("ia-sin-revisar", "Lecturas de la IA que no cuadran", "La IA ha leído estas facturas pero algún dato no encaja (falta el proveedor o la fecha, o los importes no suman). Ábrelas y corrígelas.", { tab: "facturas", texto: "Revisar" },
+    fP.filter((f) => f.analizado_ia && !f._editada && dudosa(f)).map((f) => ({ fecha: f.fecha, texto: `${f.proveedor || f.archivo} ${f.numero || ""}`, importe: f.total ? -f.total : undefined })));
 
   add("cargos-sin-justificante", "Cargos del banco sin su justificante", "Cada cargo debería tener el documento individual del banco (adeudo, recibo, orden de transferencia) en «documentos_banco». Descárgalo de la banca online y súbelo, o asócialo si ya está.", { tab: "banco", texto: "Asociar justificantes" },
-    movimientos.filter((m) => enP(m.fecha) && m.importe < 0 && !m._justificante).map((m) => ({ fecha: m.fecha, texto: m.concepto, importe: m.importe })));
+    // Las compras con tarjeta, comisiones e impuestos ya se justifican con su factura o con el extracto; y si el pago ya tiene su factura, basta
+    movimientos.filter((m) => enP(m.fecha) && m.importe < 0 && !m._justificante && !m._factura && !/OP\.?TARJ|COMIS|HACIENDA|TRIBUTO|RECIBO/i.test(m.concepto || "")).map((m) => ({ fecha: m.fecha, texto: m.concepto, importe: m.importe })));
   const eP = emitidas.filter((f) => enP(f.fecha));
   add("emitidas-sin-cobro", "Facturas emitidas sin cobro en el banco", "No se ha encontrado en el extracto un cobro por el mismo importe: pendiente de cobrar o cobrada por otra vía.", { tab: "facturas", sub: "emitidas", texto: "Revisar" },
     eP.filter((f) => f.total && noPagada(f, d)).map((f) => ({ fecha: f.fecha, texto: `${f.cliente || f.archivo} ${f.numero || ""}`, importe: f.total })));

@@ -61,7 +61,7 @@ async function analizar(doc, propia) {
 }
 
 // Revisa la carpeta: devuelve { total, nuevos: [...], vinculados: n }. onPaso(texto) informa del progreso.
-export async function revisarCarpeta({ empresa, raiz, propia, onPaso }) {
+export async function revisarCarpeta({ empresa, raiz, propia, onPaso, reintentar = false }) {
   const inv = await leerJSON(raiz, ARCHIVO, { docs: {} });
   const docs = await recorrer(empresa);
   const nuevos = [];
@@ -91,14 +91,14 @@ export async function revisarCarpeta({ empresa, raiz, propia, onPaso }) {
   }
   // Limpieza de revisiones antiguas: los vínculos hechos solo por el nombre (sin que la IA leyera el documento) se quitan
   // y esos documentos, junto con los «sin clasificar», se vuelven a leer ahora (con OCR y la IA).
-  const autoNombre = (v) => v.propuestoIA && !v.revisado && /por el nombre|sin texto|sin IA/i.test(v.ia || "");
+  const autoNombre = (v) => reintentar && v.propuestoIA && !v.revisado && /por el nombre|sin texto|sin IA/i.test(v.ia || "");
   const quitar = new Set(vinc.filter(autoNombre).map((v) => [...v.ruta, v.archivo].join("/")));
   if (quitar.size) { for (let j = vinc.length - 1; j >= 0; j--) if (autoNombre(vinc[j])) vinc.splice(j, 1); cambiosVinc = true; }
   const yaVinc = new Set(vinc.map((v) => [...v.ruta, v.archivo].join("/")));
   const yaEnCola = new Set(nuevos.map((d) => d.k));
   for (const d of docs) {
     const k = [...d.ruta, d.nombre].join("/"), prev = inv.docs[k];
-    if (yaEnCola.has(k) || !prev) continue;
+    if (yaEnCola.has(k) || !prev || !reintentar) continue;
     if (quitar.has(k) || prev.estado === "sin clasificar" || prev.estado === "pendiente de IA" || /app\/|node_modules/.test(k)) { nuevos.push({ ...d, k, cambiado: true }); yaEnCola.add(k); }
   }
   for (const k of Object.keys(inv.docs)) if (/^(app|node_modules)\//.test(k)) delete inv.docs[k];

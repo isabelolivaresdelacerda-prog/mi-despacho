@@ -391,3 +391,7 @@ label small { font-size: 12px; }
 .fila-checks label { display: flex; gap: 8px; align-items: flex-start; }
 .aviso-ia-clave { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex-basis: 100%; }
 .aviso-ia-clave input { flex: 1 1 220px; }
+.tarea-ia { margin: 12px 0; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--acento, #2f5d50) 8%, transparent); border: 1px solid color-mix(in srgb, var(--acento, #2f5d50) 30%, transparent); font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.tarea-ia.hecha { background: color-mix(in srgb, #1d9a56 8%, transparent); border-color: color-mix(in srgb, #1d9a56 30%, transparent); }
+.girando { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; animation: girar 0.9s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }

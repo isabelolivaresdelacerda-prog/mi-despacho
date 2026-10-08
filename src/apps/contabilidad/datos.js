@@ -37,7 +37,7 @@ export const CARPETAS = [
   { id: "seguros", nombre: "Seguros" },
 ];
 
-async function sub(dir, nombre, crear = false) {
+export async function sub(dir, nombre, crear = false) {
   try { return await dir.getDirectoryHandle(nombre, { create: crear }); } catch { return null; }
 }
 export async function listar(raiz, carpeta) {

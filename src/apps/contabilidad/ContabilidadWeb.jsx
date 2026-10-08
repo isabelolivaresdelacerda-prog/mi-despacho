@@ -33,6 +33,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
   const [aviso, nodoAviso] = useAviso();
   const [enviar, setEnviar] = useState(false);
   const [subLibros, setSubLibros] = useState("diario");
+  const [tarea, setTarea] = useState(null); // «Hacer todo con la IA»: { paso, res }
   // Periodo de trabajo: año + trimestre (1-4) o el año entero; se recuerda por usuario y empresa
   const [per, setPer] = useState(() => {
     try { const g = JSON.parse(localStorage.getItem("md-conta-periodo") || "null"); if (g?.anio) return g; } catch { /* nada */ }
@@ -150,10 +151,18 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
   return (
     <div className="app">
       <Cabecera carpeta={`${empresa.name} › 004 ADMINISTRACIÓN › ${raiz.name}`} acciones={<>
-        <button className="btn" type="button" disabled={!datos} onClick={() => setEnviar(true)}>Enviar a la gestoría</button>
+        <button className="btn" type="button" disabled={!datos || !!tarea?.paso} title="Lee todas las facturas y documentos del banco (con OCR si son escaneados), los renombra con tu formato, puntea el banco y revisa la carpeta de la empresa" onClick={async () => {
+          setTarea({ paso: "Empezando…" });
+          const { hacerTodo } = await import("./tareasIA.js");
+          const res = await hacerTodo({ raiz, empresa, propia, datos: corregirPropia(datos, propia), onPaso: (t) => setTarea((x) => ({ ...x, paso: t })) });
+          setTarea({ paso: "", res }); await cargarExtra(); await cargar();
+        }}>{tarea?.paso ? "La IA está trabajando…" : "✨ Hacer todo con la IA"}</button>
+        <button className="btn ghost" type="button" disabled={!datos} onClick={() => setEnviar(true)}>Enviar a la gestoría</button>
         <button className="btn ghost" type="button" onClick={() => cargar()}>{cargando ? "Leyendo…" : "Actualizar"}</button>
         <a className="btn ghost" href="#/carpetas">Carpetas</a>
       </>} />
+      {tarea && (tarea.paso ? <div className="tarea-ia" role="status"><span className="girando" aria-hidden="true" /> <strong>La IA está trabajando en tu ordenador.</strong> {tarea.paso} <span className="muted">Puedes seguir usando la app; no cierres esta pestaña.</span></div>
+        : tarea.res && <div className="tarea-ia hecha" role="status"><strong>Hecho.</strong> {tarea.res.facturas} facturas leídas{tarea.res.ilegibles ? ` (${tarea.res.ilegibles} ilegibles: rellénalas a mano)` : ""} · {tarea.res.banco} documentos del banco leídos ({tarea.res.punteables} con importe para puntear) · {tarea.res.renombrados} renombrados · {tarea.res.punteados || 0} movimientos del banco punteados{tarea.res.inventario ? ` · carpeta de la empresa: ${tarea.res.inventario.nuevos.length} documentos leídos, ${tarea.res.inventario.vinculados} vinculados` : ""}.{tarea.res.errores.length > 0 && <details><summary>{tarea.res.errores.length} avisos</summary><ul className="pequeño">{tarea.res.errores.slice(0, 30).map((e, i) => <li key={i}>{e}</li>)}</ul></details>} <button className="enlace" type="button" onClick={() => setTarea(null)}>Cerrar</button></div>)}
       <nav className="cont-tabs" role="tablist">
         {PESTANAS.map(([k, t]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t}{k === "bandeja" && nEntrada > 0 && <span className="insignia">{nEntrada}</span>}</button>)}
       </nav>
