@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { leerConfig, guardarConfig, TIPOS } from "./almacen.js";
 import { NUBES } from "./nube.js";
 import Bienvenida from "./Bienvenida.jsx";
-import Ajustes from "./Ajustes.jsx";
+import Ajustes, { FormIA } from "./Ajustes.jsx";
+import { EstadoIALocal } from "./comunes.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
@@ -191,6 +192,8 @@ export default function App() {
       vista = <VistaCarpeta titulo="Carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} contabilidad config={config} />; break;
     case "usuarios":
       vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
+    case "ia":
+      vista = <PaginaIA />; break;
     case "ajustes":
       vista = <><Ajustes config={config} guardar={guardar} /><div className="app"><AccesosEmpresa empresa={empresa} yo={yo} esTitular={empresa.rol === "titular"} /></div></>; break;
     default:
@@ -241,6 +244,7 @@ export default function App() {
           <Seccion titulo="General">
             <Item r="inicio" icono="inicio">Inicio</Item>
             <Item r="calendario" icono="calendario">Calendario</Item>
+            <Item r="ia" icono="chispa">Conectar la IA</Item>
           </Seccion>
           {tiene("contabilidad") && <Seccion titulo="Contabilidad">
             <Item r="contabilidad" icono="conta">Mi contabilidad</Item>
@@ -288,15 +292,52 @@ function Proximamente({ titulo, texto }) {
   );
 }
 
-// Estado de la IA del ordenador, siempre a la vista en el menú
+// Estado de la IA del ordenador, siempre a la vista en el menú. Al pulsar, lleva a «Conectar la IA».
 function IaMenu() {
   const [e, setE] = useState(null);
   const mirar = () => import("./ia-navegador.js").then((m) => m.estadoLocal()).then(setE).catch(() => setE({ ok: false }));
   useEffect(() => { mirar(); const t = setInterval(mirar, 30000); return () => clearInterval(t); }, []);
   return (
-    <button type="button" className={"ia-menu " + (e?.ok ? "ok" : e ? "no" : "")} onClick={mirar} title={e?.ok ? `IA de tu ordenador lista (${e.modelo})` : "La IA de tu ordenador no responde. Abre «IA local de Mi Despacho» en el escritorio; si Chrome pregunta por la red local, pulsa Permitir."}>
-      <span className="ia-punto" />{e == null ? "Comprobando la IA…" : e.ok ? "IA de tu ordenador lista" : "IA del ordenador apagada"}
-    </button>
+    <a href="#/ia" className={"ia-menu " + (e?.ok ? "ok" : e ? "no" : "")} onClick={mirar} title={e?.ok ? `IA de tu ordenador lista (${e.modelo})` : "Pulsa para conectar la IA de tu ordenador"}>
+      <span className="ia-punto" />{e == null ? "Comprobando la IA…" : e.ok ? "IA de tu ordenador lista" : "IA apagada · conectar"}
+    </a>
+  );
+}
+
+// Página para conectar la IA: estado, botón que pide a Chrome el permiso de red local y ajustes de la IA
+function PaginaIA() {
+  const [r, setR] = useState(null);
+  const conectar = async () => {
+    setR({ estado: "probando" });
+    const m = await import("./ia-navegador.js");
+    const e = await m.estadoLocal();
+    if (!e.ok) return setR({ estado: "no", e });
+    const p = await m.preguntarIA("Responde solo: OK", { maxTokens: 10 });
+    setR({ estado: p.estado === "ok" ? "ok" : "no", e, p });
+  };
+  return (
+    <div className="app">
+      <header className="app-cab"><div><div className="eyebrow">General</div><h1>Conectar la IA</h1>
+        <p className="muted">La IA lee tus facturas, escrituras y extractos en tu propio ordenador. Ningún documento sale de él.</p></div></header>
+      <section className="tarjeta">
+        <h2>1. Enciende la IA de tu ordenador</h2>
+        <EstadoIALocal />
+      </section>
+      <section className="tarjeta">
+        <h2>2. Deja que esta web hable con ella</h2>
+        <p>Esta dirección ({location.host}) es nueva para Chrome, así que hay que darle permiso una vez. Pulsa el botón y, si Chrome pregunta <em>«Buscar dispositivos de tu red local»</em> o <em>«Acceder a la red local»</em>, pulsa <strong>Permitir</strong>.</p>
+        <p><button className="btn" type="button" onClick={conectar} disabled={r?.estado === "probando"}>{r?.estado === "probando" ? "Probando…" : "Conectar y probar la IA"}</button></p>
+        {r?.estado === "ok" && <p className="ok-texto">✓ Conectada: {r.e.modelo} ha respondido. Ya puedes usarla en contabilidad y documentos.</p>}
+        {r?.estado === "no" && <div className="ia-local falta">
+          <p><strong>No responde.</strong> {r.e?.motivo === "cargando" ? "Se está encendiendo: espera unos segundos y vuelve a probar." : "Comprueba que la ventana «IA local de Mi Despacho» está abierta y diga que está lista."}</p>
+          <p>Si está abierta y aun así no conecta, es el permiso de Chrome: pulsa el icono a la izquierda de la dirección (🔒 o ⚙) → <em>Configuración del sitio</em> → <em>Acceso a la red local</em> → <strong>Permitir</strong>, y recarga la página.</p>
+        </div>}
+      </section>
+      <section className="tarjeta">
+        <h2>3. Cómo trabaja</h2>
+        <FormIA />
+      </section>
+    </div>
   );
 }
 

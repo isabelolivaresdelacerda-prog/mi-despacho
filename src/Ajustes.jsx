@@ -79,7 +79,7 @@ export function FormNube({ datos, cambiar }) {
   );
 }
 
-function FormIA() {
+export function FormIA() {
   const [modo, setModo] = useState(leerModo());
   const [claves, setClaves] = useState(leerClaves());
   const [ver, setVer] = useState({});

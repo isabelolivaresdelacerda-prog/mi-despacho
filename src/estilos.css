@@ -363,3 +363,5 @@ button.enlace-cuenta:hover { color: var(--brand); }
 .ia-menu.ok .ia-punto { background: #1d9a56; box-shadow: 0 0 0 3px color-mix(in srgb, #1d9a56 25%, transparent); }
 .ia-menu.no { color: var(--aviso); }
 .ia-menu.no .ia-punto { background: var(--aviso); }
+.ok-texto { color: #1d7a46; font-weight: 600; }
+a.ia-menu { text-decoration: none; }
