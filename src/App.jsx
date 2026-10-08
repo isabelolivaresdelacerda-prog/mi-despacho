@@ -193,59 +193,74 @@ export default function App() {
       vista = <Inicio config={config} ir={ir} />;
   }
 
-  const Enl = ({ r, children }) => (
-    <a href={"#/" + r} className={ruta === r ? "active" : ""} aria-current={ruta === r ? "page" : undefined} onClick={() => document.activeElement?.blur()}>{children}</a>
-  );
-  // Desplegable estilo Patriam: el título del grupo y sus opciones debajo
-  const Despl = ({ titulo, items, insignia }) => {
-    const activo = items.some((x) => x && ruta === x.ruta);
-    return (
-      <div className="despl">
-        <button type="button" className={"despl-btn" + (activo ? " active" : "")} aria-haspopup="true">{titulo}{insignia > 0 && <span className="insignia">{insignia}</span>} <span aria-hidden>▾</span></button>
-        <div className="despl-menu">{items.filter(Boolean).map((x) => x.accion
-          ? <button key={x.titulo} type="button" onClick={() => { document.activeElement?.blur(); x.accion(); }}>{x.titulo}</button>
-          : <Enl key={x.ruta} r={x.ruta}>{x.titulo}{x.insignia > 0 && <span className="insignia">{x.insignia}</span>}</Enl>)}</div>
-      </div>
-    );
+  // Iconos de línea, todos del mismo estilo
+  const I = {
+    inicio: "M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z",
+    calendario: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4",
+    conta: "M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6",
+    carpeta: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z",
+    carpetas: "M3 7h6l2 2h10v9H3zM7 4h5",
+    contrato: "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6",
+    guia: "M5 4h10a4 4 0 014 4v12H9a4 4 0 01-4-4zM5 16a4 4 0 014-4h10",
+    escudo: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z",
+    usuarios: "M9 11a4 4 0 100-8 4 4 0 000 8zM2 21a7 7 0 0114 0M17 11a3 3 0 100-6M22 21a6 6 0 00-5-6",
+    enlace: "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1",
+    ajustes: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z",
+    empresa: "M4 21V5a1 1 0 011-1h9a1 1 0 011 1v16M15 9h4a1 1 0 011 1v11M8 8h3M8 12h3M8 16h3M3 21h18",
+    salir: "M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4M10 17l5-5-5-5M15 12H3",
   };
-  const apps = MENU.filter((m) => config.apps[m.app]);
+  const Ico = ({ n }) => <svg className="ico-menu" viewBox="0 0 24 24" aria-hidden><path d={I[n]} /></svg>;
+  const Item = ({ r, icono, children, insignia }) => (
+    <a href={"#/" + r} className={"menu-item" + (ruta === r ? " activo" : "")} aria-current={ruta === r ? "page" : undefined}>
+      <Ico n={icono} /><span>{children}</span>{insignia > 0 && <span className="insignia">{insignia}</span>}
+    </a>
+  );
+  const Seccion = ({ titulo, children }) => <div className="menu-seccion"><div className="menu-seccion-t">{titulo}</div>{children}</div>;
+  const tiene = (app) => config.apps[app];
 
   return (
-    <div className="sitio-app" style={tema}>
-      <header className="cabecera">
-        <div className="cabecera-in">
-          <a href="#/inicio" className="logo-cab" aria-label="Inicio">{config.logo ? <img src={config.logo} alt={config.nombre || "Mi Despacho"} /> : <><Logo config={config} /><span className="nombre-cab">{config.nombre || "Mi Despacho"}</span></>}</a>
-          <div className="cabecera-derecha">
-            {(empresas.length > 1 || yo.rol === "admin") && <button type="button" className="enlace-cuenta" title="Cambiar de empresa" onClick={() => { fijarEspacio(null); setEmpresa(null); }}>🏢 <span className="texto-cuenta">{empresa.nombre}</span></button>}
-            <span className="enlace-cuenta" title={yo.email}>
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0" /></svg>
-              <span className="texto-cuenta">{yo.nombre || yo.email}</span>
-            </span>
-            <button type="button" className="btn btn-cabecera" onClick={salir}>Salir</button>
-          </div>
+    <div className={"marco" + (menuAbierto ? " menu-abierto" : "")} style={tema}>
+      <aside className="lateral">
+        <div className="lateral-cab">
+          <a href="#/inicio" className="marca-lat">{config.logo ? <img src={config.logo} alt={config.nombre || "Mi Despacho"} /> : <><Logo config={config} /><span>{config.nombre || "Mi Despacho"}</span></>}</a>
+          <button className="btn-menu" type="button" aria-label="Abrir el menú" aria-expanded={menuAbierto} onClick={() => setMenuAbierto(!menuAbierto)}>☰</button>
         </div>
-        <nav className="menu-principal" aria-label="Menú principal">
-          <div className="menu-in">
-            <Enl r="inicio">Inicio</Enl>
-            <Enl r="calendario">Calendario</Enl>
-            {apps.map((m) => <Despl key={m.app} titulo={m.titulo} items={m.hijos} />)}
-            <Despl titulo="Utilidades" items={[
-              { ruta: "carpetas", titulo: "Organizar las carpetas de la empresa" },
-              { ruta: "guias/asociaciones", titulo: "Guía: contabilidad de asociaciones" },
-              { ruta: "seguridad", titulo: "Seguridad, datos e IA" },
-            ]} />
-            <Despl titulo="Administración" insignia={yo.rol === "admin" ? pendientes : 0} items={[
-              yo.rol === "admin" && { ruta: "usuarios", titulo: "Usuarios y empresas", insignia: pendientes },
-              { ruta: "vincular", titulo: "Vincular una empresa (gestorías)" },
-              { ruta: "ajustes", titulo: "Ajustes de la empresa" },
-              (empresas.length > 1 || yo.rol === "admin") && { titulo: "Cambiar de empresa", accion: () => { fijarEspacio(null); setEmpresa(null); } },
-              { titulo: "Salir", accion: salir },
-            ]} />
+        <div className="quien-lat">
+          <strong>{yo.nombre || yo.email}</strong>
+          <span>{empresa.nombre}</span>
+        </div>
+        <nav className="menu">
+          <Seccion titulo="General">
+            <Item r="inicio" icono="inicio">Inicio</Item>
+            <Item r="calendario" icono="calendario">Calendario</Item>
+          </Seccion>
+          {tiene("contabilidad") && <Seccion titulo="Contabilidad">
+            <Item r="contabilidad" icono="conta">Mi contabilidad</Item>
+            <Item r="contabilidad/carpeta" icono="carpeta">Carpeta de contabilidad</Item>
+          </Seccion>}
+          <Seccion titulo="Documentos">
+            <Item r="empresa/carpeta" icono="carpeta">Carpeta de la empresa</Item>
+            <Item r="carpetas" icono="carpetas">Organizar carpetas</Item>
+          </Seccion>
+          {tiene("contratos") && <Seccion titulo="Contratos">
+            <Item r="contratos/crear/cuentas-participacion" icono="contrato">Cuentas en participación</Item>
+            <Item r="contratos/crear/encargo-tratamiento" icono="contrato">Encargo del tratamiento</Item>
+          </Seccion>}
+          <Seccion titulo="Ayuda">
+            <Item r="guias/asociaciones" icono="guia">Guía: asociaciones</Item>
+            <Item r="seguridad" icono="escudo">Seguridad, datos e IA</Item>
+          </Seccion>
+          <div className="menu-pie">
+            {yo.rol === "admin" && <Item r="usuarios" icono="usuarios" insignia={pendientes}>Usuarios y empresas</Item>}
+            <Item r="vincular" icono="enlace">Vincular una empresa</Item>
+            <Item r="ajustes" icono="ajustes">Ajustes</Item>
+            {(empresas.length > 1 || yo.rol === "admin") && <button className="menu-item" type="button" onClick={() => { fijarEspacio(null); setEmpresa(null); }}><Ico n="empresa" /><span>Cambiar de empresa</span></button>}
+            <button className="menu-item" type="button" onClick={salir}><Ico n="salir" /><span>Salir</span></button>
           </div>
         </nav>
-      </header>
-      <main className="principal">{vista}</main>
-      <footer className="pie-app">Documentos en {NUBES[config.nube].nombre} · {empresa.nombre} · Mi Despacho · bitini labs</footer>
+      </aside>
+      <div className="velo" onClick={() => setMenuAbierto(false)} aria-hidden />
+      <main className="principal">{vista}<footer className="pie-app">Documentos en {NUBES[config.nube].nombre} · {empresa.nombre} · Mi Despacho · bitini labs</footer></main>
     </div>
   );
 }
