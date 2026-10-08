@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { abrirRuta, buscarContabilidad, QUE_VA } from "./carpetas.js";
 import { useRaiz } from "./CarpetasUI.jsx";
 import "./explorador.css";
-import { proponerNombre, renombrarArchivo, cumpleFormato, prefijoEmpresa } from "./renombrar.js";
+import { proponerNombre, propuestaRapida, renombrarArchivo, cumpleFormato, prefijoEmpresa } from "./renombrar.js";
 
 const ICONOS = [
   [/\.pdf$/i, "📕", "PDF"], [/\.(docx?|odt|rtf)$/i, "📘", "Word"], [/\.(xlsx?|csv|ods)$/i, "📗", "Excel"],
@@ -137,7 +137,7 @@ export default function Explorador({ titulo, eyebrow, contabilidad = false, conf
             <div className="expl-acciones">
               <input className="expl-buscar" placeholder="Buscar aquí…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
               <button className="btn ghost" type="button" onClick={() => setNueva("")}>+ Carpeta</button>
-              {cont.archivos.some((a) => !cumpleFormato(a.n)) && <button className="btn ghost" type="button" onClick={() => setLote(cont.archivos.filter((a) => !cumpleFormato(a.n)).map((a) => ({ a, nuevo: "", marcado: true, estado: "" })))} title="Poner a los documentos de esta carpeta el nombre con tu formato">Ordenar nombres</button>}
+              {cont.archivos.some((a) => !cumpleFormato(a.n)) && <button className="btn ghost" type="button" onClick={() => setLote(cont.archivos.filter((a) => !cumpleFormato(a.n)).map((a) => ({ a, nuevo: propuestaRapida(a.f, a.n, prefijo), marcado: true, estado: "propuesta rápida: pulsa «Leer con IA» para afinar" })))} title="Poner a los documentos de esta carpeta el nombre con tu formato">Ordenar nombres</button>}
               <label className="btn">Subir<input type="file" multiple hidden onChange={(e) => { subir([...e.target.files]); e.target.value = ""; }} /></label>
             </div>
           </div>
@@ -169,7 +169,7 @@ export default function Explorador({ titulo, eyebrow, contabilidad = false, conf
                   return (
                     <tr key={"f" + a.n} onDoubleClick={() => abrirArchivo(a)}>
                       <td><div className="celda-nombre"><button type="button" className="expl-item" onClick={() => abrirArchivo(a)} title="Abrir"><span className="ico">{ico}</span>{a.n}</button>
-                        <button type="button" className="expl-ren" title="Renombrar con tu formato" onClick={() => setRen({ a, nuevo: "", metodo: "", cargando: true })}>✏️</button></div></td>
+                        <button type="button" className="expl-ren" title="Renombrar con tu formato" onClick={() => setRen({ a, nuevo: propuestaRapida(a.f, a.n, prefijo), metodo: "", cargando: true })}>✏️</button></div></td>
                       <td className="col-tipo muted">{t}</td><td className="col-fecha muted">{fecha(a.f.lastModified)}</td><td className="num col-tam muted">{tam(a.f.size)}</td>
                     </tr>
                   );
@@ -178,9 +178,9 @@ export default function Explorador({ titulo, eyebrow, contabilidad = false, conf
             </table>
           )}
           {ren && <DialogoRenombrar ren={ren} setRen={setRen} prefijo={prefijo} setPrefijo={guardarPrefijo} propia={propia}
-            aplicar={async (nuevo) => { const d = await abrirRuta(raiz, ruta); const f = await renombrarArchivo(d, ren.a.n, nuevo); setRen(null); setMsg(`Renombrado: ${f}`); recargar(); }} />}
+            aplicar={async (nuevo) => { try { const d = await abrirRuta(raiz, ruta); const f = await renombrarArchivo(d, ren.a.n, nuevo); setRen(null); setMsg(`Renombrado: ${f}`); } catch (e) { setRen(null); setMsg(`No se ha podido renombrar: ${e.message || e}`); } recargar(); }} />}
           {lote && <DialogoLote lote={lote} setLote={setLote} prefijo={prefijo} setPrefijo={guardarPrefijo} propia={propia}
-            aplicar={async () => { const d = await abrirRuta(raiz, ruta); let n = 0; for (const x of lote.filter((y) => y.marcado && y.nuevo)) { try { await renombrarArchivo(d, x.a.n, x.nuevo); n++; } catch { /* sigue */ } } setLote(null); setMsg(`${n} documentos renombrados`); recargar(); }} />}
+            aplicar={async () => { const d = await abrirRuta(raiz, ruta); let n = 0, err = ""; for (const x of lote.filter((y) => y.marcado && y.nuevo)) { try { await renombrarArchivo(d, x.a.n, x.nuevo); n++; } catch (e) { err = e.message || String(e); } } setLote(null); setMsg(`${n} documentos renombrados${err ? ` · aviso: ${err}` : ""}`); recargar(); }} />}
           <p className="expl-pie">{cont.carpetas.length} carpetas · {cont.archivos.length} archivos · arrastra documentos aquí para guardarlos en esta carpeta</p>
         </section>
       </div>
@@ -196,7 +196,7 @@ function RamasDe({ raiz, ruta, sel, onSel, abiertas, alternar }) {
 }
 
 function DialogoRenombrar({ ren, setRen, prefijo, setPrefijo, propia, aplicar }) {
-  useEffect(() => { let vivo = true; proponerNombre(ren.a.f, ren.a.n, { propia, prefijo }).then((p) => vivo && setRen((r) => r && { ...r, nuevo: p.nombre, metodo: p.metodo, cargando: false })); return () => { vivo = false; }; }, [prefijo]);
+  useEffect(() => { let vivo = true; proponerNombre(ren.a.f, ren.a.n, { propia, prefijo }).then((p) => vivo && setRen((r) => r && { ...r, nuevo: r.tocado ? r.nuevo : p.nombre, metodo: p.metodo, cargando: false })).catch(() => vivo && setRen((r) => r && { ...r, cargando: false, metodo: "sin IA: revisa la fecha" })); return () => { vivo = false; }; }, [prefijo]);
   return (
     <div className="mc-fondo" role="dialog" aria-modal="true" aria-labelledby="rn-t">
       <div className="mc-dialogo">
@@ -205,7 +205,7 @@ function DialogoRenombrar({ ren, setRen, prefijo, setPrefijo, propia, aplicar })
           <p className="mc-nota">Ahora: <strong>{ren.a.n}</strong></p>
           <p className="pequeño muted">Formato: fecha AAMMDD, « - » y el título. Escrituras: título, protocolo y guion con las iniciales del notario (BI260423 - AMPLIACIÓN DE CAPITAL 1648-EDF). Contratos: CONTRATO DE … - CON QUIÉN.</p>
           <label className="mc-campo"><span>Prefijo de la empresa (opcional)</span><input value={prefijo} onChange={(e) => setPrefijo(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4))} placeholder="BI" /></label>
-          <label className="mc-campo"><span>Nuevo nombre {ren.cargando ? "(leyendo el documento…)" : ren.metodo ? `· ${ren.metodo}` : ""}</span><input value={ren.nuevo} onChange={(e) => setRen({ ...ren, nuevo: e.target.value })} /></label>
+          <label className="mc-campo"><span>Nuevo nombre {ren.cargando ? "(la IA está leyendo el documento para afinarlo; puedes renombrar ya)" : ren.metodo ? `· ${ren.metodo}` : ""}</span><input value={ren.nuevo} onChange={(e) => setRen({ ...ren, nuevo: e.target.value, tocado: true })} /></label>
         </div>
         <footer><button className="mc-btn sec" onClick={() => setRen(null)}>Cancelar</button><button className="mc-btn" disabled={!ren.nuevo.trim() || ren.nuevo === ren.a.n} onClick={() => aplicar(ren.nuevo.trim())}>Renombrar</button></footer>
       </div>
@@ -218,7 +218,7 @@ function DialogoLote({ lote, setLote, prefijo, setPrefijo, propia, aplicar }) {
   const proponer = async () => {
     for (let i = 0; i < lote.length; i++) {
       setTrabajando(`Leyendo ${i + 1} de ${lote.length}…`);
-      const p = await proponerNombre(lote[i].a.f, lote[i].a.n, { propia, prefijo });
+      let p; try { p = await proponerNombre(lote[i].a.f, lote[i].a.n, { propia, prefijo }); } catch { continue; }
       setLote((l) => l.map((x, j) => (j === i ? { ...x, nuevo: p.nombre, estado: p.metodo } : x)));
     }
     setTrabajando("");
@@ -230,7 +230,7 @@ function DialogoLote({ lote, setLote, prefijo, setPrefijo, propia, aplicar }) {
         <div className="mc-cuerpo">
           <p className="pequeño muted">{lote.length} documentos no siguen tu formato. La IA lee cada uno y propone el nombre; revisa y corrige antes de aplicar. Nunca se sobrescribe otro archivo.</p>
           <div className="fila"><label className="mc-campo"><span>Prefijo</span><input value={prefijo} onChange={(e) => setPrefijo(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4))} /></label>
-            <button className="btn" type="button" disabled={!!trabajando} onClick={proponer}>{trabajando || "Proponer nombres"}</button></div>
+            <button className="btn" type="button" disabled={!!trabajando} onClick={proponer}>{trabajando || "Leer con IA y afinar"}</button></div>
           <table className="tabla"><thead><tr><th></th><th>Ahora</th><th>Nuevo nombre</th></tr></thead>
             <tbody>{lote.map((x, i) => <tr key={x.a.n}><td><input type="checkbox" checked={x.marcado} onChange={(e) => setLote(lote.map((y, j) => (j === i ? { ...y, marcado: e.target.checked } : y)))} /></td>
               <td className="pequeño">{x.a.n}</td>

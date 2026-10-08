@@ -34,6 +34,14 @@ TEXTO:
 `;
 
 // Lee el documento (PDF con texto) y propone el nombre; si no se puede leer, propone a partir del nombre actual
+// Propuesta inmediata, sin leer el documento (fecha del archivo y nombre actual)
+export function propuestaRapida(file, nombreActual, prefijo) {
+  const base = nombreActual.replace(/\.[^.]+$/, "").replace(/^[A-Z]{0,4}\d{6}\s*-\s*/, "");
+  const f = new Date(file?.lastModified || Date.now());
+  const info = { clase: /escritura|esc\b/i.test(base) ? "escritura" : /contrato/i.test(base) ? "contrato" : "otro", fecha: `${f.getDate()}/${f.getMonth() + 1}/${f.getFullYear()}`, titulo: base };
+  return nombreSegunFormato(info, prefijo, ext(nombreActual).toLowerCase());
+}
+
 export async function proponerNombre(file, nombreActual, { propia, prefijo } = {}) {
   let info = null, metodo = "por el nombre actual";
   if (/\.pdf$/i.test(nombreActual)) {
@@ -41,7 +49,8 @@ export async function proponerNombre(file, nombreActual, { propia, prefijo } = {
       const { textoPDF } = await import("../apps/contabilidad/leer.js");
       const texto = await textoPDF(file, 4);
       if (texto.length > 40) {
-        const r = await preguntarIA(PROMPT(propia) + texto.slice(0, 7000), { maxTokens: 300, json: true });
+        // La IA tiene 40 s; si no responde (apagada o colgada), se propone sin ella
+        const r = await Promise.race([preguntarIA(PROMPT(propia) + texto.slice(0, 7000), { maxTokens: 300, json: true }), new Promise((ok) => setTimeout(() => ok({ estado: "tiempo" }), 40000))]);
         const m = r.estado === "ok" && String(r.texto).match(/\{[\s\S]*\}/);
         if (m) { info = JSON.parse(m[0]); metodo = `IA (${r.ia})`; }
       }
@@ -56,16 +65,19 @@ export async function proponerNombre(file, nombreActual, { propia, prefijo } = {
   return { nombre: nombreSegunFormato(info, prefijo, ext(nombreActual).toLowerCase()), info, metodo };
 }
 
-// Cambia el nombre de un archivo dentro de su carpeta (sin sobrescribir nunca otro)
+// Cambia el nombre de un archivo dentro de su carpeta (sin sobrescribir nunca otro). Pide permiso de escritura si hace falta.
 export async function renombrarArchivo(dir, nombreActual, nuevo) {
   if (nombreActual === nuevo) return nuevo;
+  if (!dir) throw new Error("No encuentro la carpeta. Vuelve a abrirla.");
+  if (dir.queryPermission && (await dir.queryPermission({ mode: "readwrite" })) !== "granted" && (await dir.requestPermission({ mode: "readwrite" })) !== "granted")
+    throw new Error("Sin permiso para cambiar archivos en esta carpeta. Pulsa «Permitir» cuando Chrome lo pregunte.");
   let final = nuevo;
   const [b, e] = nuevo.match(/^(.*?)(\.[^.]+)?$/).slice(1);
   for (let i = 2; i < 100; i++) { try { await dir.getFileHandle(final); final = `${b} (${i})${e || ""}`; } catch { break; } }
   const h = await dir.getFileHandle(nombreActual);
-  if (typeof h.move === "function") { await h.move(final); return final; }
+  if (typeof h.move === "function") { try { await h.move(final); return final; } catch { /* algunos Chrome no lo permiten en disco: se copia */ } }
   const f = await h.getFile();
   const w = await (await dir.getFileHandle(final, { create: true })).createWritable(); await w.write(f); await w.close();
-  await dir.removeEntry(nombreActual);
+  try { await dir.removeEntry(nombreActual); } catch { throw new Error(`Copiado como «${final}», pero no he podido quitar el original (¿está abierto en otro programa?).`); }
   return final;
 }
