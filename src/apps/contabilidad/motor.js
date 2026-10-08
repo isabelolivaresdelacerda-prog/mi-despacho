@@ -238,7 +238,9 @@ function sinPagarPorSaldo(A, pendFactura, todas) {
   const out = new Set();
   for (const [c, fs] of Object.entries(porCta)) {
     let falta = c.startsWith("430") ? r2(saldo[c] || 0) : r2(-(saldo[c] || 0)); // lo que aún se debe (o nos deben)
-    for (const f of [...fs].sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha)))) { if (falta <= 0.01) break; out.add(f.archivo); falta = r2(falta - f.total); }
+    // Las que tienen su propio pago casado (por número, importe o elegido a mano) están pagadas; lo que quede debiendo
+    // la cuenta se reparte solo entre las que no lo tienen, empezando por las más recientes
+    for (const f of [...fs].filter((x) => !x._pago && !x._cobro).sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha)))) { if (falta <= 0.01) break; out.add(f.archivo); falta = r2(falta - f.total); }
   }
   return out;
 }
