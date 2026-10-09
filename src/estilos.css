@@ -373,6 +373,9 @@ a.ia-menu { text-decoration: none; }
 
 /* --- Contratos: añadidos para el contrato de encargo (mismo sistema que cuentas en participación) --- */
 .documento .subtitulo { text-align: center; font-style: italic; font-size: 13.5px; color: var(--suave); margin-top: -8px; }
+.documento table.tabla-doc { width: 100%; border-collapse: collapse; margin: 4px 0 14px; font-size: 14px; line-height: 1.45; }
+.documento table.tabla-doc th, .documento table.tabla-doc td { border: 1px solid var(--linea); padding: 6px 9px; vertical-align: top; text-align: left; }
+.documento table.tabla-doc th { width: 30%; font-weight: 700; }
 .documento hr.salto { border: 0; border-top: 1px dashed var(--linea); margin: 28px 0; }
 .campo-error input, .campo-error textarea, .campo-error select { border-color: var(--error); }
 .msg-error { color: var(--error); font-size: 12px; }

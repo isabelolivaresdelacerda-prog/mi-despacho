@@ -1,5 +1,5 @@
 // Piezas comunes de los generadores de contratos (cuentas en participación, encargo del tratamiento…).
-// Trabajan con bloques {t:'title'|'sub'|'h'|'p'|'sig'|'salto', text, lead, a, b}; un texto puede tener
+// Trabajan con bloques {t:'title'|'sub'|'h'|'p'|'tabla'|'sig'|'salto', text, lead, a, b, filas}; un texto puede tener
 // varios párrafos separados por "\n".
 import { useState } from "react";
 
@@ -102,6 +102,11 @@ export function VistaDocumento({ bloques }) {
         if (b.t === "sub") return <p key={i} className="subtitulo">{b.text}</p>;
         if (b.t === "h") return <h3 key={i}>{b.text}</h3>;
         if (b.t === "salto") return <hr key={i} className="salto" />;
+        if (b.t === "tabla") return (
+          <table key={i} className="tabla-doc"><tbody>
+            {(b.filas || []).map(([k, v], n) => <tr key={n}><th scope="row">{k}</th><td>{String(v).split("\n").map((l, j) => <div key={j}><Marcas texto={l} /></div>)}</td></tr>)}
+          </tbody></table>
+        );
         if (b.t === "sig") return (
           <div key={i} className="firmas">
             {[b.a, b.b].map((s, j) => <div key={j}>{s.split("\n").map((l, n) => <div key={n}><Marcas texto={l} /></div>)}</div>)}

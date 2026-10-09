@@ -69,6 +69,7 @@ export const SECTORES = {
 export const DESTINO = {
   cuentas_participacion: ["001 corporate", "participes"],
   encargo_tratamiento: ["004 ADMINISTRACIÓN", "contratos gestion e intermediacion"],
+  mandato_venta: ["004 ADMINISTRACIÓN", "contratos gestion e intermediacion"],
 };
 
 // Crea SOLO las carpetas que falten. Nunca mueve, renombra ni borra nada.

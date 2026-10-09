@@ -7,6 +7,7 @@ import { EstadoIALocal } from "./comunes.jsx";
 import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
+import ContratoMandato from "./apps/ContratoMandato.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
 import Calendario, { ProximosAvisos } from "./apps/calendario/Calendario.jsx";
 import Seguridad from "./Seguridad.jsx";
@@ -38,6 +39,7 @@ const MENU = [
     hijos: [
       { ruta: "contratos/crear/cuentas-participacion", titulo: "Contrato de cuentas en participación" },
       { ruta: "contratos/crear/encargo-tratamiento", titulo: "RGPD - Contrato de encargo del tratamiento" },
+      { ruta: "contratos/crear/mandato-venta", titulo: "Contrato de mandato de venta" },
     ],
   },
 ];
@@ -171,6 +173,8 @@ export default function App() {
       vista = <ContratoCEP config={config} irAAjustes={irAAjustes} />; break;
     case "contratos/crear/encargo-tratamiento":
       vista = <ContratoEncargo config={config} irAAjustes={irAAjustes} />; break;
+    case "contratos/crear/mandato-venta":
+      vista = <ContratoMandato config={config} irAAjustes={irAAjustes} />; break;
     case "empresa/carpeta":
     case "contratos/carpeta":
       vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Documentación" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
@@ -263,7 +267,7 @@ export default function App() {
               <div className="menu-sub">
                 <Item r="contratos/crear/cuentas-participacion" icono="punto">Cuentas en participación</Item>
                 <Item r="contratos/crear/encargo-tratamiento" icono="punto">RGPD - Contrato de encargo del tratamiento</Item>
-                <a href="/herramientas/mandato-venta.html" className="menu-item"><Ico n="punto" /><span>Mandato de venta (Villanueva de la Torre)</span></a>
+                <Item r="contratos/crear/mandato-venta" icono="punto">Mandato de venta</Item>
               </div>
             </>}
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>
