@@ -14,6 +14,7 @@ import { rango, enRango } from "./periodo.js";
 import { generarDiario, usarPlan } from "./motor.js";
 import Impuestos, { impuestosParaDiario, otrosParaDiario } from "./Impuestos.jsx";
 import ExportarTodo from "./ExportarTodo.jsx";
+import MensajeGestoria from "./MensajeGestoria.jsx";
 import Bandeja, { CARPETA_ENTRADA } from "./Bandeja.jsx";
 import { revisarCarpeta } from "./inventario.js";
 import { planPorDefecto, opcionesFiscales, esESFL } from "../../lib/entidad.js";
@@ -22,7 +23,7 @@ import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.
 import { AvisoIA, EstadoIALocal, useAviso } from "../../comunes.jsx";
 import "./contabilidad.css";
 
-const PESTANAS = [["resumen", "Resumen"], ["bandeja", "Bandeja de entrada"], ["facturas", "Facturas"], ["banco", "Banco y cierre"], ["impuestos", "Impuestos"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["exportar", "Exportar A3 / Sage"]];
+const PESTANAS = [["resumen", "Resumen"], ["bandeja", "Bandeja de entrada"], ["facturas", "Facturas"], ["banco", "Banco y cierre"], ["impuestos", "Impuestos"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["gestoria", "Mensaje gestoría"], ["exportar", "Exportar A3 / Sage"]];
 
 export default function ContabilidadWeb({ config, guardar: guardarConfig, empresaId }) {
   const [raiz, setRaiz] = useState(null);
@@ -170,7 +171,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
       <nav className="cont-tabs" role="tablist">
         {PESTANAS.map(([k, t]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t}{k === "bandeja" && nEntrada > 0 && <span className="insignia">{nEntrada}</span>}</button>)}
       </nav>
-      {datos && ["resumen", "facturas", "banco", "libros", "exportar"].includes(tab) && <SelPeriodo anio={per.anio} tramo={per.tramo} cambiar={cambiarPeriodo} cierres={extra.cierres} anios={anios} />}
+      {datos && ["resumen", "facturas", "banco", "libros", "gestoria", "exportar"].includes(tab) && <SelPeriodo anio={per.anio} tramo={per.tramo} cambiar={cambiarPeriodo} cierres={extra.cierres} anios={anios} />}
       {!datos ? <p className="muted">Leyendo la carpeta…</p> : <>
         {tab === "resumen" && <ResumenPeriodo esfl={esESFL(config)} d={dd} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
         {tab === "facturas" && <Facturas d={dd} propia={propia} r={r} raiz={raiz} recargar={cargar} aviso={aviso} emitidas={verEmitidas} setEmitidas={setVerEmitidas} />}
@@ -180,6 +181,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
         {tab === "bandeja" && <Bandeja raiz={raiz} empresa={empresa} propia={propia} aviso={aviso} recargar={cargar} onCambio={() => { cargarExtra(); contarEntrada(); }} />}
         {tab === "vinculados" && <Vinculados raiz={raiz} empresa={empresa} movimientos={datos.movimientos} aviso={aviso} onCambio={() => cargarExtra()} propia={propia} revisionAuto={revAuto} />}
         {tab === "documentos" && <Documentos raiz={raiz} aviso={aviso} recargar={cargar} />}
+        {tab === "gestoria" && <MensajeGestoria raiz={raiz} d={dd} diario={diario} extra={extra} r={r} config={config} aviso={aviso} />}
         {tab === "exportar" && <ExportarTodo d={dd} diario={diario} extra={extra} r={r} config={config} guardarConfig={guardarConfig} raiz={raiz} aviso={aviso} />}
       </>}
       {enviar && datos && <EnviarGestoria raiz={raiz} empresa={empresa} datos={dd} diario={diario} extra={extra} r={r} config={config} aviso={aviso} onCerrar={() => setEnviar(false)} />}

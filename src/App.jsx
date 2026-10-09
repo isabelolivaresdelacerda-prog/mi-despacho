@@ -37,7 +37,7 @@ const MENU = [
     app: "contratos", titulo: "Contratos", icono: "§",
     hijos: [
       { ruta: "contratos/crear/cuentas-participacion", titulo: "Contrato de cuentas en participación" },
-      { ruta: "contratos/crear/encargo-tratamiento", titulo: "Contrato de encargo del tratamiento (RGPD)" },
+      { ruta: "contratos/crear/encargo-tratamiento", titulo: "RGPD - Contrato de encargo del tratamiento" },
     ],
   },
 ];
@@ -262,7 +262,7 @@ export default function App() {
               <div className="menu-grupo-t"><Ico n="contrato" /><span>Contratos</span></div>
               <div className="menu-sub">
                 <Item r="contratos/crear/cuentas-participacion" icono="punto">Cuentas en participación</Item>
-                <Item r="contratos/crear/encargo-tratamiento" icono="punto">Encargo del tratamiento</Item>
+                <Item r="contratos/crear/encargo-tratamiento" icono="punto">RGPD - Contrato de encargo del tratamiento</Item>
               </div>
             </>}
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>

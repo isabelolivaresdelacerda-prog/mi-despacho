@@ -60,7 +60,7 @@ export const ETIQUETAS = {
 };
 
 export const MODELO = [
-  { tipo: "titulo", texto: "CONTRATO DE ENCARGO DEL TRATAMIENTO DE DATOS PERSONALES" },
+  { tipo: "titulo", texto: "RGPD - CONTRATO DE ENCARGO DEL TRATAMIENTO DE DATOS PERSONALES" },
   { tipo: "subtitulo", texto: "(artículo 28 del Reglamento (UE) 2016/679 y artículo 33 de la Ley Orgánica 3/2018)" },
 
   { tipo: "seccion", texto: "REUNIDOS" },

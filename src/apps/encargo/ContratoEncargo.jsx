@@ -167,7 +167,7 @@ export default function ContratoEncargo({ config, irAAjustes }) {
   const bloqueado = !!expediente;
   const firmas = expediente?.firmas || [];
   const firmo = r => firmas.some(f => f.rol === r);
-  const nombreBase = `Contrato encargo tratamiento - ${(d.resp.razon_social || "cliente").trim()} - ${(d.enc.razon_social || "prestador").trim()}`;
+  const nombreBase = `RGPD - Contrato de encargo del tratamiento - ${(d.resp.razon_social || "cliente").trim()} - ${(d.enc.razon_social || "prestador").trim()}`;
 
   const set = (k, v) => setD({ ...d, [k]: v });
   const campo = (k) => ({ value: d[k], onChange: e => set(k, e.target.value), error: err[k] });
@@ -276,7 +276,7 @@ export default function ContratoEncargo({ config, irAAjustes }) {
       <header className="app-cab">
         <div>
           <div className="eyebrow">Contratos · Crear</div>
-          <h1>Contrato de encargo del tratamiento</h1>
+          <h1>RGPD - Contrato de encargo del tratamiento</h1>
           <p className="muted">Rellena los datos y el borrador se escribe solo (art. 28 RGPD y art. 33 LOPDGDD · modelo v{VERSION_CONTRATO}). Los huecos entre corchetes se rellenan con tus datos.</p>
         </div>
         <div className="acciones">

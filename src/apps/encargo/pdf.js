@@ -149,7 +149,7 @@ function maquetador(pdf, f, pie) {
 // `bloques`: el contrato en el formato del sistema (los mismos que el Word y la vista previa, con las cláusulas modificadas).
 export async function generarContratoPDF(datos, bloques) {
   const pdf = await PDFDocument.create();
-  pdf.setTitle("Contrato de encargo del tratamiento de datos personales");
+  pdf.setTitle("RGPD - Contrato de encargo del tratamiento de datos personales");
   pdf.setSubject(apto(`${datos.resp?.razon_social || ""} / ${datos.enc?.razon_social || ""}`));
   pdf.setCreator("Mi Despacho");
   pdf.setProducer("Mi Despacho");
@@ -159,7 +159,7 @@ export async function generarContratoPDF(datos, bloques) {
   pdf.setModificationDate(fija);
 
   const f = await fuentes(pdf);
-  const m = maquetador(pdf, f, `Contrato de encargo del tratamiento · modelo v${VERSION_CONTRATO}`);
+  const m = maquetador(pdf, f, `RGPD - Contrato de encargo del tratamiento · modelo v${VERSION_CONTRATO}`);
   const n = (texto) => ({ texto, font: f.normal });
   const b_ = (texto) => ({ texto, font: f.negrita });
 
@@ -196,7 +196,7 @@ export async function generarPDFFirmado(contratoBytes, hashContrato, datos, firm
     e.escribir(k, { font: f.negrita, size: 8.5, despues: 0, color: gris });
     e.escribir(v, { size: 9.5, despues: 5 });
   };
-  fila("Documento", `Contrato de encargo del tratamiento — modelo v${VERSION_CONTRATO}`);
+  fila("Documento", `RGPD - Contrato de encargo del tratamiento — modelo v${VERSION_CONTRATO}`);
   fila("Partes", `${datos.resp.razon_social} (${datos.resp.nif}) — Responsable · ${datos.enc.razon_social} (${datos.enc.nif}) — Encargado`);
   fila("Páginas del contrato", String(pdf.getPageCount() - 1));
   fila("Huella digital del contrato (SHA-256)", hashContrato);

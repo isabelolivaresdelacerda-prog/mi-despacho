@@ -111,3 +111,7 @@ label.check { flex-direction: row; align-items: center; gap: 6px; font-size: 14p
 .pegar-texto summary { cursor: pointer; font-weight: 600; }
 .pegar-texto textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; margin: 6px 0; resize: vertical; }
 tr.resaltada td { background: var(--ok-suave, #eef7ee); }
+.mensaje-gestoria h3 { margin: 18px 0 6px; font-size: 15px; }
+.notas-g { list-style: none; padding: 0; margin: 0 0 8px; }
+.notas-g li { padding: 6px 0; border-bottom: 1px solid var(--borde, #eee); }
+.notas-g li.hecha span { text-decoration: line-through; opacity: .55; }
