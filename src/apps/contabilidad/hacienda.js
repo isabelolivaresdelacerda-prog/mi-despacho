@@ -53,8 +53,9 @@ export function casillas303(d, r, presentados = {}, { extraDeducible = 0 } = {})
   return { filas, resultado, importe: Math.abs(c71), c71, c87, extraDeducible: num(extraDeducible), facturas: { emitidas: em.length, recibidas: rec.length, isp: isp.length } };
 }
 
+// La retención se declara en el trimestre en que se PAGA la factura (no en el de su fecha)
 export function casillas111(d, r) {
-  const rec = validas(d.facturas).filter((f) => enR(f, r) && num(f.retencion_importe) > 0);
+  const rec = validas(d.facturas).filter((f) => num(f.retencion_importe) > 0 && enR({ fecha: (f._pago?.fecha && !f._pago.manual ? f._pago.fecha : f.fecha) }, r));
   const nifs = new Set(rec.map((f) => (f.nif_proveedor || f.proveedor || "").toUpperCase()));
   const base = r2(rec.reduce((s, f) => s + num(f.base), 0)), ret = r2(rec.reduce((s, f) => s + num(f.retencion_importe), 0));
   return {
