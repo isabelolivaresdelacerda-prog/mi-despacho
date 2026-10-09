@@ -9,6 +9,8 @@ import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import ContratoMandato from "./apps/ContratoMandato.jsx";
 import Papeleria from "./Papeleria.jsx";
+import ContratoGestion from "./apps/ContratoGestion.jsx";
+import ContratoIntermediacion from "./apps/ContratoIntermediacion.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
 import Calendario, { ProximosAvisos } from "./apps/calendario/Calendario.jsx";
 import Seguridad from "./Seguridad.jsx";
@@ -41,6 +43,8 @@ const MENU = [
       { ruta: "contratos/crear/cuentas-participacion", titulo: "Contrato de cuentas en participación" },
       { ruta: "contratos/crear/encargo-tratamiento", titulo: "RGPD - Contrato de encargo del tratamiento" },
       { ruta: "contratos/crear/mandato-venta", titulo: "Contrato de mandato de venta" },
+      { ruta: "contratos/crear/gestion", titulo: "Contrato de gestión" },
+      { ruta: "contratos/crear/intermediacion", titulo: "Contrato de intermediación" },
     ],
   },
 ];
@@ -71,6 +75,8 @@ const TARJETAS_INICIO = {
   "contratos/crear/cuentas-participacion": ["manos", "Socios que aportan capital a un negocio"],
   "contratos/crear/encargo-tratamiento": ["escudo", "Protección de datos con tu gestoría o proveedor"],
   "contratos/crear/mandato-venta": ["casa", "Encargo de venta de un inmueble o activo"],
+  "contratos/crear/gestion": ["edificio", "Gestión integral de una sociedad inmobiliaria"],
+  "contratos/crear/intermediacion": ["manos", "Honorarios por poner en contacto a comprador y vendedor"],
 };
 function IconoInicio({ n }) {
   return <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONOS_INICIO[n] || ICONOS_INICIO.libro} /></svg>;
@@ -215,6 +221,10 @@ export default function App() {
       vista = <ContratoEncargo config={config} irAAjustes={irAAjustes} />; break;
     case "contratos/crear/mandato-venta":
       vista = <ContratoMandato config={config} irAAjustes={irAAjustes} />; break;
+    case "contratos/crear/gestion":
+      vista = <ContratoGestion config={config} irAAjustes={irAAjustes} />; break;
+    case "contratos/crear/intermediacion":
+      vista = <ContratoIntermediacion config={config} irAAjustes={irAAjustes} />; break;
     case "empresa/carpeta":
     case "contratos/carpeta":
       vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Documentación" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
@@ -308,6 +318,8 @@ export default function App() {
                 <Item r="contratos/crear/cuentas-participacion" icono="punto">Cuentas en participación</Item>
                 <Item r="contratos/crear/encargo-tratamiento" icono="punto">RGPD - Contrato de encargo del tratamiento</Item>
                 <Item r="contratos/crear/mandato-venta" icono="punto">Mandato de venta</Item>
+                <Item r="contratos/crear/gestion" icono="punto">Contrato de gestión</Item>
+                <Item r="contratos/crear/intermediacion" icono="punto">Contrato de intermediación</Item>
               </div>
             </>}
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>

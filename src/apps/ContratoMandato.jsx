@@ -6,66 +6,16 @@ import { GuardarEnNube, RevisionIA, useAviso } from "../comunes.jsx";
 import { DialogoCorreo } from "../lib/CorreoUI.jsx";
 import { EditorClausulas, VistaDocumento, aplicarCambios, leerCambios } from "../lib/contratoUI.jsx";
 import { guardar as guardarEnCarpeta, raizGuardada, DESTINO } from "../lib/carpetas.js";
-import { eurosEnLetras } from "../lib/numeroLetras.js";
-
-const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-const fmtFecha = (v, etq = "fecha") => { if (!v) return `[${etq}]`; const [y, m, d] = v.split("-").map(Number); return d + " de " + MESES[m - 1] + " de " + y; };
-const fmtEur = (v) => { const n = parseFloat(v); return isNaN(n) ? "[importe]" : n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " euros"; };
-const or = (v, etq = "●") => (String(v ?? "")).trim() || `[${etq}]`;
-const num = (v, etq) => (String(v ?? "").trim() === "" ? `[${etq}]` : String(v).trim().replace(".", ","));
-
-// Tipos de activo del mundo inmobiliario (se puede escribir otro a mano con «Otro»)
-const TIPOS_ACTIVO = [
-  ["Suelo", ["Solar urbano", "Parcela urbanizable", "Suelo en desarrollo (sector o unidad de ejecución)", "Suelo rústico o finca"]],
-  ["Promoción y obra", ["Promoción en proyecto (con o sin licencia)", "Promoción en curso", "Obra parada", "Promoción terminada (stock de unidades)"]],
-  ["Residencial", ["Edificio residencial", "Vivienda", "Conjunto de viviendas", "Residencia de estudiantes o senior", "Coliving o build to rent"]],
-  ["Terciario", ["Local comercial", "Oficina", "Edificio de oficinas", "Hotel o apartamentos turísticos", "Centro o parque comercial"]],
-  ["Industrial y otros", ["Nave industrial", "Plataforma logística", "Garajes y trasteros", "Activo sanitario o educativo", "Activo agrícola o rural"]],
-  ["Carteras", ["Cartera de activos inmobiliarios", "Cartera de créditos con garantía inmobiliaria"]],
-];
-const ACTIVO_VACIO = { tipo: "Solar urbano", tipo_otro: "", nombre: "", dir: "", mun: "", cat: "", reg: "", sup: "", desc: "", estado: "", urb: "", arr: "", cargas: "", precio: "", extra: [] };
-const tipoDe = (a) => (a.tipo === "Otro" ? (a.tipo_otro || "").trim() || "[tipo de activo]" : a.tipo);
-
-// Ficha de un activo en el contrato (tabla de dos columnas; solo las filas con dato)
-function fichaActivo(a, conPrecio) {
-  const t = (v) => (v || "").trim();
-  return [
-    ["Tipo de activo", tipoDe(a)],
-    ["Denominación", t(a.nombre)],
-    ["Ubicación", [a.dir, a.mun].map(t).filter(Boolean).join(", ") || "[ubicación]"],
-    ["Referencia catastral", t(a.cat) || "Pendiente de facilitar por el Mandante"],
-    ["Datos registrales", t(a.reg)],
-    ["Superficie", t(a.sup)],
-    ["Descripción", t(a.desc)],
-    ["Estado actual", t(a.estado)],
-    ["Situación urbanística y licencias", t(a.urb)],
-    ["Arrendamientos u ocupación", t(a.arr)],
-    ["Cargas", t(a.cargas) || "Libre de cargas, según manifestación del Mandante"],
-    ...(a.extra || []).filter((x) => t(x.k) && t(x.v)).map((x) => [x.k.trim(), x.v.trim()]),
-    ...(conPrecio ? [["Precio mínimo", eurosTxt(a.precio)]] : []),
-  ].filter(([, v]) => v);
-}
-const eurosTxt = (v) => { const n = parseFloat(v); return isNaN(n) ? "[precio mínimo]" : fmtEur(n) + " (" + eurosEnLetras(n).toUpperCase() + ")"; };
+import { parte, firma, ParteForm, parteVacia, fmtFecha, fmtEur, or, num, eurosTxt, hoy, ACTIVO_VACIO, bloquesActivos, ActivosForm } from "../lib/contratoInmo.jsx";
 
 const VACIO = {
-  ciudad: "", fecha: new Date().toISOString().slice(0, 10),
-  a_tipo: "juridica", a_nombre: "", a_nif: "", a_dom: "", a_rm: "", a_rep: "", a_rep_dni: "", a_cargo: "administrador único",
-  m_tipo: "juridica", m_nombre: "", m_nif: "", m_dom: "", m_rm: "", m_rep: "", m_rep_dni: "", m_cargo: "administrador único",
+  ciudad: "", fecha: hoy(),
+  ...parteVacia("a"), ...parteVacia("m"),
   activos: [{ ...ACTIVO_VACIO }], objeto: "activos", soc_nombre: "", soc_nif: "", venta: "bloque", precio_modo: "global",
   exclusiva: "si", precio: "", margen: "5",
   hon_tipo: "pct", hon_pct: "3", hon_fijo: "", devengo: "arras", plazo_fra: "15", gastos: "Mandatario",
   dur: "6", prorroga: "6", preaviso: "30", proteccion: "12", conf: "2", subsana: "15", trib: "",
 };
-
-function parte(d, pre, rol) {
-  const juridica = d[pre + "_tipo"] === "juridica";
-  let s = or(d[pre + "_nombre"], rol.toUpperCase()) + ", con " + (juridica ? "NIF " : "DNI/NIF ") + or(d[pre + "_nif"], "NIF del " + rol) + " y domicilio" + (juridica ? " social" : "") + " en " + or(d[pre + "_dom"], "domicilio del " + rol);
-  if (juridica) {
-    if ((d[pre + "_rm"] || "").trim()) s += ", inscrita en el Registro Mercantil de " + d[pre + "_rm"].trim();
-    s += ", representada en este acto por D./D.ª " + or(d[pre + "_rep"], "representante") + ", con DNI " + or(d[pre + "_rep_dni"], "DNI del representante") + ", en su condición de " + or(d[pre + "_cargo"], "cargo");
-  } else s += ", que actúa en su propio nombre y derecho";
-  return s + " (en adelante, el «" + rol + "»).";
-}
 
 export function construir(d) {
   const B = [];
@@ -103,10 +53,7 @@ export function construir(d) {
   p("En su virtud, las partes acuerdan suscribir el presente Contrato con arreglo a las siguientes");
   h("CLÁUSULAS");
   p("El Mandante encomienda al Mandatario, que lo acepta, la búsqueda de comprador o inversor para " + queVende.replace("vender", "la venta de").replace("la venta de el", "la venta del") + ". " + (varios ? "El Activo está formado por los " + activos.length + " activos siguientes:" : "El Activo tiene las siguientes características:"), "Primera. Objeto.");
-  activos.forEach((a, i) => {
-    if (varios) B.push({ t: "sub", text: "Activo " + (i + 1) + (a.nombre && a.nombre.trim() ? " · " + a.nombre.trim() : "") });
-    B.push({ t: "tabla", filas: fichaActivo(a, porActivo) });
-  });
+  bloquesActivos(B, activos, { conPrecio: porActivo });
   if (varios) p({ bloque: "La venta podrá hacerse en bloque o por separado, según convenga al Mandante.", solo_bloque: "El Activo se venderá en bloque, como una única operación, salvo que el Mandante autorice por escrito otra cosa.", separado: "Cada uno de los activos podrá venderse por separado, a uno o varios compradores." }[d.venta] || "");
   p("El mandato comprende, salvo pacto distinto por escrito: (a) la búsqueda activa de comprador o inversor para el Activo, ya sea mediante compraventa directa, entrada en el capital de la sociedad titular o cualquier otra estructura que acuerden las partes; (b) la preparación y presentación de documentación comercial y financiera del Activo a los potenciales interesados; (c) la negociación de las condiciones económicas con los interesados, dentro de los límites fijados en la cláusula segunda; y (d) el acompañamiento hasta la firma del contrato de arras o de compraventa, cuya firma corresponderá siempre al Mandante.");
   p("El presente mandato se otorga " + (excl ? "con carácter exclusivo." : "sin carácter exclusivo, pudiendo el Mandante encomendar la venta del Activo simultáneamente a otros intermediarios."));
@@ -123,7 +70,7 @@ export function construir(d) {
   p("Cada parte declara que actúa con fondos y bienes de origen lícito y se compromete a facilitar la documentación que se le solicite para cumplir la normativa de prevención del blanqueo de capitales y de la financiación del terrorismo, incluida la identificación de los compradores o inversores y de su titular real.", "Octava. Prevención del blanqueo de capitales.");
   p("Este Contrato se rige por la ley española. Para cualquier controversia, las partes se someten, con renuncia a cualquier otro fuero, a los juzgados y tribunales de " + or(d.trib, "ciudad") + ".", "Novena. Ley aplicable y jurisdicción.");
   p("Y en prueba de conformidad, las partes firman el presente Contrato por duplicado y a un solo efecto en el lugar y fecha indicados en el encabezamiento.");
-  B.push({ t: "sig", a: "El Mandante\n" + or(d.a_nombre, "MANDANTE") + (d.a_tipo === "juridica" && d.a_rep ? "\np.p. " + d.a_rep : ""), b: "El Mandatario\n" + or(d.m_nombre, "MANDATARIO") + (d.m_tipo === "juridica" && d.m_rep ? "\np.p. " + d.m_rep : "") });
+  B.push({ t: "sig", a: firma(d, "a", "El Mandante"), b: firma(d, "m", "El Mandatario") });
   return B;
 }
 
@@ -166,57 +113,6 @@ export default function ContratoMandato({ config, irAAjustes }) {
     "\nBORRADOR:\n" + bloquesATexto(bloques),
   ].join("\n");
 
-  const setA = (i, cambio) => setD({ ...d, activos: d.activos.map((a, j) => (j === i ? { ...a, ...cambio } : a)) });
-  const ca = (i, k) => ({ value: d.activos[i][k], onChange: (e) => setA(i, { [k]: e.target.value }) });
-  const FichaForm = (a, i) => (
-    <fieldset key={i}><legend>{d.activos.length > 1 ? "Activo " + (i + 1) : "El activo"}</legend>
-      <label>Tipo<select {...ca(i, "tipo")}>
-        {TIPOS_ACTIVO.map(([g, ts]) => <optgroup key={g} label={g}>{ts.map((t) => <option key={t}>{t}</option>)}</optgroup>)}
-        <option>Otro</option>
-      </select></label>
-      {a.tipo === "Otro" && <label>¿Qué tipo de activo?<input {...ca(i, "tipo_otro")} /></label>}
-      <label>Nombre o denominación (opcional)<input {...ca(i, "nombre")} placeholder="p. ej. Edificio Alcalá, Sector 4, Lote 2" /></label>
-      <div className="fila"><label>Dirección<input {...ca(i, "dir")} /></label><label>Municipio y provincia<input {...ca(i, "mun")} /></label></div>
-      <div className="fila"><label>Referencia catastral<input {...ca(i, "cat")} placeholder="Si no la tienes, se pone «pendiente»" /></label><label>Finca registral / Registro<input {...ca(i, "reg")} /></label></div>
-      <label>Superficie<input {...ca(i, "sup")} placeholder="Parcela, edificabilidad, m² construidos, n.º de unidades…" /></label>
-      <label>Descripción<textarea rows={3} {...ca(i, "desc")} placeholder="Qué es y qué permite: viviendas, usos, plantas, garaje…" /></label>
-      <label>Estado actual<input {...ca(i, "estado")} placeholder="p. ej. obra al 60 %, terminado, en rentabilidad, vacío…" /></label>
-      <label>Situación urbanística y licencias<input {...ca(i, "urb")} placeholder="Clasificación, planeamiento, licencias concedidas o en trámite" /></label>
-      <div className="fila"><label>Arrendamientos u ocupación<input {...ca(i, "arr")} placeholder="Inquilinos, rentas, libre…" /></label><label>Cargas<input {...ca(i, "cargas")} placeholder="Vacío = libre de cargas" /></label></div>
-      {d.activos.length > 1 && d.precio_modo === "activo" && <label>Precio mínimo de este activo (€)<input type="number" min="0" step="1" {...ca(i, "precio")} /></label>}
-      {a.extra.map((x, j) => (
-        <div className="fila" key={j}>
-          <label>Otro dato<input value={x.k} onChange={(e) => setA(i, { extra: a.extra.map((y, n) => (n === j ? { ...y, k: e.target.value } : y)) })} placeholder="p. ej. Rentabilidad" /></label>
-          <label>Valor<span style={{ display: "flex", gap: 8 }}><input value={x.v} onChange={(e) => setA(i, { extra: a.extra.map((y, n) => (n === j ? { ...y, v: e.target.value } : y)) })} />
-            <button className="enlace" type="button" onClick={() => setA(i, { extra: a.extra.filter((_, n) => n !== j) })}>Quitar</button></span></label>
-        </div>
-      ))}
-      <div className="acciones">
-        <button className="enlace" type="button" onClick={() => setA(i, { extra: [...a.extra, { k: "", v: "" }] })}>+ Añadir otro dato</button>
-        {d.activos.length > 1 && <button className="enlace" type="button" onClick={() => setD({ ...d, activos: d.activos.filter((_, j) => j !== i) })}>Quitar este activo</button>}
-      </div>
-    </fieldset>
-  );
-
-  const Parte = ({ k, titulo }) => (
-    <fieldset><legend>{titulo}</legend>
-      <label>Es<select {...campo(k + "_tipo")}><option value="juridica">Una sociedad</option><option value="fisica">Una persona física</option></select></label>
-      <label>{d[k + "_tipo"] === "juridica" ? "Razón social" : "Nombre y apellidos"}<input {...campo(k + "_nombre")} /></label>
-      <div className="fila">
-        <label>{d[k + "_tipo"] === "juridica" ? "NIF" : "DNI / NIF"}<input {...campo(k + "_nif")} /></label>
-        <label>Domicilio<input {...campo(k + "_dom")} /></label>
-      </div>
-      {d[k + "_tipo"] === "juridica" && <>
-        <label>Registro Mercantil de<input {...campo(k + "_rm")} /></label>
-        <div className="fila">
-          <label>Representante<input {...campo(k + "_rep")} /></label>
-          <label>DNI del representante<input {...campo(k + "_rep_dni")} /></label>
-        </div>
-        <label>Cargo<select {...campo(k + "_cargo")}><option>administrador único</option><option>administrador solidario</option><option>administrador mancomunado</option><option>consejero delegado</option><option>apoderado</option></select></label>
-      </>}
-    </fieldset>
-  );
-
   return (
     <div className="app">
       <header className="app-cab">
@@ -238,8 +134,8 @@ export default function ContratoMandato({ config, irAAjustes }) {
           <fieldset><legend>Lugar y fecha</legend>
             <div className="fila"><label>Ciudad<input {...campo("ciudad")} /></label><label>Fecha<input type="date" {...campo("fecha")} /></label></div>
           </fieldset>
-          {Parte({ k: "a", titulo: "Mandante (propietario que vende)" })}
-          {Parte({ k: "m", titulo: "Mandatario (intermediario)" })}
+          {ParteForm(d, campo, "a", "Mandante (propietario que vende)")}
+          {ParteForm(d, campo, "m", "Mandatario (intermediario)")}
           <fieldset><legend>Qué se vende</legend>
             <label>Se vende<select {...campo("objeto")}>
               <option value="activos">El activo o los activos directamente</option>
@@ -252,8 +148,7 @@ export default function ContratoMandato({ config, irAAjustes }) {
               <label>Precio mínimo<select {...campo("precio_modo")}><option value="global">Uno para todo</option><option value="activo">Uno por activo</option></select></label>
             </div>}
           </fieldset>
-          {d.activos.map((a, i) => FichaForm(a, i))}
-          <button className="btn ghost" type="button" onClick={() => setD({ ...d, activos: [...d.activos, { ...ACTIVO_VACIO }] })}>+ Añadir otro activo</button>
+          <ActivosForm activos={d.activos} setActivos={(activos) => setD({ ...d, activos })} conPrecio={d.activos.length > 1 && d.precio_modo === "activo"} />
           <fieldset><legend>Precio y exclusiva</legend>
             <div className="fila">
               {!(d.activos.length > 1 && d.precio_modo === "activo") && <label>Precio mínimo (€){d.activos.length > 1 ? " de todo" : ""}<input type="number" min="0" step="1" {...campo("precio")} /></label>}
