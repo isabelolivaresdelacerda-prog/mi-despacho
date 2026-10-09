@@ -28,26 +28,34 @@ import { fijarEspacio, hayDatosAntiguos, moverDatosAntiguos, borrarDatosAntiguos
 import { recortarLogo } from "./lib/logo.js";
 import { migrarRaizAntigua, borrarRaizAntigua } from "./lib/carpetas.js";
 
-// Apps del despacho. "app" es la clave de contratación (de momento, todas activas).
-const MENU = [
-  {
-    app: "contabilidad", titulo: "Contabilidad", icono: "€",
-    hijos: [
-      { ruta: "contabilidad", titulo: "Mi contabilidad" },
-      { ruta: "contabilidad/carpeta", titulo: "Carpeta de contabilidad" },
-      { ruta: "empresa/carpeta", titulo: "Carpeta de la empresa (toda)" },
-    ],
-  },
-  {
-    app: "contratos", titulo: "Contratos", icono: "§",
-    hijos: [
-      { ruta: "contratos/crear/cuentas-participacion", titulo: "Contrato de cuentas en participación" },
-      { ruta: "contratos/crear/encargo-tratamiento", titulo: "RGPD - Contrato de encargo del tratamiento" },
-      { ruta: "contratos/crear/mandato-venta", titulo: "Contrato de mandato de venta" },
-      { ruta: "contratos/crear/gestion", titulo: "Contrato de gestión" },
-      { ruta: "contratos/crear/intermediacion", titulo: "Contrato de intermediación" },
-    ],
-  },
+// Contratos que se pueden crear (miniapps de la app «Contratos»)
+const CONTRATOS = [
+  { ruta: "contratos/crear/cuentas-participacion", titulo: "Cuentas en participación", icono: "manos", sub: "Socios que aportan capital a un negocio" },
+  { ruta: "contratos/crear/encargo-tratamiento", titulo: "RGPD - Encargo del tratamiento", icono: "escudo", sub: "Protección de datos con tu gestoría o proveedor" },
+  { ruta: "contratos/crear/mandato-venta", titulo: "Mandato de venta", icono: "casa", sub: "Encargo de venta de uno o varios activos inmobiliarios" },
+  { ruta: "contratos/crear/gestion", titulo: "Contrato de gestión", icono: "grafica", sub: "Gestión de activos e inversiones (asset management)" },
+  { ruta: "contratos/crear/intermediacion", titulo: "Contrato de intermediación", icono: "enlace", sub: "Honorarios por poner en contacto a comprador y vendedor" },
+];
+
+// Secciones del inicio. "app" es la clave de contratación (de momento, todas activas); "pronto" = en preparación.
+const SECCIONES = [
+  { titulo: "Servidor", items: [
+    { ruta: "empresa/carpeta", titulo: "Servidor", icono: "servidor", sub: "Toda la documentación de la empresa" },
+    { ruta: "contabilidad/carpeta", titulo: "Carpeta de contabilidad", icono: "carpeta", sub: "Los documentos de la contabilidad", app: "contabilidad" },
+    { ruta: "carpetas", titulo: "Organizar carpetas", icono: "carpeta", sub: "Estructura de carpetas de la empresa" },
+  ] },
+  { titulo: "Aplicaciones", items: [
+    { ruta: "contabilidad", titulo: "Contabilidad", icono: "libro", sub: "Facturas, banco, impuestos y libros en un solo sitio", app: "contabilidad" },
+    { ruta: "facturar", titulo: "Emitir factura", icono: "papel", sub: "VERI*FACTU directo con Hacienda, con tu papelería y el QR", app: "contabilidad" },
+    { ruta: "contratos", titulo: "Contratos", icono: "contrato", sub: "Crea contratos con cláusulas que puedes cambiar", app: "contratos" },
+    { ruta: "actas", titulo: "Actas y certificaciones", icono: "papel", sub: "Juntas y consejos, con artículos ya redactados", pronto: true },
+    { ruta: "prompts", titulo: "Prompts y skills", icono: "chispa", sub: "Biblioteca de IA para tu despacho o empresa", pronto: true },
+    { ruta: "papeleria", titulo: "Papelería corporativa", icono: "papel", sub: "Hoja corporativa, informe y factura con tu imagen" },
+  ] },
+  { titulo: "Herramientas", items: [
+    { ruta: "ia", titulo: "IA gratis en tu ordenador", icono: "chispa", sub: "Lee y ordena documentos sin sacar nada de tu PC" },
+    { ruta: "correos", titulo: "Plantillas de correo", icono: "sobre", sub: "Correos tipo listos para enviar" },
+  ] },
 ];
 
 const rutaActual = () => decodeURIComponent(window.location.hash.replace(/^#\/?/, "")) || "inicio";
@@ -70,26 +78,30 @@ const ICONOS_INICIO = {
   enlace: "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1",
   chispa: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z",
   sobre: "M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3 7l9 6 9-6",
-};
-const TARJETAS_INICIO = {
-  "contabilidad": ["libro", "Facturas, banco, impuestos y libros en un solo sitio"],
-  "contabilidad/carpeta": ["carpeta", "Los documentos de la contabilidad de tu OneDrive"],
-  "empresa/carpeta": ["edificio", "Toda la documentación de la empresa"],
-  "contratos/crear/cuentas-participacion": ["manos", "Socios que aportan capital a un negocio"],
-  "contratos/crear/encargo-tratamiento": ["escudo", "Protección de datos con tu gestoría o proveedor"],
-  "contratos/crear/mandato-venta": ["casa", "Encargo de venta de un inmueble o activo"],
-  "contratos/crear/gestion": ["grafica", "Gestión de activos e inversiones (asset management)"],
-  "contratos/crear/intermediacion": ["enlace", "Honorarios por presentar una operación inmobiliaria"],
-  "contratos/crear/gestion": ["edificio", "Gestión integral de una sociedad inmobiliaria"],
-  "contratos/crear/intermediacion": ["manos", "Honorarios por poner en contacto a comprador y vendedor"],
+  servidor: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4",
+  contrato: "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6",
+  papel: "M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4",
 };
 function IconoInicio({ n }) {
   return <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONOS_INICIO[n] || ICONOS_INICIO.libro} /></svg>;
 }
 
+function Tarjetas({ items, ir }) {
+  return (
+    <div className="tarjetas-inicio">
+      {items.map((h) => (
+        <button key={h.ruta} type="button" className="tarjeta-inicio" onClick={() => ir(h.ruta)}>
+          <span className="ti-icono"><IconoInicio n={h.icono} /></span>
+          <span className="ti-titulo">{h.titulo}{h.pronto && <em className="pronto"> pronto</em>}</span>
+          {h.sub && <span className="ti-sub">{h.sub}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Inicio({ config, ir }) {
-  const grupos = MENU.filter((m) => config.apps[m.app]).map((m) => ({ ...m, items: m.hijos.flatMap((h) => (h.grupo ? h.hijos : [h])) }));
-  const extra = [{ ruta: "facturar", titulo: "Emitir factura", icono: "libro", sub: "VERI*FACTU directo con Hacienda, con tu papelería y el QR" }, { ruta: "ia", titulo: "IA gratis en tu ordenador", icono: "chispa", sub: "Lee y ordena documentos sin sacar nada de tu PC" }, { ruta: "correos", titulo: "Plantillas de correo", icono: "sobre", sub: "Correos tipo listos para enviar" }];
+  const secciones = SECCIONES.map((s) => ({ ...s, items: s.items.filter((h) => !h.app || config.apps[h.app]) })).filter((s) => s.items.length);
   return (
     <div className="app">
       <header className="app-cab inicio-cab">
@@ -101,32 +113,28 @@ function Inicio({ config, ir }) {
         </div>
       </header>
       <ProximosAvisos config={config} ir={ir} />
-      {grupos.map((g) => (
-        <section key={g.app} className="inicio-grupo">
+      {secciones.map((g) => (
+        <section key={g.titulo} className="inicio-grupo">
           <h2 className="inicio-grupo-t">{g.titulo}</h2>
-          <div className="tarjetas-inicio">
-            {g.items.map((h) => { const [ic, sub] = TARJETAS_INICIO[h.ruta] || ["libro", ""]; return (
-              <button key={h.ruta} type="button" className="tarjeta-inicio" onClick={() => ir(h.ruta)}>
-                <span className="ti-icono"><IconoInicio n={ic} /></span>
-                <span className="ti-titulo">{h.titulo.replace(/^Contrato de /, "")}</span>
-                {sub && <span className="ti-sub">{sub}</span>}
-              </button>
-            ); })}
-          </div>
+          <Tarjetas items={g.items} ir={ir} />
         </section>
       ))}
-      <section className="inicio-grupo">
-        <h2 className="inicio-grupo-t">Herramientas</h2>
-        <div className="tarjetas-inicio">
-          {extra.map((h) => (
-            <button key={h.ruta} type="button" className="tarjeta-inicio" onClick={() => ir(h.ruta)}>
-              <span className="ti-icono"><IconoInicio n={h.icono} /></span>
-              <span className="ti-titulo">{h.titulo}</span>
-              <span className="ti-sub">{h.sub}</span>
-            </button>
-          ))}
+    </div>
+  );
+}
+
+// App «Contratos»: al abrirla se eligen sus miniapps
+function Contratos({ ir }) {
+  return (
+    <div className="app">
+      <header className="app-cab">
+        <div>
+          <div className="eyebrow">Aplicaciones</div>
+          <h1>Contratos</h1>
+          <p className="muted">Elige el contrato que quieres crear. Todos son plantillas jurídicas fijas que se rellenan con tus datos, y puedes cambiar, quitar o añadir cláusulas.</p>
         </div>
-      </section>
+      </header>
+      <Tarjetas items={CONTRATOS} ir={ir} />
     </div>
   );
 }
@@ -232,9 +240,13 @@ export default function App() {
       vista = <ContratoIntermediacion config={config} irAAjustes={irAAjustes} />; break;
     case "empresa/carpeta":
     case "contratos/carpeta":
-      vista = <VistaCarpeta titulo="Carpeta de la empresa" eyebrow="Documentación" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
+      vista = <VistaCarpeta titulo="Servidor" eyebrow="Toda la documentación de la empresa" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
     case "vincular":
       vista = <VincularEmpresa onHecho={() => misEmpresas().then(setEmpresas)} />; break;
+    case "contratos":
+      vista = <Contratos ir={ir} />; break;
+    case "actas":
+      vista = <Proximamente titulo="Actas y certificaciones" texto="Convocatorias, actas y certificaciones de juntas y consejos, con una biblioteca de artículos y acuerdos ya redactados (anónimos) que se insertan con un clic." />; break;
     case "prompts":
       vista = <Proximamente titulo="Prompts y skills" texto="Biblioteca de prompts y skills de IA preparados para tu despacho o empresa (contratos, contabilidad, cumplimiento…). Será un servicio adicional." />; break;
     case "facturar":
@@ -264,6 +276,7 @@ export default function App() {
     default:
       vista = <Inicio config={config} ir={ir} />;
   }
+  if (ruta.startsWith("contratos/crear/")) vista = <><div className="app volver-app"><a href="#/contratos" className="enlace">← Todos los contratos</a></div>{vista}</>;
 
   // Iconos de línea, todos del mismo estilo
   const I = {
@@ -281,16 +294,17 @@ export default function App() {
     empresa: "M4 21V5a1 1 0 011-1h9a1 1 0 011 1v16M15 9h4a1 1 0 011 1v11M8 8h3M8 12h3M8 16h3M3 21h18",
     salir: "M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4M10 17l5-5-5-5M15 12H3",
     punto: "M12 12h.01",
+    servidor: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
     chispa: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z",
     papel: "M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4",
     ia: "M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2M7 7h10v10H7zM10 10h4v4h-4z",
   };
   const Ico = ({ n }) => <svg className="ico-menu" viewBox="0 0 24 24" aria-hidden><path d={I[n]} /></svg>;
-  const Item = ({ r, icono, children, insignia }) => (
-    <a href={"#/" + r} className={"menu-item" + (ruta === r ? " activo" : "")} aria-current={ruta === r ? "page" : undefined}>
+  const Item = ({ r, pre, icono, children, insignia }) => { const act = ruta === r || (pre && ruta.startsWith(pre)); return (
+    <a href={"#/" + r} className={"menu-item" + (act ? " activo" : "")} aria-current={act ? "page" : undefined}>
       <Ico n={icono} /><span>{children}</span>{insignia > 0 && <span className="insignia">{insignia}</span>}
     </a>
-  );
+  ); };
   const Seccion = ({ titulo, children }) => <div className="menu-seccion"><div className="menu-seccion-t">{titulo}</div>{children}</div>;
   const tiene = (app) => config.apps[app];
 
@@ -310,27 +324,17 @@ export default function App() {
             <Item r="inicio" icono="inicio">Inicio</Item>
             <Item r="calendario" icono="calendario">Calendario</Item>
           </Seccion>
-          {tiene("contabilidad") && <Seccion titulo="Contabilidad">
-            <Item r="contabilidad" icono="conta">Mi contabilidad</Item>
-            <Item r="contabilidad/carpeta" icono="carpeta">Carpeta de contabilidad</Item>
-          </Seccion>}
-          <Seccion titulo="Documentos">
-            <Item r="empresa/carpeta" icono="carpeta">Carpeta de la empresa</Item>
+          <Seccion titulo="Servidor">
+            <Item r="empresa/carpeta" icono="servidor">Servidor</Item>
+            {tiene("contabilidad") && <Item r="contabilidad/carpeta" icono="carpeta">Carpeta de contabilidad</Item>}
             <Item r="carpetas" icono="carpetas">Organizar carpetas</Item>
           </Seccion>
           <Seccion titulo="Aplicaciones">
-            {tiene("contratos") && <>
-              <div className="menu-grupo-t"><Ico n="contrato" /><span>Contratos</span></div>
-              <div className="menu-sub">
-                <Item r="contratos/crear/cuentas-participacion" icono="punto">Cuentas en participación</Item>
-                <Item r="contratos/crear/encargo-tratamiento" icono="punto">RGPD - Contrato de encargo del tratamiento</Item>
-                <Item r="contratos/crear/mandato-venta" icono="punto">Mandato de venta</Item>
-                <Item r="contratos/crear/gestion" icono="punto">Contrato de gestión</Item>
-                <Item r="contratos/crear/intermediacion" icono="punto">Contrato de intermediación</Item>
-              </div>
-            </>}
+            {tiene("contabilidad") && <Item r="contabilidad" icono="conta">Contabilidad</Item>}
+            {tiene("contabilidad") && <Item r="facturar" icono="papel">Emitir factura</Item>}
+            {tiene("contratos") && <Item r="contratos" pre="contratos/" icono="contrato">Contratos</Item>}
+            <Item r="actas" icono="papel">Actas y certificaciones <em className="pronto">pronto</em></Item>
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>
-            <Item r="facturar" icono="papel">Emitir facturas (VERI*FACTU)</Item>
             <Item r="papeleria" icono="papel">Papelería corporativa</Item>
           </Seccion>
           <Seccion titulo="Herramientas">

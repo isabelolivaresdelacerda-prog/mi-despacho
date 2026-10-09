@@ -462,3 +462,6 @@ label small { font-size: 12px; }
 .vf-lineas input, .vf-lineas select { width: 100%; }
 .vf-totales { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: flex-end; align-items: baseline; margin-top: 6px; }
 .vf-totales strong { font-size: 17px; }
+/* Enlace «← Todos los contratos» encima de cada miniapp de contratos */
+.volver-app { padding-bottom: 0 !important; margin-bottom: -12px; }
+.tarjeta-inicio .pronto { margin-left: 8px; vertical-align: middle; }
