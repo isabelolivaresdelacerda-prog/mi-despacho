@@ -66,6 +66,8 @@ const ICONOS_INICIO = {
   manos: "M8 12l3 3 5-5M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z",
   escudo: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4",
   casa: "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
+  grafica: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  enlace: "M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1",
   chispa: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z",
   sobre: "M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3 7l9 6 9-6",
 };
@@ -76,6 +78,8 @@ const TARJETAS_INICIO = {
   "contratos/crear/cuentas-participacion": ["manos", "Socios que aportan capital a un negocio"],
   "contratos/crear/encargo-tratamiento": ["escudo", "Protección de datos con tu gestoría o proveedor"],
   "contratos/crear/mandato-venta": ["casa", "Encargo de venta de un inmueble o activo"],
+  "contratos/crear/gestion": ["grafica", "Gestión de activos e inversiones (asset management)"],
+  "contratos/crear/intermediacion": ["enlace", "Honorarios por presentar una operación inmobiliaria"],
   "contratos/crear/gestion": ["edificio", "Gestión integral de una sociedad inmobiliaria"],
   "contratos/crear/intermediacion": ["manos", "Honorarios por poner en contacto a comprador y vendedor"],
 };
