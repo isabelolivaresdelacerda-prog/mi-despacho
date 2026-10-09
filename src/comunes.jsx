@@ -83,6 +83,17 @@ export function GuardarEnNube({ abierto, blob, nombre, config, onCerrar, irAAjus
 }
 
 // --- Aviso compacto para las apps: si la IA del ordenador está apagada, botón para encenderla ---
+// Aviso de transparencia del Reglamento de IA (Reglamento (UE) 2024/1689, art. 50): se dice siempre cuándo se usa
+// un sistema de IA y que lo que produce está generado automáticamente, puede tener errores y debe revisarlo una persona.
+export function TransparenciaIA({ que = "propone", compacto }) {
+  return (
+    <p className={"transparencia-ia" + (compacto ? " compacto" : "")}>
+      <span className="ti-sello" aria-hidden="true">IA</span>
+      <span><strong>Aquí se usa inteligencia artificial.</strong> Lo que la IA {que} se genera de forma automática y puede contener errores: revísalo siempre antes de usarlo. La decisión final es tuya.{!compacto && " Aviso de transparencia conforme al Reglamento (UE) 2024/1689 de Inteligencia Artificial (art. 50)."}</span>
+    </p>
+  );
+}
+
 export function AvisoIA() {
   const [e, setE] = useState(null);
   const [clave, setClave] = useState(null);
@@ -180,6 +191,7 @@ export function RevisionIA({ construirPrompt, irAAjustes }) {
         </div>
         <button className="btn" type="button" onClick={() => revisar(false)} disabled={cargando}>Revisar el contrato</button>
       </div>
+      <TransparenciaIA que="señala en esta revisión" />
       <EstadoIALocal key={vuelta} />
       {modo === "nube" && !hayClave && (
         <div className="clave-rapida">
@@ -195,6 +207,7 @@ export function RevisionIA({ construirPrompt, irAAjustes }) {
       </label>
       {salida && (
         <div className={"ia-salida" + (salida.error ? " err" : "")}>
+          {!salida.error && <div className="ia-generado">Texto generado por IA · revísalo antes de usarlo</div>}
           {salida.texto}
           {salida.ia && <div className={"ia-quien" + (salida.dePago ? " pago" : "")}>Respuesta de {salida.ia}{salida.local ? " · no ha salido de tu ordenador" : salida.dePago ? " · de pago, en la nube" : " · en la nube"}</div>}
           {salida.ajustes && irAAjustes && <div><button className="btn ghost" type="button" onClick={irAAjustes}>Ir a Ajustes</button></div>}

@@ -3,7 +3,7 @@ import { leerConfig, guardarConfig, TIPOS } from "./almacen.js";
 import { NUBES } from "./nube.js";
 import Bienvenida from "./Bienvenida.jsx";
 import Ajustes, { FormIA } from "./Ajustes.jsx";
-import { EstadoIALocal } from "./comunes.jsx";
+import { EstadoIALocal, TransparenciaIA } from "./comunes.jsx";
 import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
@@ -408,6 +408,7 @@ function PaginaIA() {
     <div className="app">
       <header className="app-cab"><div><div className="eyebrow">Herramientas</div><h1>IA gratis en tu ordenador</h1>
         <p className="muted">Gratis y en tu PC: lee tus facturas, escrituras y extractos en tu propio ordenador. Tus datos no salen de él ni se comparten con ninguna empresa de IA.</p></div></header>
+      <TransparenciaIA que="lee, resume o propone" />
       <section className="tarjeta">
         <h2>1. Enciende la IA de tu ordenador</h2>
         <EstadoIALocal />

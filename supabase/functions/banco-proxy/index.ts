@@ -2,7 +2,7 @@
 // La clave privada NO viene aquí: el navegador firma el token con la clave que está en la carpeta de la empresa
 // (en el ordenador de la usuaria) y esta función solo reenvía la consulta, que la API no permite hacer directamente
 // desde el navegador. No guarda nada. Solo usuarias activas con entrada en dos pasos.
-// Permite: leer movimientos/saldos/sesión (GET) y renovar el permiso (POST /auth y POST /sessions) con la vuelta
+// Permite: leer la lista de bancos, movimientos/saldos/sesión (GET) y renovar el permiso (POST /auth y POST /sessions) con la vuelta
 // obligatoriamente a una dirección de Mi Despacho.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
@@ -13,6 +13,8 @@ const cors = (req: Request) => {
   return { "Access-Control-Allow-Origin": ORIGENES.includes(o) ? o : ORIGENES[0], "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" };
 };
 const LECTURA = /^\/(accounts\/[0-9a-f-]{36}\/(transactions|balances|details)|sessions\/[0-9a-f-]{36})(\?[A-Za-z0-9_=&%.:-]*)?$/;
+// Lista de bancos de un país (para elegir el banco de cada cuenta)
+const BANCOS = /^\/aspsps\?country=[A-Z]{2}(&psu_type=(business|personal))?$/;
 const txt = (v: unknown, max: number) => typeof v === "string" && v.length > 0 && v.length <= max;
 
 // Solo se reenvían los campos conocidos, comprobados uno a uno
@@ -43,7 +45,7 @@ Deno.serve(async (req) => {
     if (typeof token !== "string" || token.split(".").length !== 3 || token.length > 4000) return err(400, "token no válido");
     let init: RequestInit;
     if (metodo === "GET") {
-      if (typeof ruta !== "string" || !LECTURA.test(ruta)) return err(400, "consulta no permitida");
+      if (typeof ruta !== "string" || !(LECTURA.test(ruta) || BANCOS.test(ruta))) return err(400, "consulta no permitida");
       init = { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } };
     } else if (metodo === "POST" && (ruta === "/auth" || ruta === "/sessions")) {
       let b;

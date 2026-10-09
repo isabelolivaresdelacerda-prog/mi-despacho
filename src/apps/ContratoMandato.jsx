@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { bloquesADocx, bloquesATexto } from "../docx.js";
 import { GuardarEnNube, RevisionIA, useAviso } from "../comunes.jsx";
 import { DialogoCorreo } from "../lib/CorreoUI.jsx";
-import { EditorClausulas, VistaDocumento, aplicarCambios, leerCambios } from "../lib/contratoUI.jsx";
+import { EditorClausulas, VistaDocumento, aplicarCambios, leerCambios, AvisoSinIA } from "../lib/contratoUI.jsx";
 import { guardar as guardarEnCarpeta, raizGuardada, DESTINO } from "../lib/carpetas.js";
 import { parte, firma, ParteForm, parteVacia, fmtFecha, fmtEur, or, num, eurosTxt, hoy, ACTIVO_VACIO, bloquesActivos, ActivosForm } from "../lib/contratoInmo.jsx";
 
@@ -178,7 +178,7 @@ export default function ContratoMandato({ config, irAAjustes }) {
       </div>
 
       <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Décima. Título de la cláusula." />
-      <div className="sin-ia"><strong>Este contrato no lo escribe la IA.</strong> El texto es una plantilla jurídica fija que se completa con tus datos y con las cláusulas que tú modifiques. La IA solo lo revisa si tú se lo pides aquí abajo, y no cambia nada por su cuenta.</div>
+      <AvisoSinIA />
       <RevisionIA construirPrompt={prompt} irAAjustes={irAAjustes} />
       <p className="muted pie">Borrador orientativo. Revísalo y adáptalo a cada operación antes de firmar.</p>
 

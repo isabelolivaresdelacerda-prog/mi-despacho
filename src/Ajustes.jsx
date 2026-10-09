@@ -1,4 +1,5 @@
 import DatosEmpresa from "./lib/DatosEmpresa.jsx";
+import CuentasBancarias from "./lib/CuentasBancarias.jsx";
 import { FUENTES, pilaCSS, cargarFuentes } from "./lib/marca.js";
 import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import { useState } from "react";
@@ -171,6 +172,7 @@ export default function Ajustes({ config, guardar }) {
         </section>
 
         <DatosEmpresa config={datos} guardar={(c) => { setDatos(c); guardar({ ...config, empresa: c.empresa }); }} />
+        <CuentasBancarias config={datos} guardar={(c) => { setDatos(c); guardar({ ...config, empresa: c.empresa }); }} aviso={aviso} />
 
         <section className="tarjeta">
           <h2>Mis documentos en la nube</h2>

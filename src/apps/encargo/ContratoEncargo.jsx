@@ -4,7 +4,7 @@ import { bloquesEncargo } from "./bloques.js";
 import { VERSION_CONTRATO, TIPOS } from "./modelo.js";
 import { bloquesADocx, bloquesATexto } from "../../docx.js";
 import { GuardarEnNube, RevisionIA, useAviso } from "../../comunes.jsx";
-import { EditorClausulas, VistaDocumento, aplicarCambios, leerCambios } from "../../lib/contratoUI.jsx";
+import { EditorClausulas, VistaDocumento, aplicarCambios, leerCambios, AvisoSinIA } from "../../lib/contratoUI.jsx";
 import { guardar as guardarEnCarpeta, raizGuardada, DESTINO } from "../../lib/carpetas.js";
 import { DialogoCorreo } from "../../lib/CorreoUI.jsx";
 
@@ -382,9 +382,7 @@ export default function ContratoEncargo({ config, irAAjustes }) {
             </ul>}
       </section>
 
-      <div className="sin-ia">
-        <strong>Este contrato no lo escribe la IA.</strong> El texto es una plantilla jurídica fija que se completa con tus datos y con las cláusulas que tú modifiques. La IA solo lo revisa si tú se lo pides aquí abajo, y no cambia nada por su cuenta.
-      </div>
+      <AvisoSinIA />
 
       <RevisionIA construirPrompt={prompt} irAAjustes={irAAjustes} />
       <p className="muted pie">Borrador orientativo. Revísalo y adáptalo a cada caso antes de firmar.</p>

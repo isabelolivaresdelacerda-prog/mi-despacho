@@ -20,7 +20,7 @@ import { revisarCarpeta } from "./inventario.js";
 import { planPorDefecto, opcionesFiscales, esESFL } from "../../lib/entidad.js";
 import { noPagada } from "./periodo.js";
 import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.js";
-import { AvisoIA, EstadoIALocal, useAviso } from "../../comunes.jsx";
+import { AvisoIA, EstadoIALocal, useAviso, TransparenciaIA } from "../../comunes.jsx";
 import "./contabilidad.css";
 
 const PESTANAS = [["resumen", "Resumen"], ["bandeja", "Bandeja de entrada"], ["facturas", "Facturas"], ["banco", "Banco y cierre"], ["impuestos", "Impuestos"], ["vinculados", "Escrituras y contratos"], ["libros", "Contabilidad"], ["documentos", "Documentos"], ["gestoria", "Mensaje gestoría"], ["exportar", "Exportar A3 / Sage"]];
@@ -160,12 +160,12 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
           const res = await hacerTodo({ raiz, empresa, propia, datos: corregirPropia(datos, propia), onPaso: (t) => setTarea((x) => ({ ...x, paso: t })) });
           setTarea({ paso: "", res }); if (res.bancoCaducado) setRenovar({ motivo: "La IA no pudo traer el banco: el permiso ha caducado (por ley hay que renovarlo cada 90 días)." }); await cargarExtra(); await cargar();
         }}>{tarea?.paso ? "La IA está trabajando…" : "✨ Hacer todo con la IA"}</button>
-        <button className="btn ghost" type="button" disabled={!datos || !!tarea?.paso} title="Trae los movimientos nuevos de tu cuenta (conexión segura PSD2). Si el permiso del banco ha caducado, te ofrece renovarlo" onClick={async () => { try { setTarea({ paso: "Trayendo los movimientos del banco…" }); const b = await import("./banco.js"); const x = await b.sincronizarBanco(raiz); setTarea(null); aviso(`Banco al día: ${x.nuevos} movimientos recibidos (${x.total} en total)`); if (x.diasPermiso != null && x.diasPermiso <= 10) setRenovar({ motivo: `El permiso del banco caduca en ${Math.max(0, x.diasPermiso)} días. Renuévalo ahora y no se corta la sincronización.`, pronto: true }); cargar(); } catch (e) { setTarea(null); if (e.caducado) setRenovar({ motivo: e.message }); else aviso(String(e.message || e)); } }}>Sincronizar banco</button>
+        <button className="btn ghost" type="button" disabled={!datos || !!tarea?.paso} title="Trae los movimientos nuevos de tu cuenta (conexión segura PSD2). Si el permiso del banco ha caducado, te ofrece renovarlo" onClick={async () => { try { setTarea({ paso: "Trayendo los movimientos del banco…" }); const b = await import("./banco.js"); const x = await b.sincronizarBanco(raiz); setTarea(null); aviso(`Banco al día: ${x.nuevos} movimientos recibidos (${x.total} en total)`); if (x.diasPermiso != null && x.diasPermiso <= 10) setRenovar({ motivo: `El permiso del banco caduca en ${Math.max(0, x.diasPermiso)} días. Renuévalo ahora y no se corta la sincronización.`, pronto: true }); cargar(); } catch (e) { setTarea(null); if (e.caducado) setRenovar({ motivo: e.message, iban: e.iban, banco: e.banco }); else aviso(String(e.message || e)); } }}>Sincronizar banco</button>
         <button className="btn ghost" type="button" disabled={!datos} onClick={() => setEnviar(true)}>Enviar a la gestoría</button>
         <button className="btn ghost" type="button" onClick={() => cargar()}>{cargando ? "Leyendo…" : "Actualizar"}</button>
         <a className="btn ghost" href="#/carpetas">Carpetas</a>
       </>} />
-      {renovar && <RenovarBanco raiz={raiz} motivo={renovar.motivo} pronto={renovar.pronto} onCerrar={() => setRenovar(null)} onHecho={async (txt) => { setRenovar(null); aviso(txt); await cargar(); }} />}
+      {renovar && <RenovarBanco raiz={raiz} motivo={renovar.motivo} pronto={renovar.pronto} iban={renovar.iban} banco={renovar.banco} onCerrar={() => setRenovar(null)} onHecho={async (txt) => { setRenovar(null); aviso(txt); await cargar(); }} />}
       {tarea && (tarea.paso ? <div className="tarea-ia" role="status"><span className="girando" aria-hidden="true" /> <strong>La IA está trabajando en tu ordenador.</strong> {tarea.paso} <span className="muted">Puedes seguir usando la app; no cierres esta pestaña.</span></div>
         : tarea.res && <div className="tarea-ia hecha" role="status"><strong>Hecho.</strong> {tarea.res.bancoNuevos != null ? `Banco: ${tarea.res.bancoNuevos} movimientos traídos · ` : ""}{tarea.res.facturas} facturas leídas{tarea.res.ilegibles ? ` (${tarea.res.ilegibles} ilegibles: rellénalas a mano)` : ""} · {tarea.res.banco} documentos del banco leídos ({tarea.res.punteables} con importe para puntear) · {tarea.res.renombrados} renombrados · {tarea.res.punteados || 0} movimientos del banco punteados{tarea.res.inventario ? ` · carpeta de la empresa: ${tarea.res.inventario.nuevos.length} documentos leídos, ${tarea.res.inventario.vinculados} vinculados` : ""}.{tarea.res.errores.length > 0 && <details><summary>{tarea.res.errores.length} avisos</summary><ul className="pequeño">{tarea.res.errores.slice(0, 30).map((e, i) => <li key={i}>{e}</li>)}</ul></details>} <button className="enlace" type="button" onClick={() => setTarea(null)}>Cerrar</button></div>)}
       <nav className="cont-tabs" role="tablist">
@@ -199,7 +199,7 @@ function Cabecera({ carpeta, acciones }) {
         <p className="muted">{carpeta ? <>Trabajando sobre la carpeta <strong>{carpeta}</strong>. Los documentos se quedan en tu OneDrive / Drive.</> : "La app está en Mi Despacho; tus documentos, en tu OneDrive o Google Drive."}</p>
       </div>
       {acciones && <div className="acciones">{acciones}</div>}
-      <div style={{ flexBasis: "100%" }}><AvisoIA /></div>
+      <div style={{ flexBasis: "100%" }}><AvisoIA /><TransparenciaIA que="lee, clasifica y propone (facturas, asientos, conciliación del banco)" compacto /></div>
     </header>
   );
 }
@@ -382,7 +382,7 @@ function Documentos({ raiz, aviso, recargar }) {
 
 // Elegir en el extracto el movimiento que paga (o cobra) una factura: primero los del mismo importe, luego los cercanos en fecha
 // Ventana para renovar el permiso del banco (PSD2: cada 90 días). Abre la web del banco, espera la vuelta y sincroniza.
-function RenovarBanco({ raiz, motivo, pronto, onCerrar, onHecho }) {
+function RenovarBanco({ raiz, motivo, pronto, iban, banco, onCerrar, onHecho }) {
   const [paso, setPaso] = useState("");
   const [error, setError] = useState("");
   const [url, setUrl] = useState("");
@@ -392,7 +392,7 @@ function RenovarBanco({ raiz, motivo, pronto, onCerrar, onHecho }) {
     const v = window.open("about:blank", "banco", "width=520,height=760"); // en el mismo clic, para que no la bloquee el navegador
     try {
       const b = await import("./banco.js");
-      const { hasta } = await b.renovarPermiso(raiz, v, setPaso);
+      const { hasta } = await b.renovarPermiso(raiz, v, setPaso, iban ? { iban, banco } : {});
       setPaso("Trayendo los movimientos…");
       const x = await b.sincronizarBanco(raiz);
       onHecho(`Banco renovado hasta el ${new Date(hasta).toLocaleDateString("es-ES")} · ${x.nuevos} movimientos recibidos`);
@@ -404,7 +404,7 @@ function RenovarBanco({ raiz, motivo, pronto, onCerrar, onHecho }) {
         <header><h2 id="rb-t">{pronto ? "Renueva el permiso del banco" : "Hay que renovar el banco"}</h2><button className="mc-x" onClick={onCerrar} aria-label="Cerrar">×</button></header>
         <div className="mc-cuerpo">
           <p>{motivo}</p>
-          <p className="muted pequeño">Se abre la web de Cajamar en una ventana: entra con tus claves, elige la cuenta de la empresa y acepta. Tus claves solo las ve el banco; Mi Despacho recibe un permiso de lectura de movimientos para 90 días, que se guarda en tu carpeta «programa».</p>
+          <p className="muted pequeño">Se abre la web de {banco || "tu banco"} en una ventana: entra con tus claves, elige la cuenta de la empresa y acepta. Tus claves solo las ve el banco; Mi Despacho recibe un permiso de lectura de movimientos para 90 días, que se guarda en tu carpeta «programa».</p>
           {paso && <p role="status"><span className="girando" aria-hidden="true" /> {paso}</p>}
           {error && <p className="error" role="alert">{error}</p>}
           <details className="pequeño"><summary>Si el banco dice que la dirección de vuelta no es válida</summary>

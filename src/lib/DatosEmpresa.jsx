@@ -1,7 +1,7 @@
 // Ajustes → Datos de la empresa (para la papelería corporativa, facturas y contratos)
 import { useState } from "react";
 import { FORMAS, OPCIONES_ESFL } from "./entidad.js";
-import { EMPRESA_VACIA, nifValido, ibanValido, pieMercantil } from "./empresa.js";
+import { EMPRESA_VACIA, nifValido, pieMercantil } from "./empresa.js";
 
 export default function DatosEmpresa({ config, guardar }) {
   const [e, setE] = useState({ ...EMPRESA_VACIA, razon_social: config.nombre || "", ...(config.empresa || {}) });
@@ -11,7 +11,6 @@ export default function DatosEmpresa({ config, guardar }) {
   );
   const errores = [];
   if (e.cif && !nifValido(e.cif)) errores.push("El CIF no es válido.");
-  if (e.iban && !ibanValido(e.iban)) errores.push("El IBAN no es válido.");
 
   return (
     <section className="tarjeta">
@@ -36,7 +35,6 @@ export default function DatosEmpresa({ config, guardar }) {
         {c("provincia", "Provincia")}
         {c("telefono", "Teléfono")}
         {c("web", "Web")}
-        {c("iban", "IBAN (para las facturas)")}
       </div>
       {["asociacion", "fundacion"].includes(e.forma) ? (<>
         <p className="ce-sub">Inscripción en el registro</p>
@@ -57,7 +55,7 @@ export default function DatosEmpresa({ config, guardar }) {
       {pieMercantil(e) && <p className="nota"><strong>Pie de documentos:</strong> {pieMercantil(e)}</p>}
       {errores.length > 0 && <p className="nota error">{errores.join(" ")}</p>}
       {msg && <p className="muted">{msg}</p>}
-      <button className="btn" type="button" disabled={errores.length > 0} onClick={() => { guardar({ ...config, empresa: { ...e, cif: e.cif.toUpperCase().replace(/[\s.-]/g, ""), iban: e.iban.toUpperCase().replace(/\s/g, "") } }); setMsg("Guardado"); }}>Guardar</button>
+      <button className="btn" type="button" disabled={errores.length > 0} onClick={() => { guardar({ ...config, empresa: { ...e, cif: e.cif.toUpperCase().replace(/[\s.-]/g, ""), cuentas: config.empresa?.cuentas, iban: config.empresa?.iban } }); /* las cuentas se guardan en su propio apartado */ setMsg("Guardado"); }}>Guardar</button>
     </section>
   );
 }

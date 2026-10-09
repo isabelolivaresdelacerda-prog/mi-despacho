@@ -469,3 +469,13 @@ label small { font-size: 12px; }
 /* Muestra de la marca en Ajustes */
 .muestra-marca { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-left: 4px solid; border-radius: 8px; background: var(--papel); }
 .muestra-marca strong { font-size: 20px; }
+
+/* Aviso de transparencia de IA (Reglamento (UE) 2024/1689, art. 50) */
+.transparencia-ia { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--brand-suave); font-size: 13.5px; line-height: 1.45; }
+.transparencia-ia.compacto { font-size: 12.5px; padding: 6px 10px; margin-top: 8px; }
+.ti-sello { flex: none; font-weight: 700; font-size: 11px; letter-spacing: .06em; padding: 2px 6px; border-radius: 6px; background: var(--brand); color: var(--sobre-brand); }
+.ia-generado { font-size: 12px; font-weight: 600; color: var(--suave); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.sin-ia p { margin: 0 0 6px; } .sin-ia p:last-child { margin: 0; }
+.cuenta-banco { margin-bottom: 12px; }
+.estado-banco { font-size: 13px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--linea); }
+.estado-banco.ok { color: #1E6B3A; border-color: #1E6B3A; } .estado-banco.pronto { color: var(--aviso); border-color: var(--aviso); } .estado-banco.caducado { color: var(--error); border-color: var(--error); }

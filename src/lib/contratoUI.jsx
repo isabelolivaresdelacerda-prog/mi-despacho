@@ -119,3 +119,13 @@ export function VistaDocumento({ bloques }) {
     </article>
   );
 }
+
+// Aviso común de todos los contratos: no los escribe la IA y los datos no salen de tu ordenador
+export function AvisoSinIA() {
+  return (
+    <div className="sin-ia">
+      <p><strong>Este contrato está hecho sin IA.</strong> El texto es una plantilla jurídica fija que se completa con tus datos y con las cláusulas que tú modifiques. La IA solo lo revisa si tú se lo pides aquí abajo, y no cambia nada por su cuenta.</p>
+      <p><strong>Tus datos no salen de aquí.</strong> Lo que escribes en el formulario solo se usa, en tu propio navegador, para generar el documento que descargas o guardas en tu carpeta. Ningún dato sale de tu Drive u OneDrive ni se comparte con una IA abierta: la revisión, si la pides, la hace la IA instalada en tu ordenador. Solo si tú activas en Ajustes la IA en la nube se usaría otra, y la app te avisa antes.</p>
+    </div>
+  );
+}
