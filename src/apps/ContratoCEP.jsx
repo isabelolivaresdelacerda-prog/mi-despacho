@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import FirmaContrato, { leerExpediente, firmanteDe } from "../lib/FirmaContrato.jsx";
 import { bloquesADocx, bloquesATexto } from "../docx.js";
 import { GuardarEnNube, RevisionIA, useAviso } from "../comunes.jsx";
 import NegocioCampos from "./cuentas/NegocioCampos.jsx";
@@ -14,8 +15,8 @@ const or = (v, etq = "●") => (v || "").trim() || `[${etq}]`;
 
 const EJEMPLO = {
   ciudad: "", fecha: new Date().toISOString().slice(0, 10),
-  g_nombre: "", g_nif: "", g_dom: "", g_rep: "", g_cargo: "",
-  p_nombre: "", p_nif: "", p_dom: "", p_rep: "", p_cargo: "",
+  g_nombre: "", g_nif: "", g_dom: "", g_rep: "", g_rep_dni: "", g_cargo: "",
+  p_nombre: "", p_nif: "", p_dom: "", p_rep: "", p_rep_dni: "", p_cargo: "",
   neg: { ...NEGOCIO_VACIO },
   importe: "", f_aport: "", iban: "",
   pct: "", perdidas: "limite", info: "trimestral", dias: "60",
@@ -75,6 +76,12 @@ function construir(d) {
 
 const CLAVE_CAMBIOS = "md-cep-clausulas";
 
+// Firmantes: si hay representante, firma él por la sociedad; si no, la propia persona
+const partesCEP = (d) => [["g", "Gestor"], ["p", "Partícipe"]].map(([k, etiqueta]) => {
+  const rep = (d[k + "_rep"] || "").trim();
+  return { rol: k, etiqueta, entidad: (d[k + "_nombre"] || "").trim(), nif: (d[k + "_nif"] || "").trim(), nombre: rep || (d[k + "_nombre"] || "").trim(), dni: rep ? (d[k + "_rep_dni"] || "").trim() : (d[k + "_nif"] || "").trim(), cargo: rep ? (d[k + "_cargo"] || "representante").trim() : "en su propio nombre", juridica: !!rep };
+});
+
 export default function ContratoCEP({ config, irAAjustes }) {
   const [d, setD] = useState(EJEMPLO);
   const [doc, setDoc] = useState(null); // { blob, nombre } cuando se crea
@@ -82,7 +89,9 @@ export default function ContratoCEP({ config, irAAjustes }) {
   const [correo, setCorreo] = useState(false);
   const [cambios, setCambios] = useState(() => leerCambios(CLAVE_CAMBIOS));
   const base = useMemo(() => construir(d), [d]);
-  const bloques = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const [exp, setExp] = useState(() => leerExpediente("md-cep-expediente")); // contrato cerrado para firmar
+  const bloquesVivos = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const bloques = exp?.bloques || bloquesVivos;
 
   const campo = (k) => ({ value: d[k], onChange: (e) => setD({ ...d, [k]: e.target.value }) });
 
@@ -140,6 +149,8 @@ export default function ContratoCEP({ config, irAAjustes }) {
 
       <div className="dos-col">
         <form className="formulario" onSubmit={(e) => e.preventDefault()} autoComplete="off">
+          {exp && <p className="nota">El contrato está cerrado para la firma: los datos ya no se pueden cambiar. Para cambiarlos, pulsa «Reabrir» en «Firma electrónica».</p>}
+          <fieldset disabled={!!exp} className="bloqueo">
           <fieldset><legend>Lugar y fecha</legend>
             <div className="fila">
               <label>Ciudad<input {...campo("ciudad")} /></label>
@@ -157,6 +168,7 @@ export default function ContratoCEP({ config, irAAjustes }) {
                 <label>Representante (si es sociedad)<input {...campo(k + "_rep")} /></label>
                 <label>Cargo o poder<input {...campo(k + "_cargo")} /></label>
               </div>
+              {(d[k + "_rep"] || "").trim() && <label>DNI del representante (para la firma)<input {...campo(k + "_rep_dni")} /></label>}
             </fieldset>
           ))}
           <NegocioCampos valor={d.neg || NEGOCIO_VACIO} onChange={(neg) => setD({ ...d, neg })} />
@@ -191,12 +203,14 @@ export default function ContratoCEP({ config, irAAjustes }) {
             {d.dur === "fecha" && <label>Fecha de terminación<input type="date" {...campo("f_fin")} /></label>}
             <label>Tribunales de<input {...campo("trib")} /></label>
           </fieldset>
+          </fieldset>
         </form>
 
         <VistaDocumento bloques={bloques} />
       </div>
 
-      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Decimocuarta. Título de la cláusula." />
+      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Decimocuarta. Título de la cláusula." bloqueado={!!exp} />
+      <FirmaContrato clave="md-cep-expediente" titulo="Contrato de cuentas en participación" nombreBase={"Contrato cuentas en participacion - " + ((d.p_nombre || "participe").trim())} bloques={bloquesVivos} partes={partesCEP(d)} expediente={exp} setExpediente={setExp} aviso={aviso} />
 
       <AvisoSinIA />
 

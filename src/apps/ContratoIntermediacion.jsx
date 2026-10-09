@@ -1,6 +1,7 @@
 // Contrato de intermediación inmobiliaria puntual y reconocimiento de honorarios. Plantilla jurídica fija y anónima:
 // formulario + borrador en vivo + Word + cláusulas editables, igual que el resto de contratos.
 import { useMemo, useState } from "react";
+import FirmaContrato, { leerExpediente, firmanteDe } from "../lib/FirmaContrato.jsx";
 import { bloquesADocx, bloquesATexto } from "../docx.js";
 import { GuardarEnNube, RevisionIA, useAviso } from "../comunes.jsx";
 import { DialogoCorreo } from "../lib/CorreoUI.jsx";
@@ -83,7 +84,9 @@ export default function ContratoIntermediacion({ config, irAAjustes }) {
   const [correo, setCorreo] = useState(false);
   const [cambios, setCambios] = useState(() => leerCambios(CLAVE_CAMBIOS));
   const base = useMemo(() => construir(d), [d]);
-  const bloques = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const [exp, setExp] = useState(() => leerExpediente("md-intermediacion-expediente")); // contrato cerrado para firmar
+  const bloquesVivos = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const bloques = exp?.bloques || bloquesVivos;
   const campo = (k) => ({ value: d[k], onChange: (e) => setD({ ...d, [k]: e.target.value }) });
   // Tu empresa puede ser el cliente o el intermediario: botón para rellenar una u otra con tus datos
   const misDatos = (pre) => setD({ ...d, [pre + "_nombre"]: config?.empresa?.razon_social || d[pre + "_nombre"], [pre + "_nif"]: config?.empresa?.cif || d[pre + "_nif"], [pre + "_dom"]: config?.empresa?.domicilio || d[pre + "_dom"] });
@@ -130,6 +133,8 @@ export default function ContratoIntermediacion({ config, irAAjustes }) {
 
       <div className="dos-col">
         <form className="formulario" onSubmit={(e) => e.preventDefault()} autoComplete="off">
+          {exp && <p className="nota">El contrato está cerrado para la firma: los datos ya no se pueden cambiar. Para cambiarlos, pulsa «Reabrir» en «Firma electrónica».</p>}
+          <fieldset disabled={!!exp} className="bloqueo">
           <fieldset><legend>Lugar y fecha</legend>
             <div className="fila"><label>Ciudad<input {...campo("ciudad")} /></label><label>Fecha<input type="date" {...campo("fecha")} /></label></div>
             <label>Quién paga los honorarios<select {...campo("rol")}><option>Comprador</option><option>Vendedor</option></select></label>
@@ -164,11 +169,13 @@ export default function ContratoIntermediacion({ config, irAAjustes }) {
             <div className="fila"><label>Validez del contrato (meses)<input type="number" min="1" {...campo("validez")} /></label><label>Exclusiva<select {...campo("excl")}><option value="no">Sin exclusiva</option><option value="si">En exclusiva</option></select></label></div>
             <label>Tribunales de<input {...campo("trib")} /></label>
           </fieldset>
+          </fieldset>
         </form>
         <VistaDocumento bloques={bloques} />
       </div>
 
-      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Décima. Título de la cláusula." />
+      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Décima. Título de la cláusula." bloqueado={!!exp} />
+      <FirmaContrato clave="md-intermediacion-expediente" titulo="Contrato de intermediación inmobiliaria" nombreBase={nombreArchivo(d).replace(/\.docx$/, "")} bloques={bloquesVivos} partes={[firmanteDe(d, "a", "a", d.rol === "Vendedor" ? "Vendedor" : "Comprador"), firmanteDe(d, "m", "m", "Intermediario")]} expediente={exp} setExpediente={setExp} aviso={aviso} />
       <AvisoSinIA />
       <RevisionIA construirPrompt={prompt} irAAjustes={irAAjustes} />
       <p className="muted pie">Borrador orientativo. Revísalo y adáptalo a cada operación antes de firmar.</p>

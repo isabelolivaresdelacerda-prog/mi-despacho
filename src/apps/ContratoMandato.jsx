@@ -1,6 +1,7 @@
 // Contrato de mandato de venta (intermediación inmobiliaria o de activos). Plantilla jurídica fija y genérica:
 // mismo sistema que cuentas en participación (formulario + borrador en vivo + Word + cláusulas editables).
 import { useMemo, useState } from "react";
+import FirmaContrato, { leerExpediente, firmanteDe } from "../lib/FirmaContrato.jsx";
 import { bloquesADocx, bloquesATexto } from "../docx.js";
 import { GuardarEnNube, RevisionIA, useAviso } from "../comunes.jsx";
 import { DialogoCorreo } from "../lib/CorreoUI.jsx";
@@ -85,7 +86,9 @@ export default function ContratoMandato({ config, irAAjustes }) {
   const [correo, setCorreo] = useState(false);
   const [cambios, setCambios] = useState(() => leerCambios(CLAVE_CAMBIOS));
   const base = useMemo(() => construir(d), [d]);
-  const bloques = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const [exp, setExp] = useState(() => leerExpediente("md-mandato-expediente")); // contrato cerrado para firmar
+  const bloquesVivos = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const bloques = exp?.bloques || bloquesVivos;
   const campo = (k) => ({ value: d[k], onChange: (e) => setD({ ...d, [k]: e.target.value }) });
 
   async function crear() {
@@ -131,6 +134,8 @@ export default function ContratoMandato({ config, irAAjustes }) {
 
       <div className="dos-col">
         <form className="formulario" onSubmit={(e) => e.preventDefault()} autoComplete="off">
+          {exp && <p className="nota">El contrato está cerrado para la firma: los datos ya no se pueden cambiar. Para cambiarlos, pulsa «Reabrir» en «Firma electrónica».</p>}
+          <fieldset disabled={!!exp} className="bloqueo">
           <fieldset><legend>Lugar y fecha</legend>
             <div className="fila"><label>Ciudad<input {...campo("ciudad")} /></label><label>Fecha<input type="date" {...campo("fecha")} /></label></div>
           </fieldset>
@@ -173,11 +178,13 @@ export default function ContratoMandato({ config, irAAjustes }) {
             <div className="fila"><label>Confidencialidad (años)<input type="number" min="0" {...campo("conf")} /></label><label>Plazo para subsanar (días)<input type="number" min="0" {...campo("subsana")} /></label></div>
             <label>Tribunales de<input {...campo("trib")} /></label>
           </fieldset>
+          </fieldset>
         </form>
         <VistaDocumento bloques={bloques} />
       </div>
 
-      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Décima. Título de la cláusula." />
+      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Décima. Título de la cláusula." bloqueado={!!exp} />
+      <FirmaContrato clave="md-mandato-expediente" titulo="Contrato de mandato de venta" nombreBase={nombreArchivo(d).replace(/\.docx$/, "")} bloques={bloquesVivos} partes={[firmanteDe(d, "a", "a", "Mandante"), firmanteDe(d, "m", "m", "Mandatario")]} expediente={exp} setExpediente={setExp} aviso={aviso} />
       <AvisoSinIA />
       <RevisionIA construirPrompt={prompt} irAAjustes={irAAjustes} />
       <p className="muted pie">Borrador orientativo. Revísalo y adáptalo a cada operación antes de firmar.</p>

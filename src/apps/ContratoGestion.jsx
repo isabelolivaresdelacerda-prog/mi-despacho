@@ -1,6 +1,7 @@
 // Contrato de gestión (asset management) de una sociedad inversora inmobiliaria. Plantilla jurídica fija y anónima:
 // formulario + borrador en vivo + Word + cláusulas editables, igual que el resto de contratos.
 import { useMemo, useState } from "react";
+import FirmaContrato, { leerExpediente, firmanteDe } from "../lib/FirmaContrato.jsx";
 import { bloquesADocx, bloquesATexto } from "../docx.js";
 import { GuardarEnNube, RevisionIA, useAviso } from "../comunes.jsx";
 import { DialogoCorreo } from "../lib/CorreoUI.jsx";
@@ -150,7 +151,9 @@ export default function ContratoGestion({ config, irAAjustes }) {
   const [correo, setCorreo] = useState(false);
   const [cambios, setCambios] = useState(() => leerCambios(CLAVE_CAMBIOS));
   const base = useMemo(() => construir(d), [d]);
-  const bloques = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const [exp, setExp] = useState(() => leerExpediente("md-gestion-expediente")); // contrato cerrado para firmar
+  const bloquesVivos = useMemo(() => aplicarCambios(base, cambios), [base, cambios]);
+  const bloques = exp?.bloques || bloquesVivos;
   const campo = (k) => ({ value: d[k], onChange: (e) => setD({ ...d, [k]: e.target.value }) });
 
   async function crear() {
@@ -196,6 +199,8 @@ export default function ContratoGestion({ config, irAAjustes }) {
 
       <div className="dos-col">
         <form className="formulario" onSubmit={(e) => e.preventDefault()} autoComplete="off">
+          {exp && <p className="nota">El contrato está cerrado para la firma: los datos ya no se pueden cambiar. Para cambiarlos, pulsa «Reabrir» en «Firma electrónica».</p>}
+          <fieldset disabled={!!exp} className="bloqueo">
           <fieldset><legend>Lugar y fecha</legend>
             <div className="fila"><label>Ciudad<input {...campo("ciudad")} /></label><label>Fecha<input type="date" {...campo("fecha")} /></label></div>
           </fieldset>
@@ -246,11 +251,13 @@ export default function ContratoGestion({ config, irAAjustes }) {
             </div>}
             <label>Tribunales de<input {...campo("trib")} /></label>
           </fieldset>
+          </fieldset>
         </form>
         <VistaDocumento bloques={bloques} />
       </div>
 
-      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Decimoquinta. Título de la cláusula." />
+      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Decimoquinta. Título de la cláusula." bloqueado={!!exp} />
+      <FirmaContrato clave="md-gestion-expediente" titulo="Contrato de gestión" nombreBase={nombreArchivo(d).replace(/\.docx$/, "")} bloques={bloquesVivos} partes={[firmanteDe(d, "a", "a", "Sociedad"), firmanteDe(d, "m", "m", "Gestor")]} expediente={exp} setExpediente={setExp} aviso={aviso} />
       <AvisoSinIA />
       <RevisionIA construirPrompt={prompt} irAAjustes={irAAjustes} />
       <p className="muted pie">Borrador orientativo. Revísalo y adáptalo a cada caso antes de firmar.</p>
