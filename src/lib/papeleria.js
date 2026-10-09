@@ -13,6 +13,9 @@ export const ESTILOS = {
 const hex = (c) => String(c || "#7A1F2B").replace("#", "").toUpperCase().padEnd(6, "0").slice(0, 6);
 const x = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+// Fuentes del estilo, cambiadas por las de la marca si la empresa las ha elegido
+const conMarca = (estilo, marca = {}) => ({ ...ESTILOS[estilo], ...(marca.fuenteTit ? { tit: marca.fuenteTit } : {}), ...(marca.fuenteTxt ? { txt: marca.fuenteTxt } : {}) });
+
 export function textoLegal(e = {}) {
   const dom = [e.domicilio, [e.cp, e.municipio].filter(Boolean).join(" "), e.provincia && e.provincia !== e.municipio ? `(${e.provincia})` : ""].filter(Boolean).join(", ");
   const reg = e.registro ? `Inscrita en el Registro Mercantil de ${e.registro}${e.tomo ? `, tomo ${e.tomo}` : ""}${e.folio ? `, folio ${e.folio}` : ""}${e.hoja ? `, hoja ${e.hoja}` : ""}${e.inscripcion ? `, inscripción ${e.inscripcion}` : ""}` : "";
@@ -31,22 +34,22 @@ async function medidasLogo(dataUrl, altoMm) {
   return { w: Math.min(w, 60 * 36000), h: Math.round(Math.min(w, 60 * 36000) / (im.width / im.height)) };
 }
 
-function cabeceraPie(estilo, empresa, color, conLogo, emu) {
-  const s = ESTILOS[estilo], c = hex(color), L = textoLegal(empresa), nombre = empresa.razon_social || "Nombre de la empresa";
+function cabeceraPie(estilo, empresa, color, conLogo, emu, marca = {}) {
+  const s = conMarca(estilo, marca), gris = marca.color2 ? hex(marca.color2) : null, c = hex(color), L = textoLegal(empresa), nombre = empresa.razon_social || "Nombre de la empresa";
   const logo = conLogo ? img(emu) : "";
   let cab, pie;
   if (estilo === "clasico") {
     cab = (conLogo ? p(logo, { jc: "center", despues: 60 }) : "") + p(r(nombre, { f: s.tit, sz: 30, b: true, c }), { jc: "center", bb: c, despues: 0 });
-    pie = p(r(L.linea1, { f: s.txt, sz: 15, c: "666666" }), { jc: "center", despues: 0 }) + p(r(L.linea2, { f: s.txt, sz: 14, c: "888888", i: true }), { jc: "center", despues: 0 });
+    pie = p(r(L.linea1, { f: s.txt, sz: 15, c: "666666" }), { jc: "center", despues: 0 }) + p(r(L.linea2, { f: s.txt, sz: 14, c: gris || "888888", i: true }), { jc: "center", despues: 0 });
   } else if (estilo === "moderno") {
     cab = `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:bottom w:val="single" w:sz="18" w:color="${c}"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="2500" w:type="pct"/><w:vAlign w:val="center"/></w:tcPr>${conLogo ? p(logo, { despues: 80 }) : p(r(nombre, { f: s.tit, sz: 28, b: true, c }), { despues: 80 })}</w:tc><w:tc><w:tcPr><w:tcW w:w="2500" w:type="pct"/><w:vAlign w:val="center"/></w:tcPr>${p(r(nombre, { f: s.tit, sz: 20, b: true, c: "333333" }), { jc: "right", despues: 0 })}${p(r([empresa.web, empresa.email].filter(Boolean).join("  ·  "), { f: s.txt, sz: 16, c: "777777" }), { jc: "right", despues: 80 })}</w:tc></w:tr></w:tbl>`;
-    pie = p(r(L.linea1, { f: s.txt, sz: 15, c: "555555" }), { bt: c, btsz: 12, despues: 0 }) + p(r(L.linea2, { f: s.txt, sz: 14, c: "888888" }), { despues: 0 });
+    pie = p(r(L.linea1, { f: s.txt, sz: 15, c: "555555" }), { bt: c, btsz: 12, despues: 0 }) + p(r(L.linea2, { f: s.txt, sz: 14, c: gris || "888888" }), { despues: 0 });
   } else if (estilo === "minimal") {
     cab = (conLogo ? p(logo, { jc: "right", despues: 40 }) : "") + p(r(nombre, { f: s.tit, sz: 16, caps: true, sp: 60, c: "333333" }), { jc: "right", despues: 0 });
-    pie = p(r([L.linea1, L.linea2].filter(Boolean).join(" · "), { f: s.txt, sz: 13, c: "9A9A9A" }), { jc: "left", despues: 0 });
+    pie = p(r([L.linea1, L.linea2].filter(Boolean).join(" · "), { f: s.txt, sz: 13, c: gris || "9A9A9A" }), { jc: "left", despues: 0 });
   } else {
     cab = p((conLogo ? logo + r("   ", { f: s.tit }) : "") + r(nombre, { f: s.tit, sz: 32, b: true, c: "FFFFFF" }), { shd: c, despues: 0, antes: 0, ind: 0, line: 360 }) + p(r(" ", { f: s.txt, sz: 8 }), { despues: 0 });
-    pie = p(r(L.linea1, { f: s.txt, sz: 15, c: "FFFFFF" }), { shd: c, jc: "center", despues: 0 }) + p(r(L.linea2, { f: s.txt, sz: 14, c: "555555" }), { jc: "center", despues: 0 });
+    pie = p(r(L.linea1, { f: s.txt, sz: 15, c: "FFFFFF" }), { shd: c, jc: "center", despues: 0 }) + p(r(L.linea2, { f: s.txt, sz: 14, c: gris || "555555" }), { jc: "center", despues: 0 });
   }
   return {
     header: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}>${cab}</w:hdr>`,
@@ -54,8 +57,8 @@ function cabeceraPie(estilo, empresa, color, conLogo, emu) {
   };
 }
 
-function cuerpo(tipo, estilo, empresa, color) {
-  const s = ESTILOS[estilo], c = hex(color), T = (t, o = {}) => r(t, { f: s.txt, sz: 22, ...o });
+function cuerpo(tipo, estilo, empresa, color, marca = {}) {
+  const s = conMarca(estilo, marca), c = hex(color), T = (t, o = {}) => r(t, { f: s.txt, sz: 22, ...o });
   const hoy = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   if (tipo === "carta") return [
     p(T(`${empresa.municipio || "Madrid"}, ${hoy}`), { jc: "right", antes: 240, despues: 360 }),
@@ -84,11 +87,11 @@ function cuerpo(tipo, estilo, empresa, color) {
   ].join("");
 }
 
-export async function docxCorporativo({ tipo, estilo, empresa = {}, color, logo }) {
+export async function docxCorporativo({ tipo, estilo, empresa = {}, color, logo, marca = {} }) {
   const conLogo = /^data:image\/(png|jpe?g)/.test(logo || "");
   const emu = conLogo ? await medidasLogo(logo, estilo === "minimal" ? 9 : estilo === "ejecutivo" ? 10 : 14) : null;
-  const { header, footer } = cabeceraPie(estilo, empresa, color, conLogo, emu);
-  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${cuerpo(tipo, estilo, empresa, color)}<w:sectPr><w:headerReference w:type="default" r:id="rCab"/><w:footerReference w:type="default" r:id="rPie"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="2200" w:right="1418" w:bottom="1700" w:left="1418" w:header="600" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const { header, footer } = cabeceraPie(estilo, empresa, color, conLogo, emu, marca);
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${cuerpo(tipo, estilo, empresa, color, marca)}<w:sectPr><w:headerReference w:type="default" r:id="rCab"/><w:footerReference w:type="default" r:id="rPie"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="2200" w:right="1418" w:bottom="1700" w:left="1418" w:header="600" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   const z = new JSZip();
   z.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>`);
   z.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);

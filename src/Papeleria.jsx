@@ -2,6 +2,7 @@
 // (hoja corporativa y plantilla de informe en Word, facturas en PDF). Se puede cambiar, pero pide confirmación.
 import { useState } from "react";
 import { ESTILOS, textoLegal, docxCorporativo, facturaPDF } from "./lib/papeleria.js";
+import { pilaCSS } from "./lib/marca.js";
 import { useAviso } from "./comunes.jsx";
 
 const descargar = (blob, nombre) => { const u = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = u; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); };
@@ -22,14 +23,14 @@ function Mini({ estilo, tipo, config }) {
     : tipo === "informe"
       ? <div className="pm-cuerpo pm-portada"><small style={{ color: c }}>INFORME</small><strong style={{ color: estilo === "ejecutivo" ? c : undefined }}>Título del informe</strong><span>Subtítulo o asunto</span></div>
       : <div className="pm-cuerpo"><div className="pm-fact-t" style={{ color: estilo === "minimal" ? undefined : c }}>FACTURA</div><div className="pm-fact-dos"><span><b>Emisor</b><br />{nombre}</span><span><b>Cliente</b><br />Cliente S.L.</span></div><div className="pm-fact-tabla" style={estilo === "moderno" || estilo === "ejecutivo" ? { background: c } : { borderColor: c }} /><i /><i /><div className="pm-fact-total" style={estilo === "moderno" || estilo === "ejecutivo" ? { background: c, color: "#fff" } : {}}>TOTAL 1.210,00 €</div></div>;
-  return <div className={"pm-hoja pm-" + estilo} style={{ "--pm-c": c }}>{estilo === "moderno" && <span className="pm-franja" style={{ background: c }} />}{cab}{cuerpo}{pie}</div>;
+  return <div className={"pm-hoja pm-" + estilo} style={{ "--pm-c": c, ...(config.marca?.fuenteTxt ? { fontFamily: pilaCSS(config.marca.fuenteTxt) } : {}) }}>{estilo === "moderno" && <span className="pm-franja" style={{ background: c }} />}{cab}{cuerpo}{pie}</div>;
 }
 
 export default function Papeleria({ config, guardar }) {
   const [aviso, nodoAviso] = useAviso();
   const [ocupado, setOcupado] = useState("");
   const elegido = config.papeleria;
-  const datos = { empresa: { razon_social: config.nombre, ...(config.empresa || {}) }, color: config.color, logo: config.logo };
+  const datos = { empresa: { razon_social: config.nombre, ...(config.empresa || {}) }, color: config.color, logo: config.logo, marca: config.marca || {} };
   const faltan = !datos.empresa.cif || !datos.empresa.domicilio;
   const elegir = (id) => {
     if (elegido && elegido !== id && !confirm(`Tu empresa ya usa el estilo «${ESTILOS[elegido].nombre}». ¿Cambiarlo por «${ESTILOS[id].nombre}» para todos los documentos nuevos?`)) return;

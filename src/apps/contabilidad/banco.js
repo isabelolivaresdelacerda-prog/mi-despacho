@@ -42,76 +42,144 @@ async function proxy(ruta, tk, metodo = "GET", cuerpo) {
 }
 const fmt = (iso) => { const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
 
+// ---- Varias cuentas y varios bancos ----
+// banco_api_config.json (carpeta «programa») guarda la aplicación de Enable Banking de la empresa (application_id y la
+// clave .pem, una sola para todos los bancos) y una «conexión» por cuenta: { iban, aspsp_name, aspsp_country, psu_type,
+// session_id, account_uid, valid_until }. Los ficheros antiguos (una sola cuenta de Cajamar en la raíz) se leen igual.
+const limpiaIban = (v) => String(v || "").replace(/\s+/g, "").toUpperCase();
+export function conexiones(cfg) {
+  if (Array.isArray(cfg.conexiones)) return cfg.conexiones;
+  if (cfg.account_uid) {
+    const iban = (cfg._cuentas || []).find((c) => c.uid === cfg.account_uid)?.iban || "";
+    return [{ iban, aspsp_name: cfg.aspsp_name || "Cajamar", aspsp_country: cfg.aspsp_country || "ES", psu_type: cfg.psu_type || "business", session_id: cfg.session_id, account_uid: cfg.account_uid, valid_until: cfg.valid_until, _cuentas: cfg._cuentas, _antigua: true }];
+  }
+  return [];
+}
+async function guardarConexion(raiz, cfg, cx) {
+  const lista = conexiones(cfg).filter((c) => !(limpiaIban(c.iban) && limpiaIban(c.iban) === limpiaIban(cx.iban)) && !(c.account_uid && c.account_uid === cx.account_uid));
+  const nuevo = { ...cfg, conexiones: [...lista, cx] };
+  // los campos antiguos de una sola cuenta ya no se usan
+  ["session_id", "account_uid", "valid_until", "_cuentas", "aspsp_name", "aspsp_country", "psu_type", "_auth_iniciada", "_state"].forEach((k) => delete nuevo[k]);
+  await escribirJSON(raiz, "banco_api_config.json", nuevo);
+}
+async function tokenDe(raiz, cfg) {
+  if (!cfg.application_id) throw new Error("Falta dar de alta la conexión bancaria de la empresa (aplicación de Enable Banking). Mira «Cómo se conecta un banco» en Ajustes › Cuentas bancarias.");
+  const dir = await dirEstado(raiz);
+  let pem;
+  try { pem = await (await (await dir.getFileHandle(cfg.key_file || "enablebanking_key.pem")).getFile()).text(); }
+  catch { throw new Error("No encuentro la clave del banco («" + (cfg.key_file || "enablebanking_key.pem") + "») en la carpeta «programa» de la contabilidad."); }
+  return token(cfg, pem);
+}
+
 export async function bancoConfigurado(raiz) {
   const cfg = await leerJSON(raiz, "banco_api_config.json", {});
-  return !!(cfg.application_id && cfg.account_uid);
+  return !!(cfg.application_id && conexiones(cfg).some((c) => c.account_uid));
+}
+// ¿Está la empresa dada de alta en Enable Banking? (sin esto no se puede conectar ningún banco)
+export async function appBancoLista(raiz) {
+  const cfg = await leerJSON(raiz, "banco_api_config.json", {});
+  return !!cfg.application_id;
+}
+// Estado de cada cuenta conectada: [{ iban, banco, hasta, dias }]
+export async function estadoConexiones(raiz) {
+  const cfg = await leerJSON(raiz, "banco_api_config.json", {});
+  return conexiones(cfg).map((c) => ({ iban: limpiaIban(c.iban), banco: c.aspsp_name, hasta: c.valid_until || null, dias: c.valid_until ? Math.floor((Date.parse(c.valid_until) - Date.now()) / 86400000) : null }));
+}
+// Bancos que se pueden conectar en un país (lista de Enable Banking)
+export async function listarBancos(raiz, pais = "ES") {
+  const cfg = await leerJSON(raiz, "banco_api_config.json", {});
+  const tk = await tokenDe(raiz, cfg);
+  const r = await proxy(`/aspsps?country=${pais}`, tk);
+  return (r.aspsps || []).map((a) => ({ nombre: a.name, pais: a.country, tipos: a.psu_types || [] })).sort((x, y) => x.nombre.localeCompare(y.nombre, "es"));
 }
 
-// Descarga los movimientos y los junta con los que ya había (no se pierde nada de lo anterior a los 90 días que da el banco)
+// Descarga los movimientos de TODAS las cuentas conectadas y los junta con los que ya había
+// (no se pierde nada de lo anterior a los 90 días que da el banco). Cada movimiento lleva su «cuenta» (IBAN).
 export async function sincronizarBanco(raiz) {
   const cfg = await leerJSON(raiz, "banco_api_config.json", {});
-  if (!cfg.application_id || !cfg.account_uid) throw new Error("Este banco no está conectado todavía.");
-  const dir = await dirEstado(raiz);
-  const pem = await (await (await dir.getFileHandle(cfg.key_file || "enablebanking_key.pem")).getFile()).text();
-  const tk = await token(cfg, pem);
-  // Antes de pedir movimientos se mira si el permiso sigue vivo (si no, la app ofrece renovarlo)
-  if (cfg.session_id) {
-    const ses = await proxy(`/sessions/${cfg.session_id}`, tk).catch((e) => { if (e.caducado) throw e; return null; });
-    const hasta = ses?.access?.valid_until;
-    if (ses && (ses.status && ses.status !== "AUTHORIZED" || (hasta && Date.parse(hasta) < Date.now()))) throw new PermisoCaducado();
-    if (hasta && hasta !== cfg.valid_until) { cfg.valid_until = hasta; await escribirJSON(raiz, "banco_api_config.json", cfg); }
-  }
-  const nuevos = [];
-  let cont = null;
-  for (let i = 0; i < 50; i++) {
-    const r = await proxy(`/accounts/${cfg.account_uid}/transactions${cont ? `?continuation_key=${encodeURIComponent(cont)}` : ""}`, tk);
-    for (const t of r.transactions || []) {
-      let imp = num((t.transaction_amount || {}).amount);
-      if (/^(DBIT|DEBIT)$/i.test(String(t.credit_debit_indicator || ""))) imp = -Math.abs(imp);
-      const rem = t.remittance_information; const parte = (imp < 0 ? t.creditor : t.debtor) || {};
-      nuevos.push({ fecha: fmt(t.booking_date || t.value_date), concepto: (Array.isArray(rem) ? rem.join(" ") : String(rem || "")).slice(0, 120), importe: Math.round(imp * 100) / 100, tercero: String(parte.name || "").slice(0, 80), _origen: "api" });
-    }
-    cont = r.continuation_key; if (!cont) break;
-  }
+  const lista = conexiones(cfg).filter((c) => c.account_uid);
+  if (!cfg.application_id || !lista.length) throw new Error("No hay ninguna cuenta bancaria conectada todavía.");
+  const tk = await tokenDe(raiz, cfg);
   const previo = await leerJSON(raiz, "extracto_api.json", { movimientos: [] });
-  const desde = nuevos.map((m) => fechaOrden(m.fecha)).sort()[0] || "9999";
-  const antiguos = (previo.movimientos || []).filter((m) => fechaOrden(m.fecha) < desde);
-  const movimientos = [...antiguos, ...nuevos].sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
+  let todos = previo.movimientos || [];
+  const ibanAntiguo = limpiaIban(lista.find((c) => c._antigua)?.iban || lista[0]?.iban);
+  todos = todos.map((m) => (m.cuenta ? m : { ...m, cuenta: ibanAntiguo })); // los guardados antes de haber varias cuentas
+  let nuevosTotal = 0; const caducadas = []; const errores = [];
+  for (const cx of lista) {
+    const iban = limpiaIban(cx.iban);
+    try {
+      if (cx.session_id) {
+        const ses = await proxy(`/sessions/${cx.session_id}`, tk).catch((e) => { if (e.caducado || e.limite) throw e; return null; });
+        const hasta = ses?.access?.valid_until;
+        if (ses && (ses.status && ses.status !== "AUTHORIZED" || (hasta && Date.parse(hasta) < Date.now()))) throw new PermisoCaducado();
+        if (hasta && hasta !== cx.valid_until) { cx.valid_until = hasta; await guardarConexion(raiz, await leerJSON(raiz, "banco_api_config.json", {}), cx); }
+      }
+      const nuevos = [];
+      let cont = null;
+      for (let i = 0; i < 50; i++) {
+        const r = await proxy(`/accounts/${cx.account_uid}/transactions${cont ? `?continuation_key=${encodeURIComponent(cont)}` : ""}`, tk);
+        for (const t of r.transactions || []) {
+          let imp = num((t.transaction_amount || {}).amount);
+          if (/^(DBIT|DEBIT)$/i.test(String(t.credit_debit_indicator || ""))) imp = -Math.abs(imp);
+          const rem = t.remittance_information; const parte = (imp < 0 ? t.creditor : t.debtor) || {};
+          nuevos.push({ fecha: fmt(t.booking_date || t.value_date), concepto: (Array.isArray(rem) ? rem.join(" ") : String(rem || "")).slice(0, 120), importe: Math.round(imp * 100) / 100, tercero: String(parte.name || "").slice(0, 80), cuenta: iban, banco: cx.aspsp_name || "", _origen: "api" });
+        }
+        cont = r.continuation_key; if (!cont) break;
+      }
+      const desde = nuevos.map((m) => fechaOrden(m.fecha)).sort()[0] || "9999";
+      todos = [...todos.filter((m) => m.cuenta !== iban || fechaOrden(m.fecha) < desde), ...nuevos];
+      nuevosTotal += nuevos.length;
+    } catch (e) {
+      if (e.caducado) caducadas.push({ iban, banco: cx.aspsp_name });
+      else if (e.limite) errores.push(`${cx.aspsp_name}: ya se han hecho hoy las consultas que permite el banco`);
+      else errores.push(`${cx.aspsp_name}: ${e.message}`);
+    }
+  }
+  const movimientos = todos.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)));
   await escribirJSON(raiz, "extracto_api.json", { actualizado: new Date().toLocaleString("es-ES"), sincronizado: new Date().toISOString(), movimientos });
   try { await excelTodoElAnio(raiz, movimientos); } catch { /* el Excel es solo para consultar; si está abierto no se puede escribir */ }
-  const dias = cfg.valid_until ? Math.floor((Date.parse(cfg.valid_until) - Date.now()) / 86400000) : null;
-  return { nuevos: nuevos.length, total: movimientos.length, diasPermiso: dias };
+  const est = await estadoConexiones(raiz);
+  const dias = est.filter((c) => c.dias != null).map((c) => c.dias).sort((a, b) => a - b)[0] ?? null;
+  if (caducadas.length) {
+    const c = caducadas[0];
+    throw Object.assign(new PermisoCaducado(`El permiso de ${c.banco || "el banco"}${c.iban ? " (cuenta …" + c.iban.slice(-4) + ")" : ""} ha caducado (por ley hay que renovarlo cada 90 días).${nuevosTotal ? ` Las demás cuentas sí se han actualizado (${nuevosTotal} movimientos).` : ""}`), { iban: c.iban, banco: c.banco });
+  }
+  if (errores.length && !nuevosTotal) throw Object.assign(new Error(errores.join(" · ")), { limite: errores.every((x) => /consultas/.test(x)) });
+  return { nuevos: nuevosTotal, total: movimientos.length, diasPermiso: dias, avisos: errores };
 }
 
-// Días que le quedan al permiso del banco (lo que se sabe sin preguntar al banco)
 // Para no gastar las pocas consultas diarias que deja el banco: ¿se sincronizó hace menos de «horas»?
 export async function sincronizadoHace(raiz, horas = 6) {
   const x = await leerJSON(raiz, "extracto_api.json", {});
   return !!x.sincronizado && Date.now() - Date.parse(x.sincronizado) < horas * 3600000;
 }
 
+// Días que le quedan al permiso que antes caduca (lo que se sabe sin preguntar al banco)
 export async function diasPermiso(raiz) {
-  const cfg = await leerJSON(raiz, "banco_api_config.json", {});
-  return cfg.valid_until ? Math.floor((Date.parse(cfg.valid_until) - Date.now()) / 86400000) : null;
+  const est = await estadoConexiones(raiz);
+  return est.filter((c) => c.dias != null).map((c) => c.dias).sort((a, b) => a - b)[0] ?? null;
 }
 
 export const urlVuelta = () => `${location.origin}/banco-vuelta.html`;
 
-// Renovar el permiso (PSD2 obliga cada 90 días). Se abre la web del banco en una ventana; al volver, la página
-// banco-vuelta.html avisa a esta pestaña con el código y aquí se crea la sesión nueva y se guarda en tu carpeta.
+// Conectar una cuenta o renovar su permiso (PSD2 obliga cada 90 días). Se abre la web del banco en una ventana; al volver,
+// la página banco-vuelta.html avisa a esta pestaña con el código y aquí se crea la sesión y se guarda en tu carpeta.
 // «ventana» se abre en el mismo clic (si no, el navegador la bloquea).
-export async function renovarPermiso(raiz, ventana, onPaso = () => {}) {
+// opciones: { iban, banco, pais, psu } — sin ellas, renueva la primera cuenta (compatible con lo anterior).
+export async function renovarPermiso(raiz, ventana, onPaso = () => {}, opciones = {}) {
   const cfg = await leerJSON(raiz, "banco_api_config.json", {});
-  if (!cfg.application_id) throw new Error("Falta la configuración del banco en la carpeta «programa».");
-  const dir = await dirEstado(raiz);
-  const pem = await (await (await dir.getFileHandle(cfg.key_file || "enablebanking_key.pem")).getFile()).text();
-  const tk = await token(cfg, pem);
+  const previa = conexiones(cfg).find((c) => opciones.iban && limpiaIban(c.iban) === limpiaIban(opciones.iban)) || (!opciones.iban && !opciones.banco ? conexiones(cfg)[0] : null);
+  const banco = opciones.banco || previa?.aspsp_name || "Cajamar";
+  const pais = opciones.pais || previa?.aspsp_country || "ES";
+  const psu = opciones.psu || previa?.psu_type || "business";
+  let tk;
+  try { tk = await tokenDe(raiz, cfg); } catch (e) { try { ventana?.close(); } catch { /* */ } throw e; }
   const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
   const hasta = new Date(Date.now() + 90 * 86400000).toISOString().replace(/\.\d{3}Z$/, ".000Z");
-  onPaso("Pidiendo al banco la página de autorización…");
+  onPaso(`Pidiendo a ${banco} la página de autorización…`);
   let r;
   try {
-    r = await proxy("/auth", tk, "POST", { access: { valid_until: hasta }, aspsp: { name: cfg.aspsp_name || "Cajamar", country: cfg.aspsp_country || "ES" }, state, redirect_url: urlVuelta(), psu_type: cfg.psu_type || "business" });
+    r = await proxy("/auth", tk, "POST", { access: { valid_until: hasta }, aspsp: { name: banco, country: pais }, state, redirect_url: urlVuelta(), psu_type: psu });
   } catch (e) {
     try { ventana?.close(); } catch { /* */ }
     if (/redirect/i.test(String(e.message))) throw new Error(`El banco no reconoce la dirección de vuelta. Añade ${urlVuelta()} en «Redirect URLs» de tu aplicación en el panel de Enable Banking (enablebanking.com › Control panel) y vuelve a intentarlo.`);
@@ -119,7 +187,7 @@ export async function renovarPermiso(raiz, ventana, onPaso = () => {}) {
   }
   if (!r.url) throw new Error("El banco no devolvió la página de autorización.");
   if (ventana && !ventana.closed) ventana.location.href = r.url; else window.open(r.url, "banco", "width=520,height=760");
-  onPaso("Autoriza la cuenta en la ventana del banco (entra con tus claves de Cajamar)…");
+  onPaso(`Autoriza la cuenta en la ventana del banco (entra con tus claves de ${banco})…`);
   const code = await new Promise((ok, mal) => {
     const canal = "BroadcastChannel" in window ? new BroadcastChannel("midespacho-banco") : null;
     const fin = (f, v) => { clearTimeout(t); canal?.close(); removeEventListener("storage", alm); f(v); };
@@ -127,19 +195,35 @@ export async function renovarPermiso(raiz, ventana, onPaso = () => {}) {
     const alm = (e) => { if (e.key === "midespacho-banco") try { recibir(JSON.parse(e.newValue)); } catch { /* */ } };
     if (canal) canal.onmessage = (e) => recibir(e.data);
     addEventListener("storage", alm);
-    const t = setTimeout(() => fin(mal, new Error("Se acabó el tiempo (15 minutos) sin autorizar. Vuelve a pulsar «Renovar banco».")), 15 * 60000);
+    const t = setTimeout(() => fin(mal, new Error("Se acabó el tiempo (15 minutos) sin autorizar. Vuelve a intentarlo.")), 15 * 60000);
   });
   try { localStorage.removeItem("midespacho-banco"); } catch { /* */ }
-  onPaso("Guardando el permiso nuevo…");
+  onPaso("Guardando el permiso…");
   const ses = await proxy("/sessions", tk, "POST", { code });
   const cuentas = ses.accounts || [];
   if (!cuentas.length) throw new Error("La autorización no devolvió ninguna cuenta.");
-  const ibanPrevio = (cfg._cuentas || []).find((c) => c.uid === cfg.account_uid)?.iban;
-  const elegida = cuentas.find((a) => ibanPrevio && (a.account_id || {}).iban === ibanPrevio) || cuentas[0];
-  const nuevo = { ...cfg, _anterior: { session_id: cfg.session_id, account_uid: cfg.account_uid, valid_until: cfg.valid_until }, session_id: ses.session_id || "", account_uid: elegida.uid, _cuentas: cuentas.map((a) => ({ uid: a.uid, iban: (a.account_id || {}).iban || "" })), valid_until: ses.access?.valid_until || hasta, renovado: new Date().toISOString() };
-  delete nuevo._auth_iniciada; delete nuevo._state;
+  const buscado = limpiaIban(opciones.iban || previa?.iban);
+  const elegida = cuentas.find((a) => buscado && limpiaIban((a.account_id || {}).iban) === buscado) || cuentas[0];
+  const iban = limpiaIban((elegida.account_id || {}).iban) || buscado;
+  // Si el banco dio permiso para varias cuentas, se guardan todas (cada una con su IBAN)
+  let cfg2 = await leerJSON(raiz, "banco_api_config.json", {});
+  for (const a of cuentas) {
+    const ib = limpiaIban((a.account_id || {}).iban);
+    if (a !== elegida && !ib) continue;
+    await guardarConexion(raiz, cfg2, { iban: a === elegida ? iban : ib, aspsp_name: banco, aspsp_country: pais, psu_type: psu, session_id: ses.session_id || "", account_uid: a.uid, valid_until: ses.access?.valid_until || hasta, conectado: new Date().toISOString() });
+    cfg2 = await leerJSON(raiz, "banco_api_config.json", {});
+  }
+  return { hasta: ses.access?.valid_until || hasta, iban, cuentas: cuentas.map((a) => limpiaIban((a.account_id || {}).iban)).filter(Boolean) };
+}
+export const conectarCuenta = renovarPermiso;
+
+// Quitar la conexión de una cuenta (no toca los movimientos ya guardados)
+export async function desconectarCuenta(raiz, iban) {
+  const cfg = await leerJSON(raiz, "banco_api_config.json", {});
+  const lista = conexiones(cfg).filter((c) => limpiaIban(c.iban) !== limpiaIban(iban));
+  const nuevo = { ...cfg, conexiones: lista };
+  ["session_id", "account_uid", "valid_until", "_cuentas", "aspsp_name", "aspsp_country", "psu_type"].forEach((k) => delete nuevo[k]);
   await escribirJSON(raiz, "banco_api_config.json", nuevo);
-  return { hasta: nuevo.valid_until };
 }
 
 // Extractos descargados del banco en Excel/CSV (carpeta «extractos»): para lo que la conexión no alcanza (más de 90 días)
@@ -221,7 +305,7 @@ export function juntarMovimientos(api, extractos) {
 async function excelTodoElAnio(raiz, movimientos) {
   const XLSX = await import("xlsx");
   let saldo = 0;
-  const filas = [["Fecha", "Concepto", "Importe", "Saldo", "Tercero", "Origen"], ...movimientos.map((m) => { saldo = Math.round((saldo + num(m.importe)) * 100) / 100; return [m.fecha, m.concepto, num(m.importe), saldo, m.tercero || "", m._origen === "api" ? "conexión banco" : "extracto Excel"]; })];
+  const filas = [["Fecha", "Concepto", "Importe", "Saldo", "Tercero", "Cuenta", "Origen"], ...movimientos.map((m) => { saldo = Math.round((saldo + num(m.importe)) * 100) / 100; return [m.fecha, m.concepto, num(m.importe), saldo, m.tercero || "", [m.banco, m.cuenta ? "…" + String(m.cuenta).slice(-4) : ""].filter(Boolean).join(" "), m._origen === "api" ? "conexión banco" : "extracto Excel"]; })];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), "Movimientos");
   const anio = (movimientos.at(-1)?.fecha || "").slice(-4) || new Date().getFullYear();
   const dir = await sub(raiz, "extractos", true);

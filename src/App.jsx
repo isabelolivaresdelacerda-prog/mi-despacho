@@ -9,6 +9,7 @@ import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import ContratoMandato from "./apps/ContratoMandato.jsx";
 import Papeleria from "./Papeleria.jsx";
+import { pilaCSS, cargarFuentes } from "./lib/marca.js";
 import ContratoGestion from "./apps/ContratoGestion.jsx";
 import ContratoIntermediacion from "./apps/ContratoIntermediacion.jsx";
 import EmitirFactura from "./apps/facturar/EmitirFactura.jsx";
@@ -213,7 +214,8 @@ export default function App() {
   }, [config.logo]);
   const irAAjustes = () => ir("ajustes");
 
-  const tema = { "--brand": config.color, "--fondo": config.fondo };
+  const tema = { "--brand": config.color, "--fondo": config.fondo, ...(config.marca?.fuenteTit ? { "--serif": pilaCSS(config.marca.fuenteTit) } : {}), ...(config.marca?.fuenteTxt ? { "--sans": pilaCSS(config.marca.fuenteTxt) } : {}) };
+  cargarFuentes(config.marca?.fuenteTit, config.marca?.fuenteTxt); // solo añade el enlace de Google Fonts la primera vez
 
   if (yo === undefined) return <div className="bienvenida" />;
   if (!yo) return <Acceso onDentro={setYo} />;

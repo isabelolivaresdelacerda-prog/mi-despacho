@@ -7,7 +7,7 @@ import { DialogoCorreo } from "../lib/CorreoUI.jsx";
 import { EditorClausulas, VistaDocumento, aplicarCambios, leerCambios } from "../lib/contratoUI.jsx";
 import { guardar as guardarEnCarpeta, raizGuardada, DESTINO } from "../lib/carpetas.js";
 import { cifraYLetras } from "../lib/numeroLetras.js";
-import { parte, firma, ParteForm, parteVacia, fmtFecha, or, num, eurosTxt, hoy, ACTIVO_VACIO, bloquesActivos, ActivosForm } from "../lib/contratoInmo.jsx";
+import { parte, firma, ParteForm, parteVacia, fmtFecha, or, num, eurosTxt, hoy, ACTIVO_VACIO, bloquesActivos, ActivosForm, tipoDe } from "../lib/contratoInmo.jsx";
 
 // Bloques de funciones que se pueden incluir (se marcan en el formulario)
 const FUNCIONES = {
@@ -53,7 +53,7 @@ const VACIO = {
   ciudad: "", fecha: hoy(),
   ...parteVacia("a"), ...parteVacia("m"),
   actividad: "la inversión inmobiliaria en sentido amplio, incluidas la adquisición, tenencia, gestión, arrendamiento, promoción, desarrollo, explotación y transmisión de bienes inmuebles, así como la participación en proyectos inmobiliarios de cualquier naturaleza",
-  inmuebles: "progresivos", activos: [{ ...ACTIVO_VACIO }],
+  inmuebles: "lista", activos: [{ ...ACTIVO_VACIO }],
   dur: "10", prorroga: "10", preaviso: "12", obligatorio: "si",
   fn: { financieras: true, inversion: true, operativa: true, secretaria: false, arrendamiento: false, promocion: false },
   subcontratar: "si",
@@ -85,13 +85,14 @@ export function construir(d) {
   p("Ambas, en adelante, conjuntamente, las «Partes» e individualmente, una «Parte».");
   h("EXPONEN");
   p("I. Que el Propietario tiene por actividad " + or(d.actividad, "actividad de la Sociedad") + ".");
+  const resumen = activos.map((a, i) => (varios ? "(" + (i + 1) + ") " : "") + tipoDe(a).toLowerCase() + ([a.nombre, a.dir, a.mun].some((v) => (v || "").trim()) ? " — " + [a.nombre, [a.dir, a.mun].filter((v) => (v || "").trim()).join(", ")].filter((v) => (v || "").trim()).join(", ") : "") + ((a.reg || "").trim() ? ", " + a.reg.trim() : "")).join("; ");
   p("II. " + (lista
-    ? "Que el Propietario es titular de " + (varios ? "los inmuebles que se describen en el Anexo I (en adelante, los «Inmuebles» y cada uno de ellos, un «Inmueble»)" : "el inmueble que se describe en el Anexo I (en adelante, el «Inmueble» o los «Inmuebles»)") + ", así como de los que adquiera en el futuro, que quedarán sujetos al presente Contrato desde su adquisición."
-    : "Que los inmuebles objeto del presente Contrato (en adelante, los «Inmuebles» y cada uno de ellos, un «Inmueble») se incorporarán progresivamente al patrimonio del Propietario conforme se vayan materializando las adquisiciones, y quedarán sujetos al presente Contrato desde el momento de su adquisición."));
+    ? "Que, a la fecha de este Contrato, el Propietario es titular de " + (varios ? "los siguientes inmuebles: " : "el siguiente inmueble: ") + resumen + ", que se describe" + (varios ? "n" : "") + " con detalle en el Anexo I (en adelante, junto con los que adquiera en el futuro, los «Inmuebles» y cada uno de ellos, un «Inmueble»). Los inmuebles que el Propietario adquiera durante la vigencia del Contrato quedarán sujetos a él desde su adquisición y se incorporarán al Anexo I."
+    : "Que los inmuebles objeto del presente Contrato (en adelante, los «Inmuebles» y cada uno de ellos, un «Inmueble») se incorporarán progresivamente al patrimonio del Propietario conforme se vayan materializando las adquisiciones, quedarán sujetos al presente Contrato desde el momento de su adquisición y se relacionarán en el Anexo I."));
   p("III. Que el Gestor cuenta con la experiencia y los medios técnicos y humanos necesarios para prestar servicios de gestión inmobiliaria, operativa, administrativa, financiera y de desinversión.");
   p("IV. Que el Propietario desea encomendar al Gestor la prestación de los servicios descritos en el presente Contrato (en adelante, los «Servicios»), y el Gestor la acepta con sujeción a las siguientes");
   h("CLÁUSULAS");
-  p("El presente Contrato tiene por objeto regular los términos y condiciones en los que el Gestor prestará al Propietario los servicios de gestión integral de los Inmuebles y de la actividad de la Sociedad (en adelante, el «Proyecto»).", "Primera. Objeto.");
+  p("El presente Contrato tiene por objeto regular los términos y condiciones en los que el Gestor prestará al Propietario los servicios de gestión integral de los Inmuebles relacionados en el Anexo I, de los que se incorporen a él en el futuro y de la actividad de la Sociedad (en adelante, el «Proyecto»). Las Partes actualizarán el Anexo I, mediante documento firmado por ambas, cada vez que el Propietario adquiera o transmita un Inmueble.", "Primera. Objeto.");
   p("El nombramiento del Gestor comenzará en la fecha de firma del presente Contrato y tendrá una duración inicial " + (d.obligatorio === "si" ? "obligatoria " : "") + "de " + anios(durN, "duración") + ", prorrogable tácitamente por periodos sucesivos de " + anios(proN, "prórroga") + ", salvo que cualquiera de las Partes notifique de forma fehaciente a la otra su voluntad de no prorrogarlo con un preaviso mínimo de " + meses(preN, "preaviso") + "." + (d.obligatorio === "si" ? " Tanto el periodo inicial como sus prórrogas tendrán carácter obligatorio para ambas Partes." : "") +
     "\nLa Sociedad nombra al Gestor gestor de activos (asset manager), con responsabilidad principal en la prestación de los Servicios, siempre con sujeción a las políticas generales, directrices y control del órgano de administración y al plan de negocio vigente en cada momento. La Sociedad comunicará al Gestor cualquier modificación del plan de negocio que pueda afectar al presente Contrato, y el Gestor no ejercerá facultades discrecionales contrarias a dicho plan." +
     "\nEl Gestor deberá: (a) actuar con la diligencia, el cuidado y la pericia propios de un gestor profesional; (b) realizar sus mejores esfuerzos para que la Sociedad cumpla el plan de negocio; (c) servir fielmente los intereses de la Sociedad; y (d) actuar en todo momento de buena fe, sin provocar el incumplimiento por la Sociedad de sus estatutos, del plan de negocio, de las instrucciones válidas de su órgano de administración, de sus contratos de financiación o de su régimen fiscal.", "Segunda. Nombramiento y duración.");
@@ -131,11 +132,10 @@ export function construir(d) {
   p("El presente Contrato se rige por el Derecho español. Las Partes se someten a los Juzgados y Tribunales de " + or(d.trib, "ciudad") + ", con renuncia a cualquier otro fuero.", "Decimocuarta. Ley aplicable y jurisdicción.");
   p("Y en prueba de conformidad, las Partes firman el presente Contrato por duplicado y a un solo efecto en el lugar y fecha indicados en el encabezamiento.");
   B.push({ t: "sig", a: firma(d, "a", "La Sociedad"), b: firma(d, "m", "El Gestor") });
-  if (lista) {
-    B.push({ t: "salto" });
-    h("ANEXO I · INMUEBLES");
-    bloquesActivos(B, activos, {});
-  }
+  B.push({ t: "salto" });
+  h("ANEXO I · INMUEBLES");
+  if (lista) bloquesActivos(B, activos, {});
+  else p("A la fecha de firma, el Propietario no es titular de ningún inmueble. Los Inmuebles se irán incorporando a este Anexo conforme se adquieran, mediante documento firmado por ambas Partes.");
   return B;
 }
 
@@ -204,11 +204,11 @@ export default function ContratoGestion({ config, irAAjustes }) {
           <fieldset><legend>Actividad e inmuebles</legend>
             <label>Actividad de la sociedad<textarea rows={3} {...campo("actividad")} /></label>
             <label>Inmuebles<select {...campo("inmuebles")}>
-              <option value="progresivos">Se irán incorporando según se compren</option>
-              <option value="lista">Ya tiene inmuebles (se describen en un anexo)</option>
+              <option value="lista">Ya tiene inmuebles o suelos (descríbelos abajo)</option>
+              <option value="progresivos">Todavía no tiene ninguno; se irán incorporando</option>
             </select></label>
           </fieldset>
-          {d.inmuebles === "lista" && <ActivosForm activos={d.activos} setActivos={(activos) => setD({ ...d, activos })} titulo="Inmueble" textoAnadir="+ Añadir otro inmueble" />}
+          {d.inmuebles === "lista" && <ActivosForm activos={d.activos} setActivos={(activos) => setD({ ...d, activos })} titulo="Inmueble o suelo" textoAnadir="+ Añadir otro inmueble o suelo" />}
           <fieldset><legend>Duración</legend>
             <div className="fila"><label>Duración inicial (años)<input type="number" min="1" {...campo("dur")} /></label><label>Prórrogas (años)<input type="number" min="0" {...campo("prorroga")} /></label></div>
             <div className="fila">

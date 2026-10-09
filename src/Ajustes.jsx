@@ -1,4 +1,5 @@
 import DatosEmpresa from "./lib/DatosEmpresa.jsx";
+import { FUENTES, pilaCSS, cargarFuentes } from "./lib/marca.js";
 import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import { useState } from "react";
 import { PROVEEDORES, leerClaves, guardarClaves, borrarClaves, leerModo, guardarModo } from "./ia-navegador.js";
@@ -28,6 +29,8 @@ export function leerLogo(archivo) {
 }
 
 export function FormDespacho({ datos, cambiar }) {
+  const m = { color2: "", fuenteTit: "", fuenteTxt: "", ...(datos.marca || {}) };
+  const cambiarM = (c) => { const n = { ...m, ...c }; cargarFuentes(n.fuenteTit, n.fuenteTxt); cambiar({ marca: n }); };
   async function subirLogo(e) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -38,8 +41,18 @@ export function FormDespacho({ datos, cambiar }) {
       <label>Nombre del despacho<input value={datos.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} maxLength={60} placeholder="Por ejemplo: Olivares Abogados" /></label>
       <div className="fila">
         <label>Color principal<input type="color" value={datos.color} onChange={(e) => cambiar({ color: e.target.value })} /></label>
-        <label>Color de fondo<input type="color" value={datos.fondo} onChange={(e) => cambiar({ fondo: e.target.value })} /></label>
+        <label>Color secundario<input type="color" value={m.color2 || "#555555"} onChange={(e) => cambiarM({ color2: e.target.value })} /></label>
+        <label>Color de fondo de la app<input type="color" value={datos.fondo} onChange={(e) => cambiar({ fondo: e.target.value })} /></label>
       </div>
+      <div className="fila">
+        <label>Tipografía de títulos<select value={m.fuenteTit} onChange={(e) => cambiarM({ fuenteTit: e.target.value })}><option value="">La del estilo de papelería</option>{FUENTES.map((f) => <option key={f.id} value={f.id}>{f.id}</option>)}</select></label>
+        <label>Tipografía de texto<select value={m.fuenteTxt} onChange={(e) => cambiarM({ fuenteTxt: e.target.value })}><option value="">La del estilo de papelería</option>{FUENTES.map((f) => <option key={f.id} value={f.id}>{f.id}</option>)}</select></label>
+      </div>
+      <div className="muestra-marca" style={{ borderColor: datos.color }}>
+        <strong style={{ fontFamily: pilaCSS(m.fuenteTit, "inherit"), color: datos.color }}>{datos.nombre || "Nombre de la empresa"}</strong>
+        <span style={{ fontFamily: pilaCSS(m.fuenteTxt, "inherit"), color: m.color2 || undefined }}>Así se verán los textos de tus cartas e informes.</span>
+      </div>
+      <p className="nota">Si eliges una tipografía que no está instalada en el ordenador de quien abre el Word, Word pone otra parecida. Georgia, Times New Roman, Garamond, Cambria, Calibri, Arial, Verdana y Segoe UI vienen con Windows y Office.</p>
       <label>Logo (PNG o JPG)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={subirLogo} /></label>
       {datos.logo && (
         <div className="logo-prev">
@@ -144,7 +157,8 @@ export default function Ajustes({ config, guardar }) {
       <a className="tarjeta enlace-tarjeta" href="#/seguridad"><strong>🔒 Seguridad, datos e IA</strong><span className="muted">Cómo se protegen los datos, qué normas se cumplen (RGPD, Reglamento de IA) y qué tiene que hacer cada parte. Para imprimir o enviar a cumplimiento normativo.</span></a>
       <div className="tarjetas">
         <section className="tarjeta">
-          <h2>Imagen del despacho</h2>
+          <h2>Marca: logo, colores y tipografías</h2>
+          <p className="muted">La app y la papelería corporativa (hoja de carta, informe y factura) salen con esta marca. Los contratos no llevan logo.</p>
           <fieldset className="opciones"><legend>Tipo de cuenta</legend>
             {Object.entries(TIPOS).map(([k, t]) => (
               <label key={k} className="opcion">

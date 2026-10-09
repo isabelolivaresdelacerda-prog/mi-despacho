@@ -9,7 +9,8 @@ const validas = (l) => (l || []).filter((f) => !f._duplicadoDe && !f.noFactura &
 // Cuentas bancarias de la empresa: las que dio el banco al conectar + la de Ajustes
 export async function cuentasEmpresa(raiz, config) {
   const cfg = await leerJSON(raiz, "banco_api_config.json", {});
-  const l = [...(cfg._cuentas || []).map((c) => c.iban), config?.empresa?.iban, ...(config?.empresa?.ibans || [])]
+  const conx = Array.isArray(cfg.conexiones) ? cfg.conexiones.map((c) => c.iban) : (cfg._cuentas || []).map((c) => c.iban);
+  const l = [...conx, config?.empresa?.iban, ...(config?.empresa?.cuentas || []).map((c) => c.iban), ...(config?.empresa?.ibans || [])]
     .map((x) => String(x || "").replace(/\s+/g, "").toUpperCase()).filter((x) => /^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(x));
   return [...new Set(l)];
 }
