@@ -420,3 +420,38 @@ label small { font-size: 12px; }
 .ti-sub { font-size: 13.5px; color: var(--suave); line-height: 1.45; }
 @media (prefers-color-scheme: dark) { .ti-icono { color: color-mix(in srgb, var(--brand) 55%, #fff); background: color-mix(in srgb, var(--brand) 30%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .tarjeta-inicio, .ti-icono { transition: none; } .tarjeta-inicio:hover { transform: none; } }
+
+/* Papelería corporativa */
+.pap-estilos { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 18px; }
+.pap-estilo.elegido { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 25%, transparent); }
+.pap-estilo.apagado { opacity: .72; }
+.pap-estilo.apagado:hover { opacity: 1; }
+.pap-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pap-sello { font-size: 12.5px; font-weight: 600; color: var(--brand); }
+.pap-minis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pap-minis figure { margin: 0; text-align: center; }
+.pap-minis figcaption { font-size: 12px; color: var(--suave); margin-top: 6px; }
+.pm-hoja { position: relative; aspect-ratio: 210 / 297; background: #fff; color: #222; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,.08); overflow: hidden; display: flex; flex-direction: column; font: 6.5px/1.35 Georgia, serif; text-align: left; }
+.pm-moderno, .pm-minimal { font-family: Arial, Helvetica, sans-serif; }
+.pm-franja { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.pm-cab { padding: 9px 10px 6px; display: flex; align-items: center; gap: 6px; }
+.pm-cab img { max-height: 16px; max-width: 46px; object-fit: contain; }
+.pm-clasico { flex-direction: column; border-bottom: 1px solid; margin: 0 10px; padding: 8px 0 4px; font-size: 8px; }
+.pm-moderno { justify-content: space-between; border-bottom: 2.5px solid; margin: 0 10px 0 12px; padding: 8px 0 5px; }
+.pm-moderno span { display: flex; flex-direction: column; align-items: flex-end; font-size: 6px; } .pm-moderno small { color: #888; font-size: 5px; }
+.pm-minimal { justify-content: space-between; } .pm-minimal span { letter-spacing: .14em; text-transform: uppercase; font-size: 5.5px; color: #555; margin-left: auto; }
+.pm-ejecutivo { color: #fff; font-size: 8.5px; padding: 10px; }
+.pm-cuerpo { flex: 1; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+.pm-cuerpo p { margin: 0; } .pm-der { text-align: right; }
+.pm-cuerpo i { display: block; height: 3px; background: #e7e7e7; border-radius: 2px; } .pm-cuerpo i.corta { width: 60%; }
+.pm-portada { justify-content: center; align-items: center; text-align: center; gap: 3px; }
+.pm-moderno ~ .pm-portada, .pm-hoja.pm-moderno .pm-portada { align-items: flex-start; text-align: left; }
+.pm-portada small { letter-spacing: .2em; font-size: 5.5px; } .pm-portada strong { font-size: 10px; } .pm-portada span { color: #777; font-size: 6px; }
+.pm-fact-t { font-weight: 700; font-size: 9px; } .pm-minimal .pm-fact-t { font-weight: 400; font-size: 11px; }
+.pm-fact-dos { display: flex; justify-content: space-between; gap: 6px; font-size: 5.5px; }
+.pm-fact-tabla { height: 5px; border-bottom: 1px solid; margin-top: 4px; }
+.pm-fact-total { align-self: flex-end; font-weight: 700; padding: 2px 4px; background: #f3f3f3; font-size: 6px; }
+.pm-pie { padding: 5px 10px 6px; font-size: 4.5px; color: #888; border-top: 1px solid #ddd; margin: 0 10px; }
+.pm-pie-clasico, .pm-pie-ejecutivo { text-align: center; } .pm-pie-minimal { border: 0; } .pm-pie-moderno { border-top: 1.5px solid; }
+.pm-pie-ejecutivo { color: #fff; margin: 0; border: 0; }
+@media (max-width: 520px) { .pap-estilos { grid-template-columns: 1fr; } }

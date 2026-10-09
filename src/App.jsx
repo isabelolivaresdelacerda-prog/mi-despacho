@@ -8,6 +8,7 @@ import { PlantillasCorreo } from "./lib/CorreoUI.jsx";
 import ContratoCEP from "./apps/ContratoCEP.jsx";
 import ContratoEncargo from "./apps/encargo/ContratoEncargo.jsx";
 import ContratoMandato from "./apps/ContratoMandato.jsx";
+import Papeleria from "./Papeleria.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
 import Calendario, { ProximosAvisos } from "./apps/calendario/Calendario.jsx";
 import Seguridad from "./Seguridad.jsx";
@@ -222,7 +223,7 @@ export default function App() {
     case "prompts":
       vista = <Proximamente titulo="Prompts y skills" texto="Biblioteca de prompts y skills de IA preparados para tu despacho o empresa (contratos, contabilidad, cumplimiento…). Será un servicio adicional." />; break;
     case "papeleria":
-      vista = <Proximamente titulo="Papelería corporativa" texto="Facturas, hoja de carta e informes con el logo, los colores y los datos legales de la empresa (CIF, domicilio, inscripción registral)." />; break;
+      vista = <Papeleria config={config} guardar={guardar} />; break;
     case "seguridad":
       vista = <Seguridad config={config} />; break;
     case "guias/asociaciones":
@@ -310,7 +311,7 @@ export default function App() {
               </div>
             </>}
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>
-            <Item r="papeleria" icono="papel">Papelería corporativa <em className="pronto">pronto</em></Item>
+            <Item r="papeleria" icono="papel">Papelería corporativa</Item>
           </Seccion>
           <Seccion titulo="Herramientas">
             <Item r="ia" icono="chispa">IA gratis en tu ordenador</Item>
