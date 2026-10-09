@@ -89,7 +89,7 @@ export function TransparenciaIA({ que = "propone", compacto }) {
   return (
     <p className={"transparencia-ia" + (compacto ? " compacto" : "")}>
       <span className="ti-sello" aria-hidden="true">IA</span>
-      <span><strong>Aquí se usa inteligencia artificial.</strong> Lo que la IA {que} se genera de forma automática y puede contener errores: revísalo siempre antes de usarlo. La decisión final es tuya.{!compacto && " Aviso de transparencia conforme al Reglamento (UE) 2024/1689 de Inteligencia Artificial (art. 50)."}</span>
+      <span><strong>Aquí se usa inteligencia artificial.</strong> Lo que la IA {que} se genera de forma automática y puede contener errores: revísalo siempre antes de usarlo. La decisión final es tuya. Todo se hace en tu ordenador: los documentos no salen de él. Eso sí, mientras tu carpeta (OneDrive o Google Drive) esté conectada a la aplicación, sus datos se ven en Mi Despacho.{!compacto && " Aviso de transparencia conforme al Reglamento (UE) 2024/1689 de Inteligencia Artificial (art. 50)."}</span>
     </p>
   );
 }
