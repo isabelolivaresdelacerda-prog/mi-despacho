@@ -455,3 +455,10 @@ label small { font-size: 12px; }
 .pm-pie-clasico, .pm-pie-ejecutivo { text-align: center; } .pm-pie-minimal { border: 0; } .pm-pie-moderno { border-top: 1.5px solid; }
 .pm-pie-ejecutivo { color: #fff; margin: 0; border: 0; }
 @media (max-width: 520px) { .pap-estilos { grid-template-columns: 1fr; } }
+
+/* Emitir factura (VERI*FACTU) */
+.vf-entorno.pruebas { border-left: 4px solid #b58900; }
+.vf-entorno.produccion { border-left: 4px solid var(--brand); }
+.vf-lineas input, .vf-lineas select { width: 100%; }
+.vf-totales { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: flex-end; align-items: baseline; margin-top: 6px; }
+.vf-totales strong { font-size: 17px; }

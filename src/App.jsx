@@ -11,6 +11,7 @@ import ContratoMandato from "./apps/ContratoMandato.jsx";
 import Papeleria from "./Papeleria.jsx";
 import ContratoGestion from "./apps/ContratoGestion.jsx";
 import ContratoIntermediacion from "./apps/ContratoIntermediacion.jsx";
+import EmitirFactura from "./apps/facturar/EmitirFactura.jsx";
 import VistaCarpeta from "./lib/VistaCarpeta.jsx";
 import Calendario, { ProximosAvisos } from "./apps/calendario/Calendario.jsx";
 import Seguridad from "./Seguridad.jsx";
@@ -84,7 +85,7 @@ function IconoInicio({ n }) {
 
 function Inicio({ config, ir }) {
   const grupos = MENU.filter((m) => config.apps[m.app]).map((m) => ({ ...m, items: m.hijos.flatMap((h) => (h.grupo ? h.hijos : [h])) }));
-  const extra = [{ ruta: "ia", titulo: "IA gratis en tu ordenador", icono: "chispa", sub: "Lee y ordena documentos sin sacar nada de tu PC" }, { ruta: "correos", titulo: "Plantillas de correo", icono: "sobre", sub: "Correos tipo listos para enviar" }];
+  const extra = [{ ruta: "facturar", titulo: "Emitir factura", icono: "libro", sub: "VERI*FACTU directo con Hacienda, con tu papelería y el QR" }, { ruta: "ia", titulo: "IA gratis en tu ordenador", icono: "chispa", sub: "Lee y ordena documentos sin sacar nada de tu PC" }, { ruta: "correos", titulo: "Plantillas de correo", icono: "sobre", sub: "Correos tipo listos para enviar" }];
   return (
     <div className="app">
       <header className="app-cab inicio-cab">
@@ -232,6 +233,8 @@ export default function App() {
       vista = <VincularEmpresa onHecho={() => misEmpresas().then(setEmpresas)} />; break;
     case "prompts":
       vista = <Proximamente titulo="Prompts y skills" texto="Biblioteca de prompts y skills de IA preparados para tu despacho o empresa (contratos, contabilidad, cumplimiento…). Será un servicio adicional." />; break;
+    case "facturar":
+      vista = <EmitirFactura config={config} guardar={guardar} />; break;
     case "papeleria":
       vista = <Papeleria config={config} guardar={guardar} />; break;
     case "seguridad":
@@ -323,6 +326,7 @@ export default function App() {
               </div>
             </>}
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>
+            <Item r="facturar" icono="papel">Emitir facturas (VERI*FACTU)</Item>
             <Item r="papeleria" icono="papel">Papelería corporativa</Item>
           </Seccion>
           <Seccion titulo="Herramientas">
