@@ -201,3 +201,100 @@ export async function facturaPDF({ estilo, empresa = {}, color, logo, factura })
   [L.linea1, L.linea2].filter(Boolean).forEach((s, i) => t(s.length > 150 ? s.slice(0, 147) + "…" : s, centrado ? W / 2 : M, 30 - i * 10, { sz: 7, c: pc, centro: centrado }));
   return doc.save();
 }
+
+// ---------- Factura en Excel (con fórmulas) ----------
+// Plantilla para rellenar: las líneas calculan su importe, el resumen saca la base y la cuota de cada tipo de IVA,
+// resta la retención (si la hay) y da el total. Logo, color, tipografía y datos legales de la marca.
+export async function facturaExcel({ estilo, empresa = {}, color, logo, marca = {} }) {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = empresa.razon_social || "Mi Despacho";
+  const ws = wb.addWorksheet("Factura", { pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.6, right: 0.6, top: 0.6, bottom: 0.7, header: 0.3, footer: 0.3 } }, views: [{ showGridLines: false }] });
+  const s = conMarca(ESTILOS[estilo] ? estilo : "clasico", marca);
+  const C = "FF" + hex(color), G = "FF" + (marca.color2 ? hex(marca.color2) : "6B6B6B");
+  const fuente = (o = {}) => ({ name: o.tit ? s.tit : s.txt, size: o.sz || 10, bold: !!o.b, italic: !!o.i, color: { argb: o.c || "FF222222" } });
+  const EUR = '#,##0.00 "€"';
+  ws.columns = [{ width: 46 }, { width: 10 }, { width: 14 }, { width: 9 }, { width: 16 }];
+  const celda = (ref, v, o = {}) => { const c = ws.getCell(ref); c.value = v; c.font = fuente(o); if (o.al) c.alignment = { horizontal: o.al, vertical: "middle", wrapText: !!o.wrap }; if (o.fmt) c.numFmt = o.fmt; if (o.fondo) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: o.fondo } }; if (o.borde) c.border = { bottom: { style: "thin", color: { argb: o.borde } } }; return c; };
+  const nombre = empresa.razon_social || "Nombre de la empresa";
+  const L = textoLegal(empresa);
+
+  // Cabecera: logo (o nombre) a la izquierda y FACTURA a la derecha
+  ws.getRow(1).height = 22; ws.getRow(2).height = 22; ws.getRow(3).height = 22;
+  if (/^data:image\/(png|jpe?g)/.test(logo || "")) {
+    const im = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = logo; });
+    const alto = 60, ancho = Math.min(240, Math.round(alto * im.width / im.height));
+    const id = wb.addImage({ base64: logo, extension: /jpe?g/.test(logo.slice(0, 20)) ? "jpeg" : "png" });
+    ws.addImage(id, { tl: { col: 0, row: 0 }, ext: { width: ancho, height: alto } });
+  } else celda("A1", nombre, { tit: true, sz: 16, b: true, c: C });
+  ws.mergeCells("C1:E2"); celda("C1", "FACTURA", { tit: true, sz: 22, b: true, c: C, al: "right" });
+  for (const k of ["A4", "B4", "C4", "D4", "E4"]) ws.getCell(k).border = { bottom: { style: "medium", color: { argb: C } } };
+
+  // Emisor | datos de la factura
+  celda("A6", "EMISOR", { b: true, sz: 8, c: C });
+  [nombre, empresa.cif && `NIF ${empresa.cif}`, empresa.domicilio, [empresa.cp, empresa.municipio].filter(Boolean).join(" ") + (empresa.provincia && empresa.provincia !== empresa.municipio ? ` (${empresa.provincia})` : ""), [empresa.email, empresa.telefono].filter(Boolean).join(" · ")]
+    .filter((x) => String(x || "").trim()).forEach((t, i) => celda("A" + (7 + i), t, { b: i === 0 }));
+  const dato = (fila, etq, v, fmt) => { ws.mergeCells(`C${fila}:D${fila}`); celda("C" + fila, etq, { b: true, c: G, al: "right" }); const c = celda("E" + fila, v, { al: "right", fmt }); c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF8E1" } }; };
+  dato(6, "Serie y número", "A-2026-001");
+  dato(7, "Fecha de factura", new Date(new Date().toDateString()), "dd/mm/yyyy");
+  dato(8, "Vencimiento", { formula: "E7+30" }, "dd/mm/yyyy");
+  dato(9, "Forma de pago", "Transferencia");
+
+  // Cliente
+  celda("A13", "CLIENTE", { b: true, sz: 8, c: C });
+  ["[Nombre o razón social del cliente]", "NIF: [NIF del cliente]", "[Domicilio]", "[CP y municipio]"].forEach((t, i) => { const c = celda("A" + (14 + i), t, { b: i === 0 }); c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF8E1" } }; });
+
+  // Líneas
+  const F0 = 19, N = 12; // fila de cabecera y número de líneas
+  ["Concepto", "Cantidad", "Precio unitario", "% IVA", "Importe"].forEach((t, i) => {
+    const c = celda(String.fromCharCode(65 + i) + F0, t, { b: true, c: "FFFFFFFF", al: i ? "right" : "left", fondo: C });
+  });
+  ws.getRow(F0).height = 20;
+  for (let k = 1; k <= N; k++) {
+    const r = F0 + k;
+    celda("A" + r, k === 1 ? "[Concepto del servicio o producto]" : null, { al: "left", wrap: true });
+    celda("B" + r, k === 1 ? 1 : null, { al: "right", fmt: "#,##0.##" });
+    celda("C" + r, k === 1 ? 0 : null, { al: "right", fmt: EUR });
+    celda("D" + r, k === 1 ? 21 : null, { al: "right", fmt: '0" %"' });
+    celda("E" + r, { formula: `IF(OR(B${r}="",C${r}=""),"",ROUND(B${r}*C${r},2))` }, { al: "right", fmt: EUR });
+    ws.getCell("D" + r).dataValidation = { type: "list", allowBlank: true, formulae: ['"21,10,4,0"'], showErrorMessage: true, errorTitle: "IVA", error: "Elige 21, 10, 4 o 0." };
+    for (const col of "ABCDE") ws.getCell(col + r).border = { bottom: { style: "hair", color: { argb: "FFCCCCCC" } } };
+  }
+  const ult = F0 + N, R = (c) => `${c}${F0 + 1}:${c}${ult}`;
+
+  // Resumen: base y cuota por tipo de IVA, retención y total
+  let r = ult + 2;
+  const linea = (etq, formula, o = {}) => { ws.mergeCells(`C${r}:D${r}`); celda("C" + r, etq, { al: "right", b: o.b, c: o.c }); celda("E" + r, formula, { al: "right", fmt: o.fmt || EUR, b: o.b, c: o.c, fondo: o.fondo }); return r++; };
+  const fBase = linea("Base imponible", { formula: `SUM(${R("E")})` });
+  const filasIva = [21, 10, 4].map((p) => linea(`IVA ${p} %`, { formula: `ROUND(SUMIF(${R("D")},${p},${R("E")})*${p}/100,2)` }));
+  ws.mergeCells(`C${r}:D${r}`); celda("C" + r, "% retención IRPF", { al: "right" });
+  const cRet = celda("E" + r, 0, { al: "right", fmt: '0" %"' }); cRet.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF8E1" } };
+  cRet.dataValidation = { type: "list", allowBlank: true, formulae: ['"0,7,15,19"'] }; const fPctRet = r++;
+  const fRet = linea("Retención IRPF", { formula: `-ROUND(E${fBase}*E${fPctRet}/100,2)` });
+  linea("TOTAL FACTURA", { formula: `E${fBase}+${filasIva.map((x) => "E" + x).join("+")}+E${fRet}` }, { b: true, c: "FFFFFFFF", fondo: C });
+  ws.getCell("C" + (r - 1)).fill = { type: "pattern", pattern: "solid", fgColor: { argb: C } };
+
+  // Pago y pie legal
+  r += 1;
+  const cuentas = (empresa.cuentas || []).filter((c) => c.iban);
+  const iban = (cuentas.find((c) => c.principal) || cuentas[0])?.iban || empresa.iban;
+  if (iban) { celda("A" + r, `Forma de pago: transferencia a ${String(iban).replace(/(.{4})/g, "$1 ").trim()}`, { sz: 9 }); r++; }
+  celda("A" + r, "Observaciones: [exenciones, inversión del sujeto pasivo, etc.]", { sz: 9, i: true, c: G }); r += 2;
+  ws.mergeCells(`A${r}:E${r}`); celda("A" + r, L.linea1, { sz: 8, c: G, al: "center", wrap: true }); r++;
+  if (L.linea2) { ws.mergeCells(`A${r}:E${r}`); celda("A" + r, L.linea2, { sz: 8, c: G, al: "center", wrap: true }); }
+  ws.pageSetup.printArea = `A1:E${r}`;
+
+  // Hoja de ayuda
+  const ay = wb.addWorksheet("Cómo se usa");
+  ay.columns = [{ width: 100 }];
+  ["Cómo usar esta factura",
+    "1. Rellena solo las celdas amarillas (número, fecha, cliente, retención) y las líneas: concepto, cantidad, precio y % de IVA.",
+    "2. El importe de cada línea, la base, el IVA de cada tipo, la retención y el total se calculan solos.",
+    "3. El vencimiento es la fecha de la factura + 30 días; cámbialo si pactas otro plazo.",
+    "4. Numera las facturas de forma correlativa dentro de cada serie, sin saltos.",
+    "5. Si la operación está exenta o tiene inversión del sujeto pasivo, ponlo en «Observaciones» con el artículo de la Ley del IVA.",
+    "6. Para VERI*FACTU, emite la factura desde Mi Despacho › Emitir factura: así lleva la huella y el código QR que exige Hacienda.",
+  ].forEach((t, i) => { const c = ay.getCell("A" + (i + 1)); c.value = t; c.font = fuente({ b: i === 0, sz: i === 0 ? 13 : 10, c: i === 0 ? C : undefined }); c.alignment = { wrapText: true }; });
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}

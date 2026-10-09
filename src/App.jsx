@@ -242,7 +242,7 @@ export default function App() {
       vista = <ContratoIntermediacion config={config} irAAjustes={irAAjustes} />; break;
     case "empresa/carpeta":
     case "contratos/carpeta":
-      vista = <VistaCarpeta titulo="Servidor" eyebrow="Toda la documentación de la empresa" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
+      vista = <VistaCarpeta key="servidor" titulo="Servidor" eyebrow="Toda la documentación de la empresa" enlace={config.carpetas.contratos} nube={config.nube} config={config} empezarEnPC />; break;
     case "vincular":
       vista = <VincularEmpresa onHecho={() => misEmpresas().then(setEmpresas)} />; break;
     case "contratos":
@@ -266,7 +266,7 @@ export default function App() {
     case "contabilidad":
       vista = <ContabilidadWeb config={config} guardar={guardar} empresaId={empresa.id} />; break;
     case "contabilidad/carpeta":
-      vista = <VistaCarpeta titulo="Carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} contabilidad config={config} />; break;
+      vista = <VistaCarpeta key="contabilidad" titulo="Carpeta de contabilidad" eyebrow="Contabilidad" enlace={config.carpetas.contabilidad} nube={config.nube} contabilidad config={config} />; break;
     case "usuarios":
       vista = yo.rol === "admin" ? <Usuarios yo={yo} onCambio={setPendientes} /> : <Inicio config={config} ir={ir} />; break;
     case "ia":

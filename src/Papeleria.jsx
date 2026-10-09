@@ -1,7 +1,7 @@
 // Papelería corporativa: la empresa elige uno de los 4 estilos y queda fijo para sus documentos
 // (hoja corporativa y plantilla de informe en Word, facturas en PDF). Se puede cambiar, pero pide confirmación.
 import { useState } from "react";
-import { ESTILOS, textoLegal, docxCorporativo, facturaPDF } from "./lib/papeleria.js";
+import { ESTILOS, textoLegal, docxCorporativo, facturaPDF, facturaExcel } from "./lib/papeleria.js";
 import { pilaCSS } from "./lib/marca.js";
 import { useAviso } from "./comunes.jsx";
 
@@ -40,7 +40,8 @@ export default function Papeleria({ config, guardar }) {
     setOcupado(tipo);
     try {
       const est = elegido || "clasico", base = (datos.empresa.razon_social || "Empresa").trim();
-      if (tipo === "factura") {
+      if (tipo === "factura-excel") descargar(await facturaExcel({ estilo: est, ...datos }), `${base} - plantilla de factura.xlsx`);
+      else if (tipo === "factura") {
         const bytes = await facturaPDF({ estilo: est, ...datos, factura: { serie: "A", numero: "2026-001", fecha: new Date().toLocaleDateString("es-ES"), cliente: { nombre: "Cliente de ejemplo, S.L.", nif: "B00000000", domicilio: "Calle Ejemplo 1, Madrid" }, lineas: [{ concepto: "Servicios de asesoramiento (ejemplo)", cantidad: 1, precio: 1000, iva: 21 }] } });
         descargar(new Blob([bytes], { type: "application/pdf" }), `${base} - factura (ejemplo).pdf`);
       } else descargar(await docxCorporativo({ tipo, estilo: est, ...datos }), `${base} - ${tipo === "carta" ? "hoja corporativa" : "plantilla de informe"}.docx`);
@@ -60,10 +61,11 @@ export default function Papeleria({ config, guardar }) {
       {elegido && (
         <section className="tarjeta pap-elegido">
           <h2>Tu estilo: {ESTILOS[elegido].nombre}</h2>
-          <p className="muted">Descarga tus plantillas ya preparadas con tu logo y tus datos:</p>
+          <p className="muted">Descarga tus plantillas ya preparadas con tu logo, tus colores, tu tipografía y tus datos. La factura en Excel calcula sola importes, IVA por tipo, retención y total.</p>
           <div className="acciones">
             <button className="btn" type="button" disabled={!!ocupado} onClick={() => bajar("carta")}>{ocupado === "carta" ? "Preparando…" : "Hoja corporativa (Word)"}</button>
             <button className="btn" type="button" disabled={!!ocupado} onClick={() => bajar("informe")}>{ocupado === "informe" ? "Preparando…" : "Plantilla de informe (Word)"}</button>
+            <button className="btn" type="button" disabled={!!ocupado} onClick={() => bajar("factura-excel")}>{ocupado === "factura-excel" ? "Preparando…" : "Plantilla de factura (Excel)"}</button>
             <button className="btn ghost" type="button" disabled={!!ocupado} onClick={() => bajar("factura")}>{ocupado === "factura" ? "Preparando…" : "Factura de ejemplo (PDF)"}</button>
           </div>
         </section>

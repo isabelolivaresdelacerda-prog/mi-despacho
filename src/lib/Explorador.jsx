@@ -69,9 +69,13 @@ export default function Explorador({ titulo, eyebrow, contabilidad = false, conf
   useEffect(() => { (async () => {
     if (!raiz || !ok) return;
     let base = [];
-    if (contabilidad) { const h = await buscarContabilidad(raiz); base = h ? ["004 ADMINISTRACIÓN", h.name] : []; }
+    if (contabilidad) {
+      const h = await buscarContabilidad(raiz);
+      if (h) base = ["004 ADMINISTRACIÓN", h.name];
+      else setMsg("No encuentro la carpeta de contabilidad (dentro de «004 ADMINISTRACIÓN», una carpeta que empiece por «contabilidad»). Te enseño la carpeta de la empresa.");
+    }
     setInicio(base); setRuta(base); setAbiertas(new Set([base.join("/")]));
-  })(); }, [raiz, ok]);
+  })(); }, [raiz, ok, contabilidad]);
 
   const recargar = async () => { if (!raiz || !ok || !ruta) return; const d = await abrirRuta(raiz, ruta); setCont(d ? await leerCarpeta(d) : { carpetas: [], archivos: [] }); };
   useEffect(() => { recargar(); setBuscar(""); }, [ruta]);
