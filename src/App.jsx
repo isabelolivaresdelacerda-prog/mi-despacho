@@ -263,6 +263,7 @@ export default function App() {
               <div className="menu-sub">
                 <Item r="contratos/crear/cuentas-participacion" icono="punto">Cuentas en participación</Item>
                 <Item r="contratos/crear/encargo-tratamiento" icono="punto">RGPD - Contrato de encargo del tratamiento</Item>
+                <a href="/herramientas/mandato-venta.html" className="menu-item"><Ico n="punto" /><span>Mandato de venta (Villanueva de la Torre)</span></a>
               </div>
             </>}
             <Item r="prompts" icono="chispa">Prompts y skills <em className="pronto">pronto</em></Item>
