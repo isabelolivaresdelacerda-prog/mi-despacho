@@ -52,7 +52,32 @@ function Logo({ config, grande }) {
     : <span className={grande ? "logo-letra grande" : "logo-letra"}>{(config.nombre || "D").trim()[0]}</span>;
 }
 
+// Iconos de línea (estilo «lucide») para las tarjetas de inicio
+const ICONOS_INICIO = {
+  libro: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14zM8 7h8M8 11h6",
+  carpeta: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+  edificio: "M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M8 7h4M8 11h4M8 15h4M3 21h18",
+  manos: "M8 12l3 3 5-5M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z",
+  escudo: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4",
+  casa: "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
+  chispa: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z",
+  sobre: "M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3 7l9 6 9-6",
+};
+const TARJETAS_INICIO = {
+  "contabilidad": ["libro", "Facturas, banco, impuestos y libros en un solo sitio"],
+  "contabilidad/carpeta": ["carpeta", "Los documentos de la contabilidad de tu OneDrive"],
+  "empresa/carpeta": ["edificio", "Toda la documentación de la empresa"],
+  "contratos/crear/cuentas-participacion": ["manos", "Socios que aportan capital a un negocio"],
+  "contratos/crear/encargo-tratamiento": ["escudo", "Protección de datos con tu gestoría o proveedor"],
+  "contratos/crear/mandato-venta": ["casa", "Encargo de venta de un inmueble o activo"],
+};
+function IconoInicio({ n }) {
+  return <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONOS_INICIO[n] || ICONOS_INICIO.libro} /></svg>;
+}
+
 function Inicio({ config, ir }) {
+  const grupos = MENU.filter((m) => config.apps[m.app]).map((m) => ({ ...m, items: m.hijos.flatMap((h) => (h.grupo ? h.hijos : [h])) }));
+  const extra = [{ ruta: "ia", titulo: "IA gratis en tu ordenador", icono: "chispa", sub: "Lee y ordena documentos sin sacar nada de tu PC" }, { ruta: "correos", titulo: "Plantillas de correo", icono: "sobre", sub: "Correos tipo listos para enviar" }];
   return (
     <div className="app">
       <header className="app-cab inicio-cab">
@@ -60,22 +85,36 @@ function Inicio({ config, ir }) {
         <div>
           <div className="eyebrow">Mi despacho · {TIPOS[config.tipo]?.nombre}</div>
           <h1>{config.nombre || "Mi Despacho"}</h1>
-          <p className="muted">Estas son las apps que tienes contratadas. También las tienes en el menú.</p>
+          <p className="muted">Elige qué quieres hacer. También lo tienes todo en el menú.</p>
         </div>
       </header>
       <ProximosAvisos config={config} ir={ir} />
-      <div className="tarjetas">
-        {MENU.filter((m) => config.apps[m.app]).map((m) => (
-          <section className="tarjeta app-tarjeta" key={m.app}>
-            <h2><span className="icono">{m.icono}</span>{m.titulo}</h2>
-            <ul>
-              {m.hijos.flatMap((h) => (h.grupo ? h.hijos.map((x) => ({ ...x, titulo: h.grupo + " · " + x.titulo })) : [h])).map((h) => (
-                <li key={h.ruta}><button className="enlace" type="button" onClick={() => ir(h.ruta)}>{h.titulo}</button></li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+      {grupos.map((g) => (
+        <section key={g.app} className="inicio-grupo">
+          <h2 className="inicio-grupo-t">{g.titulo}</h2>
+          <div className="tarjetas-inicio">
+            {g.items.map((h) => { const [ic, sub] = TARJETAS_INICIO[h.ruta] || ["libro", ""]; return (
+              <button key={h.ruta} type="button" className="tarjeta-inicio" onClick={() => ir(h.ruta)}>
+                <span className="ti-icono"><IconoInicio n={ic} /></span>
+                <span className="ti-titulo">{h.titulo.replace(/^Contrato de /, "")}</span>
+                {sub && <span className="ti-sub">{sub}</span>}
+              </button>
+            ); })}
+          </div>
+        </section>
+      ))}
+      <section className="inicio-grupo">
+        <h2 className="inicio-grupo-t">Herramientas</h2>
+        <div className="tarjetas-inicio">
+          {extra.map((h) => (
+            <button key={h.ruta} type="button" className="tarjeta-inicio" onClick={() => ir(h.ruta)}>
+              <span className="ti-icono"><IconoInicio n={h.icono} /></span>
+              <span className="ti-titulo">{h.titulo}</span>
+              <span className="ti-sub">{h.sub}</span>
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

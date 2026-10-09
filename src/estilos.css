@@ -401,3 +401,22 @@ label small { font-size: 12px; }
 .comprobacion { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; border: 1px solid var(--linea); }
 .comprobacion.bien { background: color-mix(in srgb, #1d9a56 7%, transparent); }
 .comprobacion.mal { background: color-mix(in srgb, var(--aviso) 8%, transparent); }
+
+/* Inicio: tarjetas con icono en círculo (estilo beatrizinversiones.com) */
+.inicio-grupo { margin: 26px 0 8px; width: 100%; }
+.inicio-grupo-t { font-size: 13px; font-family: var(--sans); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); margin: 0 0 12px; }
+.tarjetas-inicio { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+.tarjeta-inicio {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px;
+  padding: 28px 22px 24px; background: var(--papel); border: 1px solid var(--linea); border-radius: 14px; cursor: pointer;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.08);
+  transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+.tarjeta-inicio:hover, .tarjeta-inicio:focus-visible { transform: translateY(-4px) scale(1.02); box-shadow: 0 25px 50px -12px rgba(0,0,0,.22); border-color: color-mix(in srgb, var(--brand) 35%, var(--linea)); }
+.ti-icono { width: 64px; height: 64px; border-radius: 999px; display: grid; place-items: center; margin-bottom: 8px;
+  background: color-mix(in srgb, var(--brand) 11%, transparent); color: var(--brand); transition: background .3s ease, color .3s ease; }
+.tarjeta-inicio:hover .ti-icono { background: var(--brand); color: var(--sobre-brand, #fff); }
+.ti-titulo { font-family: var(--serif); font-size: 19px; font-weight: 600; line-height: 1.2; color: var(--tinta); }
+.ti-sub { font-size: 13.5px; color: var(--suave); line-height: 1.45; }
+@media (prefers-color-scheme: dark) { .ti-icono { color: color-mix(in srgb, var(--brand) 55%, #fff); background: color-mix(in srgb, var(--brand) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .tarjeta-inicio, .ti-icono { transition: none; } .tarjeta-inicio:hover { transform: none; } }
