@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { TRAMOS, rango, cifras, porGestionar, plazos, fechaBonita, huella, saldosExtracto, saldo572, claveCierre, enRango, noPagada } from "./periodo.js";
 import { filtrarPeriodo } from "./motor.js";
 import { a8 } from "./pgc.js";
-import { eur, num, fechaOrden, guardarJustificante, subir } from "./datos.js";
+import { eur, num, fechaOrden, guardarJustificante, subir, sub, casarFacturaConMovimiento, guardarLectura } from "./datos.js";
 import { espacioActual } from "../../lib/espacio.js";
 
 export function SelPeriodo({ anio, tramo, cambiar, cierres = {}, anios }) {
@@ -187,8 +187,9 @@ export function ResumenPeriodo({ d, todos, pendientes, vinculados, r, cambiar, c
 }
 
 // ---- Banco del periodo con cierre del extracto ----
-export function BancoPeriodo({ d, raiz, recargar, todos, pendientes, r, cierres, guardarCierres, irA, aviso }) {
+export function BancoPeriodo({ d, raiz, recargar, todos, pendientes, r, cierres, guardarCierres, irA, aviso, propia }) {
   const [just, setJust] = useState(null); // movimiento al que asociar justificante
+  const [casar, setCasar] = useState(null); // movimiento al que elegir su factura
   const [soloFaltan, setSoloFaltan] = useState(false);
   const movs = useMemo(() => d.movimientos.filter((m) => enRango(m.fecha, r)).sort((a, b) => fechaOrden(b.fecha).localeCompare(fechaOrden(a.fecha))), [d, r]);
   const c = useMemo(() => cifras(todos, d.movimientos, pendientes, r), [todos, d, pendientes, r]);
@@ -239,15 +240,79 @@ export function BancoPeriodo({ d, raiz, recargar, todos, pendientes, r, cierres,
           <thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th>{s && <th className="num">Saldo</th>}<th>Documento</th><th>Justificante del banco <label className="check pequeño"><input type="checkbox" checked={soloFaltan} onChange={(e) => setSoloFaltan(e.target.checked)} /> solo los que faltan</label></th></tr></thead>
           <tbody>{movs.filter((m) => !soloFaltan || (m.importe < 0 && !m._justificante)).map((m) => { const a = docDe.get(m._id); return (
             <tr key={m._id}><td>{m.fecha}</td><td>{m.concepto}</td><td className={"num " + (m.importe < 0 ? "neg" : "pos")}>{eur(m.importe)}</td>{s && <td className="num">{m.saldo !== undefined ? eur(m.saldo) : ""}</td>}
-              <td>{m._factura ? <span className="ok">{m._factura}</span> : m._emitida ? <span className="ok">{m._emitida}</span> : a ? (a.origen === "banco-tercero" ? <button type="button" className="aviso-btn" title="El pago está apuntado al proveedor, pero falta su factura en la carpeta «facturas»" onClick={() => irA("facturas")}>falta la factura · {String(a.concepto).replace(/^Pago a |^Cobro de | \(a falta de factura\)$/g, "")} ›</button> : a.doc ? <span className="ok">{a.doc}</span> : <span className="muted pequeño">{a.concepto}</span>) : pendIds.has(m._id) ? <button type="button" className="aviso-btn" onClick={() => irA("libros", "aplicar")}>sin documento ›</button> : ""}</td>
+              <td>{m._factura ? <span className="ok">{m._factura}</span> : m._emitida ? <span className="ok">{m._emitida}</span> : a ? (a.origen === "banco-tercero" ? <button type="button" className="aviso-btn" title="Elige su factura en la carpeta" onClick={() => setCasar(m)}>falta la factura · {String(a.concepto).replace(/^Pago a |^Cobro de |^Devolución de | \(a falta de factura\)$/g, "")} · elegir ›</button> : a.doc ? <span className="ok">{a.doc}</span> : <span className="muted pequeño">{a.concepto}</span>) : pendIds.has(m._id) ? <button type="button" className="aviso-btn" onClick={() => irA("libros", "aplicar")}>sin documento ›</button> : ""}
+                {a?.origen !== "banco-tercero" && <button type="button" className="enlace pequeño" title="Elegir en la carpeta la factura de este movimiento" onClick={() => setCasar(m)}> 📎 {m._factura || m._emitida ? "cambiar factura" : "elegir factura"}</button>}</td>
               <td>{m._justificante?.no ? <span className="muted pequeño">no necesita</span> : m._justificante ? <button className="enlace" type="button" onClick={() => verJust(m._justificante.nombre)} title={m._justificante.extracto ? "Cargo sin documento propio: lo justifica el extracto mensual del banco" : ""}>📄 {m._justificante.extracto ? "en el extracto: " : ""}{m._justificante.nombre}</button> : m.importe < 0 ? <button type="button" className="aviso-btn" onClick={() => setJust(m)}>falta · asociar ›</button> : ""}
                 {m._justificante && <button className="enlace pequeño" type="button" onClick={() => setJust(m)}> cambiar</button>}</td></tr>); })}</tbody>
         </table></div>
       )}
 
+      {casar && <DialogoFactura m={casar} d={d} raiz={raiz} propia={propia} onCerrar={() => setCasar(null)} hecho={(t) => { setCasar(null); aviso?.(t); recargar(); }} />}
       {just && <DialogoJustificante m={just} d={d} raiz={raiz} onCerrar={() => setJust(null)} hecho={() => { setJust(null); recargar?.(); aviso?.("Justificante asociado"); }} />}
       {dialogo && <DialogoCierre r={r} c={c} s={s} contable={contable} huellaAhora={huellaAhora} onCerrar={() => setDialogo(false)}
         guardar={async (datos) => { await guardarCierres({ ...cierres, [claveCierre(r)]: datos }); setDialogo(false); aviso?.(`Extracto de ${r.etiqueta} cerrado`); }} />}
+    </div>
+  );
+}
+
+// Casar a mano un movimiento con su factura: de la lista o abriendo la carpeta y eligiendo el archivo
+// (si se elige uno de fuera de «facturas», se copia allí y se lee en el momento).
+function DialogoFactura({ m, d, raiz, propia, onCerrar, hecho }) {
+  const emitida = m.importe > 0, carpeta = emitida ? "facturas_emitidas" : "facturas";
+  const imp = Math.abs(m.importe), f0 = Date.parse(fechaOrden(m.fecha)) || 0;
+  const pal = String(m.concepto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().split(/[^A-Z0-9]+/).filter((w) => w.length >= 4);
+  const [buscar, setBuscar] = useState("");
+  const [ocupado, setOcupado] = useState("");
+  const lista = (emitida ? d.emitidas : d.facturas).filter((f) => !f._duplicadoDe)
+    .map((f) => { const n = `${f.proveedor || f.cliente || ""} ${f.numero || ""} ${f.archivo}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(); return { f, igual: Math.abs((f.total || 0) - imp) < 0.011, nombre: pal.some((w) => n.includes(w)), dias: Math.abs(((Date.parse(fechaOrden(f.fecha)) || 0) - f0) / 86400000) }; })
+    .filter((x) => !buscar || x.f.archivo.toLowerCase().includes(buscar.toLowerCase()))
+    .sort((a, b) => (b.igual - a.igual) || (b.nombre - a.nombre) || (a.dias - b.dias)).slice(0, 60);
+  const casar = async (archivo) => { await casarFacturaConMovimiento(raiz, m, archivo, emitida); hecho(archivo ? `Casado: ${archivo}` : "Quitado el casado a mano"); };
+  const traer = async (file, yaDentro) => {
+    setOcupado("Leyendo la factura…");
+    try {
+      const nombre = yaDentro || (await subir(raiz, carpeta, [file]))[0];
+      const esta = (emitida ? d.emitidas : d.facturas).find((f) => f.archivo === nombre);
+      if (!esta?.total) {
+        const { leerFactura } = await import("./leer.js");
+        const r = await leerFactura(file, { propia, emitida });
+        if (r.datos) await guardarLectura(raiz, nombre, file.lastModified, { archivo: nombre, ...r.datos, ...(emitida ? { cuenta_pgc: "705" } : {}) }, emitida);
+      }
+      await casar(nombre);
+    } catch (e) { setOcupado(""); alert(String(e.message || e)); }
+  };
+  const abrirCarpeta = async () => {
+    const dir = await sub(raiz, carpeta, true);
+    if (!window.showOpenFilePicker) { document.getElementById("df-input")?.click(); return; }
+    let h;
+    try { [h] = await window.showOpenFilePicker({ startIn: dir, types: [{ description: "Facturas", accept: { "application/pdf": [".pdf"], "image/*": [".jpg", ".jpeg", ".png"] } }] }); } catch { return; } // cancelado
+    const ruta = await dir.resolve(h).catch(() => null);
+    await traer(await h.getFile(), ruta?.length === 1 ? ruta[0] : null); // si está en una subcarpeta o fuera, se copia a «facturas»
+  };
+  return (
+    <div className="mc-fondo" role="dialog" aria-modal="true" aria-labelledby="df-t">
+      <div className="mc-dialogo ancho">
+        <header><h2 id="df-t">¿Qué factura es este {emitida ? "cobro" : "pago"}?</h2><button className="mc-x" onClick={onCerrar} aria-label="Cerrar">×</button></header>
+        <div className="mc-cuerpo">
+          <p className="mc-nota">{m.fecha} · {m.concepto} · <strong>{eur(m.importe)}</strong></p>
+          <div className="acciones">
+            <button className="btn" type="button" disabled={!!ocupado} onClick={abrirCarpeta}>📂 Abrir la carpeta y elegir…</button>
+            <input id="df-input" type="file" hidden accept=".pdf,image/*" onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; if (f) traer(f, null); }} />
+            <input placeholder="Buscar en las facturas…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
+          </div>
+          {ocupado && <p role="status"><span className="girando" aria-hidden="true" /> {ocupado}</p>}
+          <table className="tabla pequeña"><thead><tr><th>Factura</th><th>Fecha</th><th className="num">Total</th><th>Ahora</th><th /></tr></thead>
+            <tbody>{lista.map(({ f, igual }) => { const ya = f._pago || f._cobro; return (
+              <tr key={f.archivo} className={igual ? "resaltada" : ""}><td>{igual ? "✓ " : ""}{f.archivo}</td><td>{f.fecha}</td><td className="num">{eur(f.total)}</td>
+                <td className="muted pequeño">{f.noFactura ? "no es factura" : ya ? `casada con ${ya.fecha || "otro pago"}` : "sin casar"}</td>
+                <td><button className="btn ghost pequeño" type="button" disabled={!!ocupado} onClick={() => casar(f.archivo)}>Casar</button></td></tr>); })}</tbody></table>
+          <p className="muted pequeño">Si el importe no coincide (pagaste de más o de menos), cásala igual: la app apunta lo que salió del banco y te avisa de la diferencia.</p>
+        </div>
+        <footer>
+          {(m._factura || m._emitida) && <button className="mc-btn sec" onClick={() => casar(null)}>Quitar lo casado a mano</button>}
+          <button className="mc-btn sec" onClick={onCerrar}>Cerrar</button>
+        </footer>
+      </div>
     </div>
   );
 }

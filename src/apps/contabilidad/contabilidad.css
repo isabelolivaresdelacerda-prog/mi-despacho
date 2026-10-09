@@ -105,3 +105,9 @@ label.check { flex-direction: row; align-items: center; gap: 6px; font-size: 14p
 .etq.aviso { border-color: var(--aviso); color: var(--aviso); }
 .tabla tr.sub-fila td { font-size: 13px; background: var(--superficie); }
 @media (max-width: 900px) { .doc-y-datos { grid-template-columns: 1fr; } .vista-doc { height: 50vh; } }
+
+/* Corregir factura: pegar el texto */
+.pegar-texto { margin: 0 0 12px; padding: 8px 10px; border: 1px dashed var(--borde, #ccc); border-radius: 8px; }
+.pegar-texto summary { cursor: pointer; font-weight: 600; }
+.pegar-texto textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; margin: 6px 0; resize: vertical; }
+tr.resaltada td { background: var(--ok-suave, #eef7ee); }

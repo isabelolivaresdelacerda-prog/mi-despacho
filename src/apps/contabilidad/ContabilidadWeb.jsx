@@ -174,7 +174,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
       {!datos ? <p className="muted">Leyendo la carpeta…</p> : <>
         {tab === "resumen" && <ResumenPeriodo esfl={esESFL(config)} d={dd} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
         {tab === "facturas" && <Facturas d={dd} propia={propia} r={r} raiz={raiz} recargar={cargar} aviso={aviso} emitidas={verEmitidas} setEmitidas={setVerEmitidas} />}
-        {tab === "banco" && <BancoPeriodo d={dd} raiz={raiz} recargar={cargar} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
+        {tab === "banco" && <BancoPeriodo d={dd} raiz={raiz} propia={propia} recargar={cargar} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
         {tab === "impuestos" && <Impuestos raiz={raiz} d={dd} todos={diario.asientos} pendientes={diario.pendientes} anio={per.anio} anios={anios} cambiarAnio={(a) => cambiarPeriodo(a, per.tramo)} presentados={extra.presentados} guardar={(n) => guardarExtra("presentados", n)} otros={extra.otros} guardarOtros={(n) => guardarExtra("otros", n)} opciones={opcionesFiscales(config)} aviso={aviso} />}
         {tab === "libros" && <Libros datos={dd} diario={diario} extra={extra} guardarExtra={guardarExtra} r={r} sub={subLibros} setSub={setSubLibros} config={config} guardarConfig={guardarConfig} aviso={aviso} />}
         {tab === "bandeja" && <Bandeja raiz={raiz} empresa={empresa} propia={propia} aviso={aviso} recargar={cargar} onCambio={() => { cargarExtra(); contarEntrada(); }} />}
@@ -302,6 +302,23 @@ function Facturas({ d, propia, r, raiz, recargar, aviso, emitidas = false, setEm
               <div>
                 <p className="muted pequeño">{edit.archivo} · <button className="enlace" type="button" onClick={() => abrir(edit._arch)}>abrir en otra pestaña</button></p>
                 {(edit._papelesCambiados || edit._proveedorPropio) && <p className="mc-nota">La IA había puesto a tu empresa como {emitidas ? "cliente" : "proveedora"}. {edit._papelesCambiados ? "Se han cambiado los papeles automáticamente: compruébalo con el documento y guarda." : "Escribe aquí quién emite realmente la factura."}</p>}
+                <details className="pegar-texto" open={!edit._leida}>
+                  <summary>Pegar el texto de la factura y que la app lo reparta</summary>
+                  <p className="muted pequeño">Abre la factura, selecciona todo (Ctrl+A), copia (Ctrl+C) y pégalo aquí (Ctrl+V). La app rellena los campos de abajo; revisa y pulsa Guardar.</p>
+                  <textarea rows={5} value={edit._pegado || ""} placeholder="Pega aquí el texto de la factura…" onChange={(e) => setEdit({ ...edit, _pegado: e.target.value })} />
+                  <button className="btn ghost" type="button" disabled={!edit._pegado?.trim() || edit._repartiendo} onClick={async () => {
+                    setEdit((x) => ({ ...x, _repartiendo: true }));
+                    try {
+                      const { leerTextoFactura } = await import("./leer.js");
+                      const r = await leerTextoFactura(edit._pegado, { propia, emitida: emitidas });
+                      const d = r.datos || {};
+                      // Solo se rellena lo que se ha encontrado; lo que ya tenías escrito y no aparece en el texto se queda
+                      const nuevos = Object.fromEntries(campos.map(([k]) => [k, d[k]]).filter(([k, v]) => v !== undefined && v !== null && v !== "" && !(typeof v === "number" && v === 0 && !/pct|retencion/.test(k))));
+                      setEdit((x) => ({ ...x, ...nuevos, ...(d.isp !== undefined && !emitidas ? { isp: d.isp } : {}), _repartiendo: false, _repartido: r.motivo }));
+                    } catch (e) { setEdit((x) => ({ ...x, _repartiendo: false, _repartido: "No se pudo leer: " + (e.message || e) })); }
+                  }}>{edit._repartiendo ? "Leyendo…" : "Repartir en los campos"}</button>
+                  {edit._repartido && <span className="muted pequeño"> {edit._repartido}. Revisa los campos.</span>}
+                </details>
                 <div className="rejilla-edit">
                   {campos.map(([k, t]) => <label key={k} className="mc-campo"><span>{t}</span><input value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} /></label>)}
                 </div>

@@ -105,11 +105,15 @@ function jsonDe(texto) {
 export function lecturaBasica(t) {
   const imp = (re) => { const m = t.match(re); return m ? num(m[1]) : 0; };
   const nifs = [...t.matchAll(/\b([A-HJNP-SUVW]\d{7}[0-9A-J]|\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\b/g)].map((m) => m[1]);
-  const fecha = (t.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/) || [])[1] || "";
+  const MES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
+  const fl = t.match(/\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|se?ptiembre|octubre|noviembre|diciembre)\s+(?:de\s+|del\s+)?(\d{4})/i);
+  const fecha = (t.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/) || [])[1] || (fl ? `${fl[1].padStart(2, "0")}/${String(MES[fl[2].toLowerCase()]).padStart(2, "0")}/${fl[3]}` : "");
   const total = imp(/total(?:\s+factura|\s+a\s+pagar)?\s*:?\s*([\d.]+,\d{2})/i) || imp(/([\d.]+,\d{2})\s*€?\s*$/m);
   const base = imp(/base\s+imponible\s*:?\s*([\d.]+,\d{2})/i);
   const iva = imp(/(?:cuota\s+)?i\.?v\.?a\.?[^\d\n]{0,20}([\d.]+,\d{2})/i);
-  return { numero: (t.match(/factura\s*(?:n[ºo°.]*|número)?\s*:?\s*([A-Z0-9][\w/-]{2,})/i) || [])[1] || "", fecha, nif_proveedor: nifs[0] || "", base, iva_importe: iva, total };
+  const ret = imp(/retenci[oó]n[^\d\n]{0,25}([\d.]+,\d{2})/i);
+  const pct = (t.match(/(\d{1,2})(?:[.,]00)?\s*%?\s*(?:de\s+)?I\.?V\.?A/i) || [])[1];
+  return { numero: (t.match(/factura\s*(?:n[ºo°.]*|número)?\s*:?\s*([A-Z0-9][\w/-]{2,})/i) || [])[1] || "", fecha, nif_proveedor: nifs[0] || "", base: base || (total ? Math.round((total - iva + ret) * 100) / 100 : 0), iva_pct: pct ? +pct : iva ? 21 : 0, iva_importe: iva, retencion_importe: ret, total };
 }
 
 // Plantillas fijas (sin IA): facturas en inglés tipo Stripe (Anthropic, Base44/Wix, OpenAI, Hostinger…) y recibos
@@ -132,6 +136,11 @@ export async function leerFactura(file, { propia, emitida = false } = {}) {
   let texto = "";
   try { texto = /\.(jpe?g|png)$/i.test(file.name || "") ? await textoImagen(file) : await textoPDF(file); } catch { texto = ""; }
   if (texto.replace(/\s/g, "").length < 30) return { datos: null, motivo: "No se ha podido leer ni con OCR. Rellena los datos a mano." };
+  return leerTextoFactura(texto, { propia, emitida });
+}
+
+// Lee una factura a partir de su TEXTO (el del PDF, o el que pegas tú en «Corregir factura»): plantilla, IA o lectura básica
+export async function leerTextoFactura(texto, { propia, emitida = false } = {}) {
   const fija = !emitida && plantilla(texto);
   if (fija && fija.proveedor && (fija.total || fija.noFactura)) { fija.analizado_ia = false; fija.metodo = "plantilla"; return { datos: fija, motivo: "leída con plantilla (sin IA)" }; }
   if (!emitida && /PRESUPUESTO/i.test(texto.slice(0, 600)) && !/FACTURA\s*(N|n)/.test(texto)) { /* presupuesto: se lee igual pero se avisa */ }

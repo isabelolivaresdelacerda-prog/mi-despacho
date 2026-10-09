@@ -181,13 +181,22 @@ export async function cargarTodo(raiz) {
   const movimientos = extractos.map((m, i) => ({ ...m, importe: num(m.importe), _id: i }));
   // Conciliación sencilla: vínculo manual o movimiento con el mismo importe (pago) a partir de la fecha de la factura
   const usados = new Set();
+  // 1º lo casado a mano (factura elegida para un movimiento, o movimiento elegido para una factura): manda sobre lo automático
+  const elegido = (f, emitida) => {
+    const v = vincular[(emitida ? "facturas_emitidas/" : "") + f.archivo];
+    if (!v?.clave_banco) return false;
+    const m = movimientos.find((x) => !usados.has(x._id) && claveMovDatos(x) === v.clave_banco) || movimientos.find((x) => !usados.has(x._id) && x.fecha === v.fecha && Math.abs(Math.abs(x.importe) - Math.abs(num(v.importe))) < 0.011);
+    if (!m) return false;
+    usados.add(m._id);
+    const dif = f.total ? Math.round((Math.abs(m.importe) - f.total) * 100) / 100 : 0;
+    if (emitida) { m._emitida = f.archivo; f._cobro = { fecha: m.fecha, texto: m.concepto, elegido: true }; }
+    else { m._factura = f.archivo; f._pago = { fecha: m.fecha, texto: m.concepto, importe: Math.abs(m.importe), elegido: true, ...(Math.abs(dif) >= 0.01 ? { dif } : {}) }; }
+    return true;
+  };
+  const yaElegidas = new Set([...facturas.filter((f) => elegido(f, false)), ...emitidas.filter((f) => elegido(f, true))]);
   for (const f of facturas.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)))) {
+    if (yaElegidas.has(f)) continue;
     const v = vincular[f.archivo];
-    // Pago elegido a mano en el extracto: se casa con ese movimiento del banco (no es un pago «por otra vía»)
-    if (v?.clave_banco) {
-      const m = movimientos.find((x) => !usados.has(x._id) && claveMovDatos(x) === v.clave_banco) || movimientos.find((x) => !usados.has(x._id) && x.fecha === v.fecha && Math.abs(Math.abs(x.importe) - Math.abs(num(v.importe))) < 0.011);
-      if (m) { usados.add(m._id); m._factura = f.archivo; f._pago = { fecha: m.fecha, texto: m.concepto, elegido: true }; continue; }
-    }
     if (v && !v.clave_banco) { f._pago = { fecha: v.fecha, texto: v.descripcion, manual: true }; continue; }
     if (!f.total) continue;
     // 1º por el número de factura escrito en el concepto del banco (aunque el importe no coincida: se avisa de la diferencia)
@@ -197,7 +206,7 @@ export async function cargarTodo(raiz) {
   }
   // Cobros de las facturas emitidas
   for (const f of emitidas.sort((a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha)))) {
-    if (!f.total) continue;
+    if (!f.total || yaElegidas.has(f)) continue;
     const m = porNumero(movimientos, usados, f.numero, 1, f.fecha, f.total) || mejorMovimiento(movimientos, usados, f.total, 1, f.fecha, f.cliente);
     if (m) { usados.add(m._id); m._emitida = f.archivo; f._cobro = { fecha: m.fecha, texto: m.concepto }; }
   }
@@ -309,6 +318,15 @@ export async function guardarLectura(raiz, archivo, mtime, datos, emitida = fals
   const c = await leerJSON(raiz, "cache_facturas.json", {});
   c[(emitida ? "facturas_emitidas/" : "facturas/") + archivo] = { _mtime: mtime / 1000, _parser_version: "web-v1", _procesado: new Date().toLocaleString("es-ES"), datos };
   await escribirJSON(raiz, "cache_facturas.json", c);
+}
+// Casar a mano un movimiento del banco con una factura (recibida o emitida). Quita cualquier otra factura casada a mano
+// con ese mismo movimiento, para que el último que elijas sea el que vale.
+export async function casarFacturaConMovimiento(raiz, m, archivo, emitida = false) {
+  const x = await leerJSON(raiz, "vincular.json", {});
+  const clave = claveMovDatos(m);
+  for (const k of Object.keys(x)) if (x[k]?.clave_banco === clave) delete x[k];
+  if (archivo) x[(emitida ? "facturas_emitidas/" : "") + archivo] = { clave_banco: clave, fecha: m.fecha, importe: m.importe, descripcion: m.concepto, elegido: new Date().toISOString().slice(0, 10) };
+  await escribirJSON(raiz, "vincular.json", x);
 }
 export async function guardarVinculo(raiz, archivo, v) {
   const x = await leerJSON(raiz, "vincular.json", {});
