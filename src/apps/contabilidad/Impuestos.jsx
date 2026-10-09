@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { modelosDelAnio, proponerPagos, leerNombreImpuesto, casillas, cifras, fechaBonita, NOMBRE_MODELO, claveModelo, rango } from "./periodo.js";
 import { claveMov } from "./motor.js";
+import { casillas303, casillas111, cuentasEmpresa, ibanBonito, ENLACE_AEAT } from "./hacienda.js";
 import { eur, num, listar, abrir, subir, csv, descargarTexto, fechaOrden } from "./datos.js";
 
 const RESULTADOS = [["ingresar", "A ingresar"], ["devolver", "A devolver"], ["compensar", "A compensar"], ["cero", "Sin actividad / cero"], ["informativa", "Declaración informativa"]];
@@ -17,7 +18,8 @@ export function sincronizarCalendario(presentados, modelos) {
   } catch { /* nada */ }
 }
 
-export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAnio, anios, presentados, guardar, otros = [], guardarOtros, opciones, aviso }) {
+export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAnio, anios, presentados, guardar, otros = [], guardarOtros, opciones, aviso, config }) {
+  const [prep, setPrep] = useState(null); // modelo que se prepara para Hacienda
   const modelos = useMemo(() => modelosDelAnio(anio, todos, d, pendientes, opciones), [anio, todos, d, pendientes, opciones]);
   const [docs, setDocs] = useState([]);
   const [dlg, setDlg] = useState(null);
@@ -171,6 +173,7 @@ export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAni
                     <td>{fechaBonita(m.plazo)}</td>
                     <td className="acciones">
                       {p?.archivo && <button className="enlace" type="button" onClick={() => { const x = docs.find((y) => y.nombre === p.archivo); if (x) abrir(x); }}>Justificante</button>}
+                      {["303", "111"].includes(m.modelo) && !p && <button className="enlace" type="button" onClick={() => setPrep(m)}>Preparar para Hacienda</button>}
                       <button className="enlace" type="button" onClick={() => setDlg({ m, ini: p || {} })}>{p ? "Editar" : "Registrar presentado"}</button>
                       {p && <button className="enlace" type="button" onClick={() => quitar(m)}>Quitar</button>}
                     </td>
@@ -184,6 +187,7 @@ export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAni
 
       <OtrosTributos anio={anio} otros={otros} guardar={guardarOtros} d={d} docs={docs} raiz={raiz} recargarDocs={cargarDocs} aviso={aviso} />
 
+      {prep && <PrepararHacienda m={prep} d={d} raiz={raiz} config={config} presentados={presentados} onCerrar={() => setPrep(null)} aviso={aviso} />}
       {dlg && <DialogoPresentado m={dlg.m} ini={dlg.ini} docs={docs} raiz={raiz} recargarDocs={cargarDocs} onCerrar={() => setDlg(null)} guardar={(x) => registrar(dlg.m, x)} />}
     </div>
   );
@@ -339,6 +343,62 @@ function DialogoOtro({ ini, docs, raiz, recargarDocs, guardar, onCerrar }) {
         <footer>
           <button className="mc-btn sec" onClick={onCerrar}>Cancelar</button>
           <button className="mc-btn" disabled={!o.fecha || !num(o.importe) || !cuenta || (o.como === "tercero" && !o.pagadoPor.trim())} onClick={() => guardar({ ...o, cuenta, importe: num(o.importe), modelo: T.modelo || "" })}>Guardar</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+
+// Casillas listas para pasar a la sede de la AEAT, con la cuenta bancaria (la única que hay, o la que elijas)
+function PrepararHacienda({ m, d, raiz, config, presentados, onCerrar, aviso }) {
+  const [cuentas, setCuentas] = useState(null);
+  const [iban, setIban] = useState("");
+  const [extra, setExtra] = useState("");
+  useEffect(() => { cuentasEmpresa(raiz, config).then((l) => { setCuentas(l); setIban(l[0] || ""); }); }, [raiz, config]);
+  // IVA soportado de trimestres anteriores ya presentados que no se dedujo (se puede incluir ahora, dentro de 4 años)
+  const sinDeducir = useMemo(() => {
+    if (m.modelo !== "303") return 0;
+    return Object.values(presentados).filter((p) => p.modelo === "303" && p.declarado && +p.anio === +m.anio && +p.tramo < +m.tramo).reduce((a, p) => {
+      const r = rango(p.anio, p.tramo), fs = (d.facturas || []).filter((f) => !f._duplicadoDe && !f.noFactura && fechaOrden(f.fecha) >= r.desde && fechaOrden(f.fecha) <= r.hasta);
+      return a + Math.max(0, fs.reduce((x, f) => x + (f.iva_importe || 0), 0) + fs.filter((f) => f.isp).reduce((x, f) => x + Math.round(f.base * 21) / 100, 0) - (p.ivaSop || 0));
+    }, 0);
+  }, [m, d, presentados]);
+  const c = m.modelo === "303" ? casillas303(d, m.r, presentados, { extraDeducible: num(extra) }) : casillas111(d, m.r);
+  const RES = { ingresar: "A ingresar", compensar: "A compensar", devolver: "A devolver", cero: "Sin actividad / cero" };
+  const copiar = async (v) => { try { await navigator.clipboard.writeText(String(v)); aviso?.(`Copiado: ${v}`); } catch { /* nada */ } };
+  const fmt = (v) => (typeof v === "number" && !Number.isInteger(v) ? v.toFixed(2).replace(".", ",") : String(v).replace(".", ","));
+  const descargar = () => {
+    const filas = [["Modelo", m.modelo], ["Periodo", m.etiqueta], ["NIF", config?.empresa?.cif || ""], ["Razón social", config?.empresa?.razon_social || config?.nombre || ""], [], ["Casilla", "Concepto", "Importe"], ...c.filas.map(([k, t, v]) => [k, t, typeof v === "number" ? v : num(v)]), [], ["Resultado", RES[c.resultado]], ["Importe", c.importe], ["Cuenta (IBAN)", iban]];
+    descargarTexto(csv(filas), `Modelo ${m.modelo} ${m.etiqueta} - para Hacienda.csv`);
+  };
+  const necesitaCuenta = c.resultado === "ingresar" || c.resultado === "devolver";
+  return (
+    <div className="mc-fondo" role="dialog" aria-modal="true" aria-labelledby="ph-t">
+      <div className="mc-dialogo ancho">
+        <header><h2 id="ph-t">Modelo {m.modelo} · {m.etiqueta} — para presentar en Hacienda</h2><button className="mc-x" onClick={onCerrar} aria-label="Cerrar">×</button></header>
+        <div className="mc-cuerpo">
+          <p className="mc-nota">Calculado con las facturas del periodo{m.modelo === "303" ? ` (${c.facturas.recibidas} recibidas, ${c.facturas.emitidas} emitidas, ${c.facturas.isp} con inversión del sujeto pasivo)` : ""}. Pulsa en un importe para copiarlo y pegarlo en el formulario de la sede.</p>
+          {m.modelo === "303" && sinDeducir > 0.5 && (
+            <label className="mc-campo"><span>IVA de trimestres anteriores que no se dedujo ({eur(sinDeducir)}). ¿Lo incluyes en este 303? (se suma a la casilla 29)</span>
+              <span className="acciones"><input value={extra} placeholder="0,00" onChange={(e) => setExtra(e.target.value)} style={{ maxWidth: 140 }} /> <button className="btn ghost pequeño" type="button" onClick={() => setExtra(sinDeducir.toFixed(2).replace(".", ","))}>Incluir {eur(sinDeducir)}</button></span></label>
+          )}
+          <table className="tabla pequeña"><thead><tr><th>Casilla</th><th>Concepto</th><th className="num">Importe</th></tr></thead>
+            <tbody>{c.filas.map(([k, t, v]) => (<tr key={k + t}><td><strong>{k}</strong></td><td>{t}</td><td className="num"><button className="enlace" type="button" title="Copiar" onClick={() => copiar(fmt(v))}>{typeof v === "number" && !Number.isInteger(v) ? eur(v) : typeof v === "number" && k !== "07" ? eur(v) : v}</button></td></tr>))}</tbody></table>
+          <p><strong>Resultado: {RES[c.resultado]}{c.importe ? ` · ${eur(c.importe)}` : ""}</strong>{m.modelo === "303" && (c.c87 > 0 || c.c71 < 0) ? <span className="muted"> · total a compensar en los siguientes trimestres: {eur(c.c87 + Math.max(0, -c.c71))}{m.tramo !== "4" ? " (en el 4T se puede pedir la devolución)" : ""}</span> : ""}</p>
+          {necesitaCuenta && (
+            <div className="mc-campo"><span>{c.resultado === "devolver" ? "Cuenta para la devolución" : "Cuenta para el cargo (domiciliación o NRC)"}</span>
+              {cuentas === null ? <span className="muted">Buscando las cuentas…</span>
+                : cuentas.length === 0 ? <span className="muted">No hay ninguna cuenta guardada: conecta el banco o ponla en Ajustes › Empresa.</span>
+                : cuentas.length === 1 ? <span><strong>{ibanBonito(cuentas[0])}</strong> <button className="enlace pequeño" type="button" onClick={() => copiar(cuentas[0])}>copiar</button> <small className="muted">(la única cuenta de la empresa: se pone sola)</small></span>
+                : <select value={iban} onChange={(e) => setIban(e.target.value)}>{cuentas.map((x) => <option key={x} value={x}>{ibanBonito(x)}</option>)}</select>}
+            </div>
+          )}
+        </div>
+        <footer>
+          <button className="mc-btn sec" type="button" onClick={descargar}>Descargar (Excel)</button>
+          <a className="mc-btn sec" href={ENLACE_AEAT[m.modelo]} target="_blank" rel="noopener noreferrer">Abrir la sede de la AEAT</a>
+          <button className="mc-btn" type="button" onClick={onCerrar}>Cerrar</button>
         </footer>
       </div>
     </div>
