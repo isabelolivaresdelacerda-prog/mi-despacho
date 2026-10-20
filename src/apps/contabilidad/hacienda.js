@@ -51,7 +51,10 @@ export function casillas303(d, r, presentados = {}, { extraDeducible = 0 } = {})
     ["69", "Resultado", c69],
     ["71", "Resultado de la liquidación", c71],
   ];
-  return { filas, resultado, importe: Math.abs(c71), c71, c87, extraDeducible: num(extraDeducible), facturas: { emitidas: em.length, recibidas: rec.length, isp: isp.length } };
+  // Valores sueltos por número de casilla, para el fichero de importación de la AEAT (ficherosAEAT.js)
+  const d4 = dev.find((x) => x.p === 4), d10 = dev.find((x) => x.p === 10), d21 = dev.find((x) => x.p === 21);
+  const valores = { c1: d4.base, c3: d4.cuota, c4: d10.base, c6: d10.cuota, c7: d21.base, c9: d21.cuota, c12: ispBase, c13: ispCuota, c27, c28: dedBase, c29: dedCuota, c45, c46, c110, c78, c87, c69, c71 };
+  return { filas, valores, resultado, importe: Math.abs(c71), c71, c87, extraDeducible: num(extraDeducible), facturas: { emitidas: em.length, recibidas: rec.length, isp: isp.length } };
 }
 
 // La retención se declara en el trimestre en que se PAGA la factura (no en el de su fecha)

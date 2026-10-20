@@ -379,6 +379,16 @@ function PrepararHacienda({ m, d, raiz, config, presentados, onCerrar, aviso }) 
     descargarTexto(csv(filas), `Modelo ${m.modelo} ${m.etiqueta} - para Hacienda.csv`);
   };
   const necesitaCuenta = c.resultado === "ingresar" || c.resultado === "devolver";
+  const [domiciliar, setDomiciliar] = useState(false);
+  const ficheroAEAT = async () => {
+    const nif = config?.empresa?.cif || "", nombre = config?.empresa?.razon_social || config?.nombre || "";
+    if (!nif) { aviso?.("Falta tu NIF: ponlo en Ajustes › Datos de la entidad."); return; }
+    const F = await import("./ficherosAEAT.js");
+    const id = { nif, nombre, anio: m.anio, tramo: m.tramo, iban: (domiciliar || c.resultado === "devolver") ? iban : "" };
+    const f = m.modelo === "303" ? F.fichero303(c, id) : F.fichero130(m.c130, id);
+    F.descargarFichero(f);
+    aviso?.(`Descargado ${f.nombre}: en el formulario del modelo ${m.modelo} de la AEAT pulsa «Importar» y elige este fichero`);
+  };
   return (
     <div className="mc-fondo" role="dialog" aria-modal="true" aria-labelledby="ph-t">
       <div className="mc-dialogo ancho">
@@ -392,6 +402,10 @@ function PrepararHacienda({ m, d, raiz, config, presentados, onCerrar, aviso }) 
           )}
           <table className="tabla pequeña"><thead><tr><th>Casilla</th><th>Concepto</th><th className="num">Importe</th></tr></thead>
             <tbody>{c.filas.map(([k, t, v]) => (<tr key={k + t}><td><strong>{k}</strong></td><td>{t}</td><td className="num"><button className="enlace" type="button" title="Copiar" onClick={() => copiar(fmt(v))}>{typeof v === "number" && !Number.isInteger(v) ? eur(v) : typeof v === "number" && k !== "07" ? eur(v) : v}</button></td></tr>))}</tbody></table>
+          {["303", "130"].includes(m.modelo) && <div className="nota pequeño">
+            <strong>Presentar importando el fichero:</strong> pulsa «Fichero para importar en la AEAT», entra en el formulario del modelo {m.modelo} en la sede (botón de abajo), pulsa <strong>Importar</strong> y elige el fichero <code>.{m.modelo}</code> descargado. El formulario se rellena solo; revisa las casillas y pulsa «Validar» antes de firmar y enviar.
+            {c.resultado === "ingresar" && <label className="check"><input type="checkbox" checked={domiciliar} onChange={(e) => setDomiciliar(e.target.checked)} /> Domiciliar el pago en la cuenta elegida (si no, sale «a ingresar» y se paga con NRC)</label>}
+          </div>}
           <p><strong>Resultado: {RES[c.resultado]}{c.importe ? ` · ${eur(c.importe)}` : ""}</strong>{m.modelo === "303" && (c.c87 > 0 || c.c71 < 0) ? <span className="muted"> · total a compensar en los siguientes trimestres: {eur(c.c87 + Math.max(0, -c.c71))}{m.tramo !== "4" ? " (en el 4T se puede pedir la devolución)" : ""}</span> : ""}</p>
           {necesitaCuenta && (
             <div className="mc-campo"><span>{c.resultado === "devolver" ? "Cuenta para la devolución" : "Cuenta para el cargo (domiciliación o NRC)"}</span>
@@ -403,6 +417,7 @@ function PrepararHacienda({ m, d, raiz, config, presentados, onCerrar, aviso }) 
           )}
         </div>
         <footer>
+          {["303", "130"].includes(m.modelo) && <button className="mc-btn" type="button" onClick={ficheroAEAT} title="Fichero para el botón «Importar» del formulario de la AEAT">Fichero para importar en la AEAT</button>}
           <button className="mc-btn sec" type="button" onClick={descargar}>Descargar (Excel)</button>
           <a className="mc-btn sec" href={ENLACE_AEAT[m.modelo]} target="_blank" rel="noopener noreferrer">Abrir la sede de la AEAT</a>
           <button className="mc-btn" type="button" onClick={onCerrar}>Cerrar</button>
