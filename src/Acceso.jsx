@@ -1,7 +1,7 @@
 // Pantalla de acceso: entrar (clave + doble factor), crear mi clave (con el código de la administradora) o pedir acceso.
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { entrar, crearClave, enviarCodigo, pedirAcceso, estadoMFA, iniciarAltaMFA, verificarMFA, salir } from "./lib/cuentas.js";
+import { entrar, crearClave, enviarCodigo, pedirAcceso, estadoMFA, iniciarAltaMFA, verificarMFA, salir, cambiarClave, miFicha } from "./lib/cuentas.js";
 
 export default function Acceso({ onDentro }) {
   const [enviado, setEnviado] = useState("");
@@ -21,7 +21,12 @@ export default function Acceso({ onDentro }) {
     setF((x) => ({ ...x, otp: "" }));
   };
   // Si ya hay sesión a medias (sin doble factor), ir directamente a ese paso
-  useEffect(() => { estadoMFA().then((st) => { if (st.sesion && st.nivel !== "aal2") siguientePaso(st).catch(() => {}); }); }, []);
+  useEffect(() => { estadoMFA().then(async (st) => {
+    if (st.sesion && st.nivel !== "aal2") siguientePaso(st).catch(() => {});
+    else if (st.sesion) { const yo = await miFicha(); if (yo?.cambiar_clave) setModo("nueva"); }
+  }); }, []);
+  // Tras el doble factor: si entró con clave temporal, primero la cambia
+  const dentro = (yo) => (yo?.cambiar_clave ? (setModo("nueva"), setF((x) => ({ ...x, clave: "", clave2: "" }))) : onDentro(yo));
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -36,15 +41,19 @@ export default function Acceso({ onDentro }) {
         await pedirAcceso(f.nombre, f.email);
         setMsg({ tipo: "ok", texto: "Solicitud enviada. Cuando la administradora la apruebe, te dará un código para crear tu clave." });
         setF({ ...f, nombre: "" });
-      } else if (modo === "mfa") onDentro(await verificarMFA(factor, f.otp));
-      else if (modo === "mfa-alta") onDentro(await verificarMFA(alta.id, f.otp));
+      } else if (modo === "mfa") dentro(await verificarMFA(factor, f.otp));
+      else if (modo === "mfa-alta") dentro(await verificarMFA(alta.id, f.otp));
+      else if (modo === "nueva") {
+        if (f.clave !== f.clave2) throw new Error("Las dos claves no coinciden.");
+        onDentro(await cambiarClave(f.clave));
+      }
     } catch (err) {
       setMsg({ tipo: "error", texto: err.message });
     } finally { setOcupado(false); }
   };
   const cambiar = (m) => { setModo(m); setMsg(null); };
-  const titulos = { entrar: "Entrar", clave: "Crear mi clave", pedir: "Pedir acceso", mfa: "Código de verificación", "mfa-alta": "Activa el doble factor" };
-  const esMfa = modo === "mfa" || modo === "mfa-alta";
+  const titulos = { entrar: "Entrar", clave: "Crear mi clave", pedir: "Pedir acceso", mfa: "Código de verificación", "mfa-alta": "Activa el doble factor", nueva: "Elige tu clave" };
+  const esMfa = modo === "mfa" || modo === "mfa-alta" || modo === "nueva";
 
   return (
     <div className="bienvenida">
@@ -57,6 +66,7 @@ export default function Acceso({ onDentro }) {
           {modo === "pedir" && "Déjanos tu nombre y tu correo. La administradora revisará tu solicitud."}
           {modo === "mfa" && "Abre la app de autenticación de tu móvil y escribe el código de 6 cifras de Mi Despacho."}
           {modo === "mfa-alta" && "Para proteger los datos, Mi Despacho pide un segundo paso al entrar. Solo se configura una vez."}
+          {modo === "nueva" && "Has entrado con una clave temporal. Elige ahora la tuya: solo la sabrás tú."}
         </p>
         {modo === "mfa-alta" && alta && (
           <ol className="pasos-mfa">
@@ -79,10 +89,15 @@ export default function Acceso({ onDentro }) {
             <label>Repite la clave<input type="password" required autoComplete="new-password" {...c("clave2")} /></label>
             <p className="muted" style={{ fontSize: 13 }}>Al menos 12 caracteres, con letras y números. Se guarda cifrada: nadie puede verla, tampoco la administradora.</p>
           </>}
-          {esMfa && <label>Código de 6 cifras<input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} className="otp" autoFocus {...c("otp")} /></label>}
+          {modo === "nueva" && <>
+            <label>Nueva clave<input type="password" required autoComplete="new-password" minLength={12} {...c("clave")} /></label>
+            <label>Repite la clave<input type="password" required autoComplete="new-password" {...c("clave2")} /></label>
+            <p className="muted" style={{ fontSize: 13 }}>Al menos 12 caracteres, con letras y números.</p>
+          </>}
+          {esMfa && modo !== "nueva" && <label>Código de 6 cifras<input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} className="otp" autoFocus {...c("otp")} /></label>}
           {msg && <p className={msg.tipo === "error" ? "nota error" : "nota"} role="status">{msg.texto}</p>}
           <div className="acciones">
-            <button className="btn" type="submit" disabled={ocupado}>{ocupado ? "Un momento…" : { entrar: "Entrar", clave: "Guardar clave y seguir", pedir: "Enviar solicitud", mfa: "Verificar", "mfa-alta": "Activar y entrar" }[modo]}</button>
+            <button className="btn" type="submit" disabled={ocupado}>{ocupado ? "Un momento…" : { entrar: "Entrar", clave: "Guardar clave y seguir", pedir: "Enviar solicitud", mfa: "Verificar", "mfa-alta": "Activar y entrar", nueva: "Guardar mi clave y entrar" }[modo]}</button>
           </div>
         </form>
         <div className="acceso-enlaces">

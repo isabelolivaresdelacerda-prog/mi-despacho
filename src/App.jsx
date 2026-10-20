@@ -185,7 +185,7 @@ export default function App() {
   }, [yo]);
 
   useEffect(() => {
-    miFicha().then((f) => setYo(f && f.estado === "activo" ? f : null)).catch(() => setYo(null));
+    miFicha().then((f) => setYo(f && f.estado === "activo" && !f.cambiar_clave ? f : null)).catch(() => setYo(null));
     const { data } = sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT") { fijarEspacio(null); setYo(null); } });
     return () => data.subscription.unsubscribe();
   }, []);

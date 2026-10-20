@@ -46,11 +46,20 @@ export async function verificarMFA(factorId, codigo) {
 
 export async function salir() { await sb.auth.signOut(); }
 
+// Primer acceso con clave temporal: la persona elige la suya (ya con el doble factor hecho)
+export async function cambiarClave(clave) {
+  if (clave.length < 12 || !/[A-Za-z]/.test(clave) || !/\d/.test(clave)) throw new Error("La clave debe tener al menos 12 caracteres, con letras y números.");
+  const { error } = await sb.auth.updateUser({ password: clave });
+  if (error) throw new Error(/same|different/i.test(error.message) ? "La nueva clave tiene que ser distinta de la temporal." : "No se pudo cambiar la clave. Inténtalo de nuevo.");
+  await sb.rpc("clave_cambiada");
+  return miFicha();
+}
+
 export async function miFicha() {
   const { data: s } = await sb.auth.getSession();
   const email = s.session?.user?.email;
   if (!email) return null;
-  const { data } = await sb.from("usuarios_permitidos").select("email,nombre,rol,estado,organizacion,tipo_cuenta").eq("email", email.toLowerCase()).maybeSingle();
+  const { data } = await sb.from("usuarios_permitidos").select("*").eq("email", email.toLowerCase()).maybeSingle();
   return data;
 }
 

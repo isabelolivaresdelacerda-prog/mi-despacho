@@ -6,7 +6,7 @@
 // obligatoriamente a una dirección de Mi Despacho.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
-const ORIGENES = ["https://midespacho.vercel.app", "https://midespacho.beatrizinversiones.com", "https://mi-despacho-nine.vercel.app", "http://localhost:5173"];
+const ORIGENES = ["https://midespacho.vercel.app", "https://midespacho-jsm.vercel.app", "https://despachojsm.vercel.app", "https://midespacho.beatrizinversiones.com", "https://mi-despacho-nine.vercel.app", "http://localhost:5173"];
 const VUELTAS = ORIGENES.map((o) => o + "/banco-vuelta.html");
 const cors = (req: Request) => {
   const o = req.headers.get("origin") ?? "";

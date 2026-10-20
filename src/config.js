@@ -16,5 +16,6 @@ export const MICROSOFT_CLIENT_ID = "";
 
 // Cuentas de usuario (Supabase, proyecto exclusivo "portal-gestoria", servidores en la UE).
 // La clave publicable es pública por diseño: la seguridad la dan las reglas de la base de datos.
-export const SUPABASE_URL = "https://mrvtlumsekoxxhjvypcc.supabase.co";
-export const SUPABASE_KEY = "sb_publishable_i375lc5ZzZjvbA0cRBIc4A_HY3Le38X";
+// Cada edición puede tener su propia base de usuarios (variables VITE_SUPABASE_URL y VITE_SUPABASE_KEY en Vercel)
+export const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "https://mrvtlumsekoxxhjvypcc.supabase.co";
+export const SUPABASE_KEY = import.meta.env?.VITE_SUPABASE_KEY || "sb_publishable_i375lc5ZzZjvbA0cRBIc4A_HY3Le38X";
