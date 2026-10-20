@@ -22,6 +22,7 @@ export function obligaciones(anio, o = {}) {
   const E = [];
   const add = (id, fecha, titulo, tipo, detalle, desde) => E.push({ id: `${anio}-${id}`, fecha: habil(fecha), desde: desde || null, titulo, tipo, detalle });
   const prev = anio - 1;
+  if (o.autonomo) return obligacionesAutonomo(anio, o, add, prev, E);
 
   // ---- Impuestos trimestrales ----
   const trimestres = [[1, iso(anio, 4, 20), iso(anio, 4, 1)], [2, iso(anio, 7, 20), iso(anio, 7, 1)], [3, iso(anio, 10, 20), iso(anio, 10, 1)]];
@@ -71,6 +72,31 @@ export function obligaciones(anio, o = {}) {
   const junta = o.fechaJunta && o.fechaJunta.startsWith(String(anio)) ? o.fechaJunta : iso(anio, 6, 30);
   add("junta", junta, `Junta General Ordinaria: aprobación de las cuentas ${prev}`, "mercantil", o.fechaJunta ? "Fecha prevista de la junta. Recuerda convocarla con al menos 15 días de antelación." : "Debe celebrarse en los 6 primeros meses del ejercicio. Pon la fecha prevista en las opciones. Convocatoria con al menos 15 días de antelación.", sumarMeses(junta, -1));
   add("deposito", sumarMeses(junta, 1), `Depósito de las cuentas anuales ${prev} en el Registro Mercantil`, "mercantil", "En el mes siguiente a su aprobación por la junta, junto con la declaración de titularidad real.", junta);
+  return E.sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+// ---- Autónomo (persona física en estimación directa) ----
+function obligacionesAutonomo(anio, o, add, prev, E) {
+  const iva = !o.ivaExenta, p130 = !o.exento130;
+  for (const [t, fin, ini] of [[1, iso(anio, 4, 20), iso(anio, 4, 1)], [2, iso(anio, 7, 20), iso(anio, 7, 1)], [3, iso(anio, 10, 20), iso(anio, 10, 1)]]) {
+    if (iva) add(`303-${t}`, fin, `IVA ${t}T (modelo 303)`, "impuesto", `IVA de tus facturas emitidas menos el de tus gastos del ${t}º trimestre. Si se domicilia, hasta 5 días antes.`, ini);
+    if (p130) add(`130-${t}`, fin, `Pago fraccionado del IRPF ${t}T (modelo 130)`, "impuesto", "El 20 % de lo que llevas ganado en el año (ingresos menos gastos), menos las retenciones de tus facturas y lo ya pagado en trimestres anteriores.", ini);
+    if (o.profesionales || o.empleados) add(`111-${t}`, fin, `Retenciones ${t}T (modelo 111)`, "impuesto", "Solo si has pagado a profesionales con retención o tienes trabajadores.", ini);
+    if (o.alquileres) add(`115-${t}`, fin, `Retenciones de alquileres ${t}T (modelo 115)`, "impuesto", "Si pagas el alquiler de un local u oficina para la actividad.", ini);
+  }
+  if (iva) {
+    add("303-4", iso(anio, 1, 30), `IVA 4T ${prev} (modelo 303)`, "impuesto", "IVA del 4º trimestre del año anterior.", iso(anio, 1, 1));
+    add("390", iso(anio, 1, 30), `Resumen anual de IVA ${prev} (modelo 390)`, "impuesto", "", iso(anio, 1, 1));
+  }
+  if (p130) add("130-4", iso(anio, 1, 30), `Pago fraccionado del IRPF 4T ${prev} (modelo 130)`, "impuesto", "Último pago fraccionado del año anterior.", iso(anio, 1, 1));
+  if (o.profesionales || o.empleados) { add("111-4", iso(anio, 1, 20), `Retenciones 4T ${prev} (modelo 111)`, "impuesto", "", iso(anio, 1, 1)); add("190", iso(anio, 1, 31), `Resumen anual de retenciones ${prev} (modelo 190)`, "impuesto", "", iso(anio, 1, 1)); }
+  if (o.alquileres) { add("115-4", iso(anio, 1, 20), `Retenciones de alquileres 4T ${prev} (modelo 115)`, "impuesto", "", iso(anio, 1, 1)); add("180", iso(anio, 1, 31), `Resumen anual de alquileres ${prev} (modelo 180)`, "impuesto", "", iso(anio, 1, 1)); }
+  add("347", iso(anio, 2, ultimoDia(anio, 2)), `Operaciones con terceros ${prev} (modelo 347)`, "impuesto", "Clientes y proveedores con los que superaste 3.005,06 € en el año (no cuentan las facturas con retención).", iso(anio, 2, 1));
+  add("100", iso(anio, 6, 30), `Declaración de la Renta ${prev} (modelo 100)`, "impuesto", "Incluye el rendimiento de tu actividad. Se puede presentar desde principios de abril; si sale a pagar y la domicilias, hasta el 25 de junio.", iso(anio, 4, 1));
+  for (let m = 1; m <= 12; m++) add(`reta-${m}`, iso(anio, m, ultimoDia(anio, m)), "Cuota de autónomos (Seguridad Social)", "laboral", "Se carga el último día hábil del mes. Es gasto deducible: guarda el recibo en «seguridad social».", null);
+  if (o.empleados) for (let m = 1; m <= 12; m++) add(`ss-${m}`, iso(anio, m, ultimoDia(anio, m)), "Seguros sociales de tus trabajadores", "laboral", "", null);
+  add("libros", iso(anio, 3, 31), `Cerrar los libros registro de ${prev}`, "mercantil", "Libros de ingresos, gastos y bienes de inversión del año anterior: guárdalos (no se legalizan). Conservar 4 años como mínimo.", iso(anio, 1, 1));
+  add("rendimientos", iso(anio, 12, 31), "Revisar tus rendimientos reales para la cuota de autónomos", "laboral", "La cuota depende de tus rendimientos netos: si cambian, comunica la previsión a la Seguridad Social (puedes cambiarla hasta 6 veces al año).", iso(anio, 11, 1));
   return E.sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 

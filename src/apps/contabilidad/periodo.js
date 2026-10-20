@@ -189,7 +189,7 @@ export { mayores };
 
 // ---- Modelos de impuestos del año: calculados, presentados y pagados ----
 // Clave: "2026-2|111" (trimestre) o "2026-anio|390" (anual)
-export const NOMBRE_MODELO = { "182": "Declaración informativa de donativos", "303": "IVA", "111": "Retenciones de profesionales y nóminas (IRPF)", "115": "Retenciones de alquileres", "202": "Pago fraccionado de Sociedades", "390": "Resumen anual de IVA", "190": "Resumen anual de retenciones", "180": "Resumen anual de retenciones de alquileres", "347": "Operaciones con terceros", "200": "Impuesto sobre Sociedades" };
+export const NOMBRE_MODELO = { "130": "Pago fraccionado del IRPF (autónomos)", "100": "Renta (IRPF): declaración anual", "182": "Declaración informativa de donativos", "303": "IVA", "111": "Retenciones de profesionales y nóminas (IRPF)", "115": "Retenciones de alquileres", "202": "Pago fraccionado de Sociedades", "390": "Resumen anual de IVA", "190": "Resumen anual de retenciones", "180": "Resumen anual de retenciones de alquileres", "347": "Operaciones con terceros", "200": "Impuesto sobre Sociedades" };
 export const claveModelo = (anio, tramo, modelo) => `${anio}-${tramo}|${modelo}`;
 
 // Id del aviso en el calendario (ver calendario/obligaciones.js)
@@ -200,27 +200,57 @@ export function idCalendario(anio, tramo, modelo) {
   return t === 4 ? `${anio + 1}-${modelo}-4` : `${anio}-${modelo}-${t}`;
 }
 
-export function modelosDelAnio(anio, todos, d, pendientes, opciones = {}) {
+// ---- Autónomos: modelo 130 (pago fraccionado del IRPF, estimación directa) ----
+// Acumulado desde el 1 de enero hasta el final del trimestre: ingresos − gastos (− 5 % de gastos de difícil
+// justificación en la simplificada, máximo 2.000 € al año); el 20 % del rendimiento, menos las retenciones de las
+// facturas emitidas y menos los pagos de los trimestres anteriores. Orientativo: lo confirma la gestoría.
+export function calculo130(todos, d, anio, tramo, opciones = {}, presentados = {}) {
+  const t = +tramo, r = rango(anio, String(t)), desde = iso(anio, 1, 1);
+  const A = filtrarPeriodo(todos, desde, r.hasta).filter((a) => a.origen !== "regularizacion");
+  const suma = (f) => r2(A.reduce((x, a) => x + a.lineas.filter((l) => f(l.cuenta)).reduce((s, l) => s + l.debe - l.haber, 0), 0));
+  const ingresos = -suma((c) => c.startsWith("7"));
+  const gastosConta = suma((c) => c.startsWith("6") && !c.startsWith("630"));
+  const previo = r2(ingresos - gastosConta);
+  const dificil = opciones.normal ? 0 : r2(Math.min(2000, Math.max(0, previo) * 0.05));
+  const gastos = r2(gastosConta + dificil);
+  const rendimiento = r2(ingresos - gastos);
+  const c04 = r2(Math.max(0, rendimiento) * 0.2);
+  const emit = (d?.emitidas || []).filter((f) => !f._duplicadoDe && !f.noFactura && fechaOrden(f.fecha) >= desde && fechaOrden(f.fecha) <= r.hasta);
+  const retenciones = r2(emit.reduce((s, f) => s + (f.retencion_importe || 0), 0));
+  let anteriores = 0;
+  for (let k = 1; k < t; k++) {
+    const p = presentados[claveModelo(anio, String(k), "130")];
+    anteriores += p ? (p.resultado === "ingresar" ? num(p.importe) : 0) : Math.max(0, calculo130(todos, d, anio, String(k), opciones, presentados).resultado);
+  }
+  anteriores = r2(anteriores);
+  const resultado = r2(c04 - anteriores - retenciones);
+  return { ingresos, gastos, dificil, rendimiento, c04, anteriores, retenciones, resultado, aIngresar: Math.max(0, resultado) };
+}
+
+export function modelosDelAnio(anio, todos, d, pendientes, opciones = {}, presentados = {}) {
   const out = [];
+  const sinIVA = (opciones.esfl || opciones.autonomo) && opciones.ivaExenta;
   for (const t of ["1", "2", "3", "4"]) {
     const r = rango(anio, t), c = cifras(todos, d.movimientos, pendientes, r, d), p = plazos(r);
-    out.push({ anio, tramo: t, modelo: "303", r, plazo: p.iva.fecha, calculado: c.iva303, ivaRep: c.ivaRep, ivaSop: c.ivaSop, siempre: !(opciones.esfl && opciones.ivaExenta) });
+    out.push({ anio, tramo: t, modelo: "303", r, plazo: p.iva.fecha, calculado: c.iva303, ivaRep: c.ivaRep, ivaSop: c.ivaSop, siempre: !sinIVA });
+    if (opciones.autonomo) { const k = calculo130(todos, d, anio, t, opciones, presentados); out.push({ anio, tramo: t, modelo: "130", r, plazo: p.iva.fecha, calculado: k.aIngresar, c130: k, siempre: !opciones.exento130 }); }
     out.push({ anio, tramo: t, modelo: "111", r, plazo: p.ret.fecha, calculado: c.ret111, siempre: opciones.profesionales || opciones.empleados || c.ret111 > 0 });
     out.push({ anio, tramo: t, modelo: "115", r, plazo: p.ret.fecha, calculado: c.ret115, siempre: opciones.alquileres || c.ret115 > 0 });
-    if (p.is && !opciones.esfl) out.push({ anio, tramo: t, modelo: "202", r, plazo: p.is.fecha, calculado: 0, siempre: !!opciones.pagosFraccionados, nota: "lo calcula la gestoría" });
+    if (p.is && !opciones.esfl && !opciones.autonomo) out.push({ anio, tramo: t, modelo: "202", r, plazo: p.is.fecha, calculado: 0, siempre: !!opciones.pagosFraccionados, nota: "lo calcula la gestoría" });
   }
   const ra = rango(anio, "anio"), ca = cifras(todos, d.movimientos, pendientes, ra, d), pa = plazos(ra);
-  out.push({ anio, tramo: "anio", modelo: "390", r: ra, plazo: pa.iva.fecha, calculado: ca.iva303, siempre: !(opciones.esfl && opciones.ivaExenta), informativo: true });
+  out.push({ anio, tramo: "anio", modelo: "390", r: ra, plazo: pa.iva.fecha, calculado: ca.iva303, siempre: !sinIVA, informativo: true });
   if (opciones.esfl && opciones.ley49) out.push({ anio, tramo: "anio", modelo: "182", r: ra, plazo: habil(iso(anio + 1, 1, 31)), calculado: 0, siempre: true, informativo: true, nota: "donativos recibidos (cuenta 726/131)" });
   out.push({ anio, tramo: "anio", modelo: "190", r: ra, plazo: pa.ret.fecha, calculado: ca.ret111, siempre: ca.ret111 > 0, informativo: true });
   out.push({ anio, tramo: "anio", modelo: "180", r: ra, plazo: pa.ret.fecha, calculado: ca.ret115, siempre: ca.ret115 > 0, informativo: true });
   out.push({ anio, tramo: "anio", modelo: "347", r: ra, plazo: habil(iso(anio + 1, 2, new Date(Date.UTC(anio + 1, 2, 0)).getUTCDate())), calculado: 0, siempre: true, informativo: true });
-  out.push({ anio, tramo: "anio", modelo: "200", r: ra, plazo: pa.is.fecha, calculado: opciones.esfl ? 0 : ca.isEstimado, siempre: true, ...(opciones.esfl ? { nota: opciones.ley49 ? "obligatorio con la Ley 49/2002 (rentas exentas)" : "no obligatorio si ingresos ≤ 75.000 €, no exentos ≤ 2.000 € y con retención" } : {}) });
+  if (opciones.autonomo) out.push({ anio, tramo: "anio", modelo: "100", r: ra, plazo: habil(iso(anio + 1, 6, 30)), calculado: 0, siempre: true, nota: `rendimiento neto de la actividad: ${calculo130(todos, d, anio, "4", opciones, presentados).rendimiento.toLocaleString("es-ES", { style: "currency", currency: "EUR" })} (la Renta suma tus otros ingresos)` });
+  else out.push({ anio, tramo: "anio", modelo: "200", r: ra, plazo: pa.is.fecha, calculado: opciones.esfl ? 0 : ca.isEstimado, siempre: true, ...(opciones.esfl ? { nota: opciones.ley49 ? "obligatorio con la Ley 49/2002 (rentas exentas)" : "no obligatorio si ingresos ≤ 75.000 €, no exentos ≤ 2.000 € y con retención" } : {}) });
   return out.filter((m) => m.siempre).map((m) => ({ ...m, clave: claveModelo(m.anio, m.tramo, m.modelo), etiqueta: m.tramo === "anio" ? `${anio}` : `${m.tramo}T ${anio}`, idCal: idCalendario(m.anio, m.tramo, m.modelo) }));
 }
 
 // Pagos a Hacienda en el banco: «AEAT», «Agencia Tributaria», «impuesto», «modelo 111»…
-const RE_AEAT = /aeat|agencia\s*(estatal\s*de\s*admin|tribut)|hacienda|impuesto|tributos|\bmod(elo)?\.?\s*(303|111|115|202|200)\b|\b(303|111|115|202|200)\b/i;
+const RE_AEAT = /aeat|agencia\s*(estatal\s*de\s*admin|tribut)|hacienda|impuesto|tributos|\bmod(elo)?\.?\s*(303|111|115|130|202|200|100)\b|\b(303|111|115|130|202|200)\b/i;
 export function pagosHacienda(movimientos) { return movimientos.filter((m) => m.importe < 0 && RE_AEAT.test(m.concepto || "")); }
 
 // Propone a qué modelo corresponde cada pago a Hacienda (por número de modelo en el concepto, fecha e importe)
@@ -231,7 +261,7 @@ export function proponerPagos(modelos, movimientos, presentados) {
   for (const mv of pagosHacienda(movimientos)) {
     if (usados.has(claveMov(mv))) continue;
     const f = fechaOrden(mv.fecha), imp = Math.abs(mv.importe);
-    const num = ((mv.concepto || "").match(/\b(303|111|115|202|200)\b/) || [])[1];
+    const num = ((mv.concepto || "").match(/\b(303|111|115|130|202|200|100)\b/) || [])[1];
     const cand = libres.filter((m) => (!num || m.modelo === num) && f >= m.r.hasta && f <= sumarDias(m.plazo, 15));
     const exacto = cand.find((m) => Math.abs(Math.abs(m.calculado) - imp) < 0.011);
     const m = exacto || (cand.length === 1 ? cand[0] : null);
@@ -244,11 +274,11 @@ function sumarDias(isoF, n) { const d = new Date(isoF + "T12:00:00Z"); d.setUTCD
 // Justificantes en la carpeta «impuestos»: "303 2T 2026.pdf", "Modelo 111 - 2º trimestre 2026.pdf"…
 export function leerNombreImpuesto(nombre) {
   const n = nombre.replace(/[_\-.]/g, " ");
-  const modelo = (n.match(/\b(303|111|115|202|200|390|190|180|347)\b/) || [])[1];
+  const modelo = (n.match(/\b(303|111|115|130|202|200|100|390|190|180|347)\b/) || [])[1];
   const anio = +((n.match(/\b(20\d\d)\b/) || [])[1] || 0);
   const t = (n.match(/\b([1-4])\s*(?:º|o)?\s*(?:t|trim|trimestre|p)\b/i) || n.match(/\b(?:t|trim\w*)\s*([1-4])\b/i) || [])[1];
   if (!modelo) return null;
-  return { modelo, anio: anio || null, tramo: ["390", "190", "180", "347", "200"].includes(modelo) ? "anio" : t || null };
+  return { modelo, anio: anio || null, tramo: ["390", "190", "180", "347", "200", "100"].includes(modelo) ? "anio" : t || null };
 }
 
 // Borrador de casillas para exportar (orientativo: comprobar con el modelo vigente de la AEAT)
@@ -257,6 +287,8 @@ export function casillas(m, c) {
   if (m.modelo === "303") return [["27", "Total cuota devengada (IVA repercutido)", e(c.ivaRep)], ["28/29", "Base y cuota deducible en operaciones interiores corrientes", e(c.ivaSop)], ["45", "Total a deducir", e(c.ivaSop)], ["46", "Resultado régimen general", e(c.ivaRep - c.ivaSop)], ["71", "Resultado de la liquidación", e(c.ivaRep - c.ivaSop)]];
   if (m.modelo === "111") return [["07–09", "Rendimientos de actividades económicas: retenciones", e(c.ret111)], ["28", "Total liquidación", e(c.ret111)]];
   if (m.modelo === "115") return [["03", "Retenciones e ingresos a cuenta (alquileres)", e(c.ret115)], ["05", "Resultado a ingresar", e(c.ret115)]];
+  if (m.modelo === "130" && m.c130) { const k = m.c130; return [["01", "Ingresos computables del año hasta el trimestre", e(k.ingresos)], ["02", `Gastos deducibles${k.dificil ? ` (incluye ${e(k.dificil)} de difícil justificación, 5 %)` : ""}`, e(k.gastos)], ["03", "Rendimiento neto", e(k.rendimiento)], ["04", "20 % del rendimiento neto", e(k.c04)], ["05", "Pagos fraccionados de trimestres anteriores", e(k.anteriores)], ["06", "Retenciones de tus facturas emitidas", e(k.retenciones)], ["07", "Resultado", e(k.resultado)], ["19", "A ingresar (si sale negativo, 0)", e(k.aIngresar)]]; }
+  if (m.modelo === "100") return [["—", "Rendimiento neto de la actividad (para la Renta)", e(c.acumulado)]];
   if (m.modelo === "202") return [["—", "Resultado contable acumulado del ejercicio (referencia para la gestoría)", e(c.acumulado)]];
   if (m.modelo === "200") return [["—", "Resultado contable antes de impuestos", e(c.acumulado)], ["—", "Cuota estimada al 25 %", e(c.isEstimado)]];
   return [["—", "Importe del periodo", e(m.calculado)]];

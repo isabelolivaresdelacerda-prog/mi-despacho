@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { obligaciones, ics } from "./obligaciones.js";
 import "./calendario.css";
-import { opcionesFiscales, esESFL } from "../../lib/entidad.js";
+import { opcionesFiscales, esESFL, esAutonomo } from "../../lib/entidad.js";
 
 const HECHOS = "md-cal-hechos", PROPIOS = "md-cal-propios";
 const leer = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
@@ -21,7 +21,7 @@ const OPCIONES = [
 ];
 
 export function useEventos(config, anio) {
-  const op = { profesionales: true, ...opcionesFiscales(config) };
+  const op = { profesionales: !esAutonomo(config), ...opcionesFiscales(config) };
   return useMemo(() => {
     const propios = leer(PROPIOS, []).filter((e) => e.fecha.startsWith(String(anio)));
     return [...obligaciones(anio, op), ...propios].sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -123,8 +123,8 @@ export default function Calendario({ config, guardar }) {
       <header className="app-cab">
         <div>
           <div className="eyebrow">Calendario</div>
-          <h1>Obligaciones de la empresa</h1>
-          <p className="muted">{esESFL(config) ? "Impuestos, asamblea, cuentas anuales y rendición de cuentas de la entidad." : "Impuestos, libros, junta y cuentas anuales."} Plazos generales: confírmalos con tu gestoría. La forma jurídica se cambia en Ajustes.</p>
+          <h1>{esAutonomo(config) ? "Mis obligaciones como autónomo" : "Obligaciones de la empresa"}</h1>
+          <p className="muted">{esAutonomo(config) ? "IVA, pagos fraccionados del IRPF (130), cuota de autónomos y Renta." : esESFL(config) ? "Impuestos, asamblea, cuentas anuales y rendición de cuentas de la entidad." : "Impuestos, libros, junta y cuentas anuales."} Plazos generales: confírmalos con tu gestoría. La forma jurídica se cambia en Ajustes.</p>
         </div>
         <div className="acciones"><button className="btn" type="button" onClick={exportar}>Añadir a Outlook</button></div>
       </header>
@@ -179,9 +179,9 @@ export default function Calendario({ config, guardar }) {
       </div>
 
       <details className="tarjeta cal-opciones">
-        <summary>Ajustar a mi empresa</summary>
-        {OPCIONES.map(([k, t]) => <label key={k} className="opcion"><input type="checkbox" checked={!!op[k]} onChange={(e) => cambiarOp(k, e.target.checked)} /> {t}</label>)}
-        <label>{esESFL(config) ? "Fecha prevista de la asamblea general" : "Fecha prevista de la Junta General Ordinaria"}<input type="date" value={op.fechaJunta || ""} onChange={(e) => cambiarOp("fechaJunta", e.target.value)} /></label>
+        <summary>{esAutonomo(config) ? "Ajustar a mi actividad" : "Ajustar a mi empresa"}</summary>
+        {OPCIONES.filter(([k]) => !esAutonomo(config) || !["pagosFraccionados", "cambiosSocios"].includes(k)).map(([k, t]) => <label key={k} className="opcion"><input type="checkbox" checked={!!op[k]} onChange={(e) => cambiarOp(k, e.target.checked)} /> {t}</label>)}
+        {!esAutonomo(config) && <label>{esESFL(config) ? "Fecha prevista de la asamblea general" : "Fecha prevista de la Junta General Ordinaria"}<input type="date" value={op.fechaJunta || ""} onChange={(e) => cambiarOp("fechaJunta", e.target.value)} /></label>}
       </details>
 
       <section className="tarjeta">

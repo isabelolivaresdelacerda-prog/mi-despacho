@@ -20,7 +20,7 @@ export function sincronizarCalendario(presentados, modelos) {
 
 export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAnio, anios, presentados, guardar, otros = [], guardarOtros, opciones, aviso, config }) {
   const [prep, setPrep] = useState(null); // modelo que se prepara para Hacienda
-  const modelos = useMemo(() => modelosDelAnio(anio, todos, d, pendientes, opciones), [anio, todos, d, pendientes, opciones]);
+  const modelos = useMemo(() => modelosDelAnio(anio, todos, d, pendientes, opciones, presentados), [anio, todos, d, pendientes, opciones, presentados]);
   const [docs, setDocs] = useState([]);
   const [dlg, setDlg] = useState(null);
   const cargarDocs = async () => setDocs(await listar(raiz, "impuestos"));
@@ -88,7 +88,7 @@ export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAni
     return ["muted", "Periodo en curso"];
   };
 
-  const grupos = [["1", "1º trimestre"], ["2", "2º trimestre"], ["3", "3º trimestre"], ["4", "4º trimestre"], ["anio", `Resúmenes anuales e Impuesto sobre Sociedades de ${anio}`]];
+  const grupos = [["1", "1º trimestre"], ["2", "2º trimestre"], ["3", "3º trimestre"], ["4", "4º trimestre"], ["anio", opciones?.autonomo ? `Resúmenes anuales y Renta de ${anio}` : `Resúmenes anuales e Impuesto sobre Sociedades de ${anio}`]];
 
   return (
     <div>
@@ -173,7 +173,7 @@ export default function Impuestos({ raiz, d, todos, pendientes, anio, cambiarAni
                     <td>{fechaBonita(m.plazo)}</td>
                     <td className="acciones">
                       {p?.archivo && <button className="enlace" type="button" onClick={() => { const x = docs.find((y) => y.nombre === p.archivo); if (x) abrir(x); }}>Justificante</button>}
-                      {["303", "111"].includes(m.modelo) && !p && <button className="enlace" type="button" onClick={() => setPrep(m)}>Preparar para Hacienda</button>}
+                      {["303", "111", "130"].includes(m.modelo) && !p && <button className="enlace" type="button" onClick={() => setPrep(m)}>Preparar para Hacienda</button>}
                       <button className="enlace" type="button" onClick={() => setDlg({ m, ini: p || {} })}>{p ? "Editar" : "Registrar presentado"}</button>
                       {p && <button className="enlace" type="button" onClick={() => quitar(m)}>Quitar</button>}
                     </td>
@@ -350,6 +350,12 @@ function DialogoOtro({ ini, docs, raiz, recargarDocs, guardar, onCerrar }) {
 }
 
 
+// Modelo 130 en el formato de la ventana «Preparar para Hacienda»
+function casillas130(k) {
+  const filas = [["01", "Ingresos computables (acumulado del año)", k.ingresos], ["02", `Gastos fiscalmente deducibles${k.dificil ? " (con el 5 % de difícil justificación)" : ""}`, k.gastos], ["03", "Rendimiento neto", k.rendimiento], ["04", "20 % de la casilla 03 (si es positiva)", k.c04], ["05", "Pagos fraccionados de trimestres anteriores", k.anteriores], ["06", "Retenciones e ingresos a cuenta", k.retenciones], ["07", "Resultado", k.resultado], ["19", "Resultado de la autoliquidación", k.aIngresar]];
+  return { filas, resultado: k.aIngresar > 0 ? "ingresar" : "cero", importe: k.aIngresar, facturas: {}, c87: 0, c71: 0 };
+}
+
 // Casillas listas para pasar a la sede de la AEAT, con la cuenta bancaria (la única que hay, o la que elijas)
 function PrepararHacienda({ m, d, raiz, config, presentados, onCerrar, aviso }) {
   const [cuentas, setCuentas] = useState(null);
@@ -364,7 +370,7 @@ function PrepararHacienda({ m, d, raiz, config, presentados, onCerrar, aviso }) 
       return a + Math.max(0, fs.reduce((x, f) => x + (f.iva_importe || 0), 0) + fs.filter((f) => f.isp).reduce((x, f) => x + Math.round(f.base * 21) / 100, 0) - (p.ivaSop || 0));
     }, 0);
   }, [m, d, presentados]);
-  const c = m.modelo === "303" ? casillas303(d, m.r, presentados, { extraDeducible: num(extra) }) : casillas111(d, m.r);
+  const c = m.modelo === "303" ? casillas303(d, m.r, presentados, { extraDeducible: num(extra) }) : m.modelo === "130" ? casillas130(m.c130) : casillas111(d, m.r);
   const RES = { ingresar: "A ingresar", compensar: "A compensar", devolver: "A devolver", cero: "Sin actividad / cero" };
   const copiar = async (v) => { try { await navigator.clipboard.writeText(String(v)); aviso?.(`Copiado: ${v}`); } catch { /* nada */ } };
   const fmt = (v) => (typeof v === "number" && !Number.isInteger(v) ? v.toFixed(2).replace(".", ",") : String(v).replace(".", ","));
@@ -378,6 +384,7 @@ function PrepararHacienda({ m, d, raiz, config, presentados, onCerrar, aviso }) 
       <div className="mc-dialogo ancho">
         <header><h2 id="ph-t">Modelo {m.modelo} · {m.etiqueta} — para presentar en Hacienda</h2><button className="mc-x" onClick={onCerrar} aria-label="Cerrar">×</button></header>
         <div className="mc-cuerpo">
+          {m.modelo === "130" && <p className="mc-nota">Cálculo acumulado desde el 1 de enero. Si el año pasado tu rendimiento neto fue de 12.000 € o menos, puedes restar además la deducción de hasta 100 € por trimestre (casilla 13). Si sale negativo, se presenta igual con resultado cero.</p>}
           <p className="mc-nota">Calculado con las facturas del periodo{m.modelo === "303" ? ` (${c.facturas.recibidas} recibidas, ${c.facturas.emitidas} emitidas, ${c.facturas.isp} con inversión del sujeto pasivo)` : ""}. Pulsa en un importe para copiarlo y pegarlo en el formulario de la sede.</p>
           {m.modelo === "303" && sinDeducir > 0.5 && (
             <label className="mc-campo"><span>IVA de trimestres anteriores que no se dedujo ({eur(sinDeducir)}). ¿Lo incluyes en este 303? (se suma a la casilla 29)</span>

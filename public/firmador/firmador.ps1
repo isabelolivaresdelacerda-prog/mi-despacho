@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 $VERSION = '1.0'
 $PUERTO = 8771
-$ORIGENES = @('https://midespacho.vercel.app', 'https://midespacho.beatrizinversiones.com', 'https://mi-despacho-nine.vercel.app', 'http://localhost:5173')
+$ORIGENES = @('https://midespacho.vercel.app', 'https://midespacho.beatrizinversiones.com', 'https://mi-despacho-nine.vercel.app', 'https://midespacho-jsm.vercel.app', 'http://localhost:5173')
 $AEAT = @{
   pruebas    = 'https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'
   produccion = 'https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'

@@ -24,6 +24,7 @@ import Usuarios from "./Usuarios.jsx";
 import { sb, miFicha, salir as salirCuenta, admin, misEmpresas, empresaPorDominio } from "./lib/cuentas.js";
 import { AccesosEmpresa, VincularEmpresa } from "./lib/Enlaces.jsx";
 import { sincronizarAjustes, subirAjustes, traerClavesIA } from "./lib/ajustesNube.js";
+import { EDICION_AUTONOMO } from "./edicion.js";
 const DIRECCION_ANTIGUA = "mi-despacho-nine.vercel.app", DIRECCION_NUEVA = "https://midespacho.vercel.app";
 import { fijarEspacio, hayDatosAntiguos, moverDatosAntiguos, borrarDatosAntiguos } from "./lib/espacio.js";
 import { recortarLogo } from "./lib/logo.js";
@@ -165,7 +166,7 @@ export default function App() {
     } else { await sincronizarAjustes(yo.email, e.id); await traerClavesIA(); }
     setSincronizando(false);
     const c = leerConfig();
-    setConfig(c.nombre ? c : { ...c, nombre: e.nombre, tipo: e.tipo === "gestoria" ? "gestoria" : "empresa", empresa: { ...(c.empresa || {}), razon_social: e.nombre, cif: e.cif || "" } });
+    setConfig(c.nombre ? c : { ...c, nombre: e.nombre, tipo: e.tipo === "gestoria" ? "gestoria" : e.tipo === "autonomo" || EDICION_AUTONOMO ? "autonomo" : "empresa", empresa: { ...(c.empresa || {}), razon_social: e.nombre, cif: e.cif || "" } });
     setEmpresa(e);
     setAntiguos(yo.rol === "admin" && hayDatosAntiguos());
     window.location.hash = "/inicio";
@@ -224,7 +225,7 @@ export default function App() {
   if (antiguos) return <DatosAntiguos empresa={empresa} usar={async () => { moverDatosAntiguos(); await migrarRaizAntigua(); setConfig(leerConfig()); setAntiguos(false); }} descartar={() => { borrarDatosAntiguos(); borrarRaizAntigua(); setAntiguos(false); }} />;
   if (!config.configurado) {
     // Primera vez: se rellena con los datos de la cuenta (nombre de la organización y tipo)
-    const base = config.nombre ? config : { ...config, nombre: yo.organizacion || "", tipo: yo.tipo_cuenta === "gestoria" ? "gestoria" : "empresa" };
+    const base = config.nombre ? config : { ...config, nombre: yo.organizacion || "", tipo: yo.tipo_cuenta === "gestoria" ? "gestoria" : EDICION_AUTONOMO ? "autonomo" : "empresa" };
     return <Bienvenida config={base} guardar={guardar} />;
   }
 
@@ -448,7 +449,7 @@ function SelectorEmpresa({ yo, empresas, elegir, salir }) {
               {empresas.map((e) => (
                 <button key={e.id} type="button" className="empresa-tarjeta" onClick={() => elegir(e)}>
                   <span className="logo-letra">{e.nombre.trim()[0]}</span>
-                  <span><strong>{e.nombre}</strong><small>{e.cif || ({ empresa: "Empresa", gestoria: "Gestoría", despacho: "Despacho", asociacion: "Asociación" }[e.tipo])}</small></span>
+                  <span><strong>{e.nombre}</strong><small>{e.cif || ({ empresa: "Empresa", gestoria: "Gestoría", despacho: "Despacho", asociacion: "Asociación", autonomo: "Autónomo" }[e.tipo])}</small></span>
                 </button>
               ))}
             </div>

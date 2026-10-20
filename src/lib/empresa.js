@@ -1,6 +1,6 @@
 // Datos legales de la empresa: se usan en la papelería corporativa (facturas, cartas, informes) y en los contratos.
 export const EMPRESA_VACIA = {
-  razon_social: "", cif: "", domicilio: "", cp: "", municipio: "", provincia: "",
+  razon_social: "", cif: "", domicilio: "", alta: "", iae: "", cp: "", municipio: "", provincia: "",
   registro: "", tomo: "", folio: "", hoja: "", inscripcion: "",
   email: "", telefono: "", web: "", iban: "",
 };
@@ -32,6 +32,7 @@ export const domicilioCompleto = (e) => [e.domicilio, [e.cp, e.municipio].filter
 // Pie mercantil obligatorio (art. 24 del Reglamento del Registro Mercantil)
 export function pieMercantil(e) {
   if (!e?.razon_social) return "";
+  if (e.forma === "autonomo") return [e.razon_social, e.cif && `NIF ${e.cif.toUpperCase()}`, domicilioCompleto(e) && `Domicilio: ${domicilioCompleto(e)}`].filter(Boolean).join(" · ");
   if (["asociacion", "fundacion"].includes(e.forma)) {
     const ins = e.registro || e.inscripcion ? `Inscrita en el ${e.registro ? (e.forma === "asociacion" ? "Registro de Asociaciones " : "Registro de Fundaciones ") + e.registro : "registro"}${e.inscripcion ? ` con el número ${e.inscripcion}` : ""}` : "";
     return [e.razon_social, e.cif && `NIF ${e.cif.toUpperCase()}`, domicilioCompleto(e) && `Domicilio: ${domicilioCompleto(e)}`, ins].filter(Boolean).join(" · ");

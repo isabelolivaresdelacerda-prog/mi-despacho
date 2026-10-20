@@ -1,9 +1,11 @@
 // Todo se guarda solo en el navegador de cada usuaria.
+import { EDICION_AUTONOMO } from "./edicion.js";
 const CLAVE = "mi-despacho-config";
 
 export const CONFIG_INICIAL = {
   configurado: false,
-  tipo: "empresa",        // "gestoria" | "empresa"
+  tipo: EDICION_AUTONOMO ? "autonomo" : "empresa", // "gestoria" | "empresa" | "autonomo"
+  ...(EDICION_AUTONOMO ? { sector: "autonomo", empresa: { forma: "autonomo" } } : {}),
   nombre: "",
   logo: "",               // imagen en base64
   color: "#7A1F2B",       // color principal
@@ -33,6 +35,7 @@ export function guardarConfig(c) {
 export const TIPOS = {
   gestoria: { nombre: "Gestoría", texto: "Llevo la contabilidad y los papeles de mis clientes." },
   empresa: { nombre: "Empresa", texto: "Gestiono mi propia empresa." },
+  autonomo: { nombre: "Autónomo", texto: "Trabajo por mi cuenta (persona física)." },
 };
 
 export const local = {

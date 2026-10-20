@@ -17,7 +17,7 @@ import ExportarTodo from "./ExportarTodo.jsx";
 import MensajeGestoria from "./MensajeGestoria.jsx";
 import Bandeja, { CARPETA_ENTRADA } from "./Bandeja.jsx";
 import { revisarCarpeta } from "./inventario.js";
-import { planPorDefecto, opcionesFiscales, esESFL } from "../../lib/entidad.js";
+import { planPorDefecto, opcionesFiscales, esESFL, esAutonomo } from "../../lib/entidad.js";
 import { noPagada } from "./periodo.js";
 import { leerVinculados, leerJSON, escribirJSON, corregirPropia } from "./datos.js";
 import { AvisoIA, EstadoIALocal, useAviso, TransparenciaIA } from "../../comunes.jsx";
@@ -173,7 +173,7 @@ export default function ContabilidadWeb({ config, guardar: guardarConfig, empres
       </nav>
       {datos && ["resumen", "facturas", "banco", "libros", "gestoria", "exportar"].includes(tab) && <SelPeriodo anio={per.anio} tramo={per.tramo} cambiar={cambiarPeriodo} cierres={extra.cierres} anios={anios} />}
       {!datos ? <p className="muted">Leyendo la carpeta…</p> : <>
-        {tab === "resumen" && <ResumenPeriodo esfl={esESFL(config)} d={dd} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
+        {tab === "resumen" && <ResumenPeriodo esfl={esESFL(config)} autonomo={esAutonomo(config)} opciones={opcionesFiscales(config)} d={dd} todos={diario.asientos} pendientes={diario.pendientes} vinculados={extra.vinc} r={r} cambiar={cambiarPeriodo} cierres={extra.cierres} irA={irA} />}
         {tab === "facturas" && <Facturas d={dd} propia={propia} r={r} raiz={raiz} recargar={cargar} aviso={aviso} emitidas={verEmitidas} setEmitidas={setVerEmitidas} />}
         {tab === "banco" && <BancoPeriodo d={dd} raiz={raiz} propia={propia} recargar={cargar} todos={diario.asientos} pendientes={diario.pendientes} r={r} cierres={extra.cierres} guardarCierres={(n) => guardarExtra("cierres", n)} irA={irA} aviso={aviso} />}
         {tab === "impuestos" && <Impuestos raiz={raiz} d={dd} todos={diario.asientos} pendientes={diario.pendientes} anio={per.anio} anios={anios} cambiarAnio={(a) => cambiarPeriodo(a, per.tramo)} presentados={extra.presentados} guardar={(n) => guardarExtra("presentados", n)} otros={extra.otros} guardarOtros={(n) => guardarExtra("otros", n)} opciones={opcionesFiscales(config)} aviso={aviso} config={config} />}

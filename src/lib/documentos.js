@@ -70,6 +70,25 @@ export const POR_SECTOR = {
   ],
 };
 
+// Autónomo (persona física): no hay escrituras, actas ni socios; sí alta censal, RETA y Renta
+const C4 = "4 años desde el fin del plazo de la declaración (prescripción) — mejor 6";
+export const AUTONOMO = [
+  { grupo: "Titular", nombre: "Alta en Hacienda (modelo 036/037) y sus modificaciones", carpeta: "001 TITULAR/alta en Hacienda (036-037)", conta: "Epígrafe del IAE, régimen de IVA e IRPF (estimación directa)", conservar: "Mientras dure la actividad" },
+  { grupo: "Titular", nombre: "Alta en autónomos (RETA), base de cotización y previsión de rendimientos", carpeta: "001 TITULAR/alta en autonomos (RETA)", conta: "Cuota de autónomos (642)", conservar: "Mientras dure la actividad" },
+  { grupo: "Titular", nombre: "Colegiación, licencias y títulos necesarios para la actividad", carpeta: "001 TITULAR/colegiacion y licencias", conta: "Cuotas colegiales (gasto deducible)", conservar: "Mientras dure la actividad" },
+  { grupo: "Contabilidad", nombre: "Facturas recibidas (gastos de la actividad)", carpeta: CONTA + "/facturas", conta: "Libro registro de compras y gastos, IVA soportado", conservar: C4 },
+  { grupo: "Contabilidad", nombre: "Facturas emitidas", carpeta: CONTA + "/facturas_emitidas", conta: "Libro registro de ventas e ingresos, IVA repercutido, retenciones (130)", conservar: C4 },
+  { grupo: "Contabilidad", nombre: "Extractos y justificantes del banco", carpeta: CONTA + "/extractos · documentos_banco", conta: "Cobros y pagos de la actividad", conservar: C4 },
+  { grupo: "Contabilidad", nombre: "Impuestos presentados (303, 130, 111, 115, 390, 347)", carpeta: CONTA + "/impuestos", conta: "IVA y pagos a cuenta del IRPF", conservar: C4 },
+  { grupo: "Seguridad Social", nombre: "Recibos de la cuota de autónomos", carpeta: "004 ADMINISTRACIÓN/seguridad social", conta: "Gasto deducible (642)", conservar: C4 },
+  { grupo: "Renta", nombre: "Declaraciones de la Renta (modelo 100) y borradores", carpeta: "004 ADMINISTRACIÓN/renta", conta: "Rendimiento neto de la actividad", conservar: C4 },
+  { grupo: "Seguros", nombre: "Seguro de responsabilidad civil, salud y otros de la actividad", carpeta: "004 ADMINISTRACIÓN/seguros", conta: "Primas de seguros (625)", conservar: C4 },
+  { grupo: "Bienes de inversión", nombre: "Facturas del vehículo, ordenador, mobiliario y su amortización", carpeta: "005 BIENES DE INVERSION", conta: "Libro de bienes de inversión y amortización (681)", conservar: "Vida útil + 4 años" },
+  { grupo: "Clientes", nombre: "Presupuestos, contratos y entregables", carpeta: "002 CLIENTES", conta: "Ingresos por servicios (705)", conservar: C4 },
+  { grupo: "Financiación", nombre: "Préstamos y ayudas (tarifa plana, subvenciones)", carpeta: "003 FINANCIACION", conta: "Deudas (520/170) y subvenciones (740)", conservar: C4 },
+];
+
 export function mapaDocumental(sector, conEmpleados = true) {
+  if (sector === "autonomo") return [...AUTONOMO, ...(conEmpleados ? LABORAL : [])];
   return [...COMUNES, ...(conEmpleados ? LABORAL : []), ...(POR_SECTOR[sector] || [])];
 }

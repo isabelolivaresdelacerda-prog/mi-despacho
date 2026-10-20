@@ -1,6 +1,7 @@
 // Asistente de carpetas: una sola carpeta por empresa en OneDrive / Google Drive, con su estructura fija.
 import { useEffect, useState } from "react";
 import { mapaDocumental } from "./documentos.js";
+import { EDICION_AUTONOMO } from "../edicion.js";
 import { SECTORES, QUE_VA, soportado, raizGuardada, elegirRaiz, olvidarRaiz, permiso, crearEstructura, crearProyecto, subcarpeta, buscarContabilidad } from "./carpetas.js";
 
 export function useRaiz() {
@@ -12,7 +13,7 @@ export function useRaiz() {
 }
 
 export default function CarpetasEmpresa({ config, guardar }) {
-  const sector = config.sector || "inmobiliaria";
+  const sector = config.sector || (EDICION_AUTONOMO ? "autonomo" : "inmobiliaria");
   const { raiz, ok, setRaiz, pedir } = useRaiz();
   const [estado, setEstado] = useState({});
   const [conta, setConta] = useState(null);

@@ -1,23 +1,24 @@
 // Ajustes → Datos de la empresa (para la papelería corporativa, facturas y contratos)
 import { useState } from "react";
-import { FORMAS, OPCIONES_ESFL } from "./entidad.js";
+import { FORMAS, OPCIONES_ESFL, OPCIONES_AUTONOMO, formaDe } from "./entidad.js";
 import { EMPRESA_VACIA, nifValido, pieMercantil } from "./empresa.js";
 
 export default function DatosEmpresa({ config, guardar }) {
-  const [e, setE] = useState({ ...EMPRESA_VACIA, razon_social: config.nombre || "", ...(config.empresa || {}) });
+  const [e, setE] = useState({ ...EMPRESA_VACIA, razon_social: config.nombre || "", ...(config.empresa || {}), forma: formaDe(config) });
+  const auto = e.forma === "autonomo";
   const [msg, setMsg] = useState("");
   const c = (k, t, props = {}) => (
     <label className={props.ancho ? "ancho" : undefined}>{t}<input value={e[k]} onChange={(ev) => setE({ ...e, [k]: ev.target.value })} {...props} ancho={undefined} /></label>
   );
   const errores = [];
-  if (e.cif && !nifValido(e.cif)) errores.push("El CIF no es válido.");
+  if (e.cif && !nifValido(e.cif)) errores.push(e.forma === "autonomo" ? "El NIF no es válido." : "El CIF no es válido.");
 
   return (
     <section className="tarjeta">
       <h2>Datos de la entidad</h2>
       <p className="muted">Salen en las facturas, la hoja de carta, los informes y los contratos.</p>
       <label>Forma jurídica
-        <select value={e.forma || "sl"} onChange={(ev) => setE({ ...e, forma: ev.target.value })}>{Object.entries(FORMAS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
+        <select value={e.forma} onChange={(ev) => setE({ ...e, forma: ev.target.value })}>{Object.entries(FORMAS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
       </label>
       {["asociacion", "fundacion"].includes(e.forma) && (
         <div className="nota">
@@ -25,18 +26,28 @@ export default function DatosEmpresa({ config, guardar }) {
           {OPCIONES_ESFL.map(([k, t]) => <label key={k} className="check"><input type="checkbox" checked={!!e.esfl?.[k]} onChange={(ev) => setE({ ...e, esfl: { ...(e.esfl || {}), [k]: ev.target.checked } })} /> {t}</label>)}
         </div>
       )}
+      {auto && (
+        <div className="nota">
+          <p><strong>Autónomo:</strong> la contabilidad lleva los libros registro de ingresos y gastos, el rendimiento neto de tu actividad, el IVA (303), el pago fraccionado del IRPF (130), la cuota de autónomos y la Renta. No hay capital, junta ni Registro Mercantil.</p>
+          {OPCIONES_AUTONOMO.map(([k, t]) => <label key={k} className="check"><input type="checkbox" checked={!!e.autonomo?.[k]} onChange={(ev) => setE({ ...e, autonomo: { ...(e.autonomo || {}), [k]: ev.target.checked } })} /> {t}</label>)}
+          <div className="rejilla-2">
+            {c("alta", "Fecha de alta como autónomo", { type: "date" })}
+            {c("iae", "Epígrafe del IAE", { placeholder: "p. ej. 731 (abogados)" })}
+          </div>
+        </div>
+      )}
       <div className="rejilla-2">
-        {c("razon_social", ["asociacion", "fundacion"].includes(e.forma) ? "Denominación" : "Razón social", { placeholder: "Beatriz Inversiones, S.L.", ancho: true })}
-        {c("cif", "CIF")}
+        {c("razon_social", auto ? "Nombre y apellidos" : ["asociacion", "fundacion"].includes(e.forma) ? "Denominación" : "Razón social", { placeholder: auto ? "Nombre Apellido Apellido" : "Beatriz Inversiones, S.L.", ancho: true })}
+        {c("cif", auto ? "NIF" : "CIF")}
         {c("email", "Correo", { type: "email" })}
-        {c("domicilio", "Domicilio social", { placeholder: "Calle, número, piso", ancho: true })}
+        {c("domicilio", auto ? "Domicilio fiscal" : "Domicilio social", { placeholder: "Calle, número, piso", ancho: true })}
         {c("cp", "Código postal")}
         {c("municipio", "Municipio")}
         {c("provincia", "Provincia")}
         {c("telefono", "Teléfono")}
         {c("web", "Web")}
       </div>
-      {["asociacion", "fundacion"].includes(e.forma) ? (<>
+      {auto ? null : ["asociacion", "fundacion"].includes(e.forma) ? (<>
         <p className="ce-sub">Inscripción en el registro</p>
         <div className="rejilla-2">
           {c("registro", e.forma === "asociacion" ? "Registro de Asociaciones" : "Registro de Fundaciones", { placeholder: e.forma === "asociacion" ? "Nacional / de la Comunidad de Madrid" : "Estatal / autonómico" })}

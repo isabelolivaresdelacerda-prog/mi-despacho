@@ -68,4 +68,5 @@ export function casillas111(d, r) {
 export const ENLACE_AEAT = {
   "303": "https://sede.agenciatributaria.gob.es/Sede/todas-gestiones/impuestos-tasas/iva/modelo-303-iva-autoliquidacion_.html",
   "111": "https://sede.agenciatributaria.gob.es/Sede/procedimientoini/GH01.shtml",
+  "130": "https://sede.agenciatributaria.gob.es/Sede/procedimientoini/G601.shtml",
 };

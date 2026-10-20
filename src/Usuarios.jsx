@@ -24,7 +24,7 @@ export default function Usuarios({ yo, onCambio }) {
 
   const correoCodigo = (c) => {
     const asunto = "Tu acceso a Mi Despacho";
-    const cuerpo = `Hola${c.nombre ? ", " + c.nombre.split(" ")[0] : ""}:\n\nYa tienes acceso a Mi Despacho.\n\n1. Entra en https://mi-despacho-nine.vercel.app\n2. Pulsa «Es mi primera vez».\n3. Escribe tu correo, este código y la clave que quieras.\n\nCódigo: ${c.codigo}\n(Caduca en 7 días y solo sirve una vez.)\n\nUn saludo,\n${yo?.nombre || ""}`;
+    const cuerpo = `Hola${c.nombre ? ", " + c.nombre.split(" ")[0] : ""}:\n\nYa tienes acceso a Mi Despacho.\n\n1. Entra en ${location.origin}\n2. Pulsa «Es mi primera vez».\n3. Escribe tu correo, este código y la clave que quieras.\n\nCódigo: ${c.codigo}\n(Caduca en 7 días y solo sirve una vez.)\n\nUn saludo,\n${yo?.nombre || ""}`;
     window.location.href = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
   };
 

@@ -10,6 +10,18 @@ const CORPORATE = { carpeta: "001 corporate", sub: ["ACTAS Y CERTIFICACIONES", "
 const ADMIN = (extra = []) => ({ carpeta: "004 ADMINISTRACIÓN", sub: ["banco", "contabilidad", "contratos gestion e intermediacion", ...extra] });
 
 export const SECTORES = {
+  autonomo: {
+    nombre: "Autónomo (persona física)",
+    estructura: [
+      { carpeta: "001 TITULAR", sub: ["alta en Hacienda (036-037)", "alta en autonomos (RETA)", "DNI y certificados", "colegiacion y licencias", "IMAGEN"] },
+      { carpeta: "002 CLIENTES", sub: ["presupuestos", "contratos", "entregables"] },
+      { carpeta: "003 FINANCIACION", sub: ["prestamos", "ayudas y subvenciones"] },
+      { carpeta: "004 ADMINISTRACIÓN", sub: ["banco", "contabilidad", "seguridad social", "renta", "seguros", "contratos gestion e intermediacion"] },
+      { carpeta: "005 BIENES DE INVERSION", sub: ["vehiculo", "equipos y mobiliario"] },
+      { carpeta: "006 PROYECTOS", sub: [] },
+    ],
+    proyectos: { padre: "006 PROYECTOS", etiqueta: "proyecto o cliente", sub: ["presupuesto", "contrato", "trabajo", "facturas"] },
+  },
   inmobiliaria: {
     nombre: "Inmobiliaria / inversión en activos",
     estructura: [
@@ -230,6 +242,9 @@ export const DESTINO = {
   intermediacion: ["004 ADMINISTRACIÓN", "contratos gestion e intermediacion"],
 };
 
+// Carpetas que usa la contabilidad dentro de «004 ADMINISTRACIÓN › contabilidad»
+export const CARPETAS_CONTABILIDAD = ["facturas", "facturas_emitidas", "extractos", "documentos_banco", "impuestos", "programa"];
+
 // Crea SOLO las carpetas que falten. Nunca mueve, renombra ni borra nada.
 export async function crearEstructura(sector) {
   const raiz = await raizGuardada();
@@ -243,7 +258,12 @@ export async function crearEstructura(sector) {
   for (const c of SECTORES[sector].estructura) {
     const d = await asegurar(raiz, c.carpeta);
     for (const s of c.sub) {
-      if (s === "contabilidad" && (await buscarContabilidad(raiz))) continue; // ya existe "contabilidad - …"
+      if (s === "contabilidad") {
+        // ya existe "contabilidad - …": se respeta; dentro, las carpetas de la contabilidad
+        const conta = (await buscarContabilidad(raiz)) || (await asegurar(d, s));
+        for (const x of CARPETAS_CONTABILIDAD) await asegurar(conta, x);
+        continue;
+      }
       await asegurar(d, s);
     }
   }
@@ -350,6 +370,10 @@ export async function buscarContabilidad(raiz, crear = false, empresa = "") {
 
 // Qué se guarda en cada carpeta (para explicarlo en pantalla)
 export const QUE_VA = {
+  "001 TITULAR": "Tus papeles como autónomo: alta en Hacienda (036/037), alta en autónomos, DNI, certificados, colegiación y licencias.",
+  "003 FINANCIACION": "Préstamos y ayudas (tarifa plana, subvenciones autonómicas) con su justificación.",
+  "005 BIENES DE INVERSION": "Lo que usas varios años en la actividad (vehículo, ordenador, mobiliario): factura, financiación y amortización.",
+  "006 PROYECTOS": "Una carpeta por proyecto o cliente importante.",
   "001 corporate": "La vida de la sociedad: escrituras, estatutos, actas de junta y certificaciones, libro de socios, imagen corporativa y contratos con partícipes.",
   "002 ACQUISITION": "Compra de activos: arras, compraventas, notas simples, memorandos y cuadros de fuentes y usos.",
   "002 PRODUCCIONES": "Cada producción (concierto, gira, musical) en su carpeta: presupuesto, contratos con artistas y salas, permisos.",

@@ -1,6 +1,6 @@
 // Resumen por trimestre y año (impuestos y pendientes) y cierre del extracto del banco.
 import { useEffect, useMemo, useState } from "react";
-import { TRAMOS, rango, cifras, porGestionar, plazos, fechaBonita, huella, saldosExtracto, saldo572, claveCierre, enRango, noPagada } from "./periodo.js";
+import { TRAMOS, rango, cifras, porGestionar, plazos, fechaBonita, huella, saldosExtracto, saldo572, claveCierre, enRango, noPagada, calculo130 } from "./periodo.js";
 import { filtrarPeriodo } from "./motor.js";
 import { a8 } from "./pgc.js";
 import { eur, num, fechaOrden, guardarJustificante, subir, sub, casarFacturaConMovimiento, guardarLectura } from "./datos.js";
@@ -106,8 +106,9 @@ export function Desglose({ tipo, r, todos, d, pendientes, irA, onCerrar }) {
   );
 }
 
-export function ResumenPeriodo({ d, todos, pendientes, vinculados, r, cambiar, cierres, irA, esfl = false }) {
-  const RES = esfl ? "Excedente" : "Resultado";
+export function ResumenPeriodo({ d, todos, pendientes, vinculados, r, cambiar, cierres, irA, esfl = false, autonomo = false, opciones = {} }) {
+  const RES = autonomo ? "Rendimiento neto" : esfl ? "Excedente" : "Resultado";
+  const k130 = useMemo(() => (autonomo ? calculo130(todos, d, r.anio, r.tramo === "anio" ? "4" : r.tramo, opciones) : null), [autonomo, todos, d, r, opciones]);
   const c = useMemo(() => cifras(todos, d.movimientos, pendientes, r, d), [todos, d, pendientes, r]);
   const ra = useMemo(() => rango(r.anio, "anio"), [r.anio]);
   const ca = useMemo(() => cifras(todos, d.movimientos, pendientes, ra, d), [todos, d, pendientes, ra]);
@@ -123,7 +124,7 @@ export function ResumenPeriodo({ d, todos, pendientes, vinculados, r, cambiar, c
   const filas = [
     ["Facturas recibidas", (x) => x.nRecibidas, "recibidas"], ["Pendientes de pago", (x) => eur(x.importePendPago), "pendPago"],
     ["Facturas emitidas", (x) => x.nEmitidas, "emitidas"], ["Pendientes de cobro", (x) => eur(x.importePendCobro), "pendCobro"],
-    ["Ingresos", (x) => eur(x.ingresos), "ingresos"], ["Gastos", (x) => eur(x.gastos), "gastos"], [esfl ? "Excedente antes de impuestos" : "Resultado antes de impuestos", (x) => eur(x.resultado), "resultado", "total"],
+    ["Ingresos", (x) => eur(x.ingresos), "ingresos"], ["Gastos", (x) => eur(x.gastos), "gastos"], [autonomo ? "Rendimiento neto" : esfl ? "Excedente antes de impuestos" : "Resultado antes de impuestos", (x) => eur(x.resultado), "resultado", "total"],
     ["IVA repercutido (477)", (x) => eur(x.ivaRep), "iva"], ["IVA soportado (472)", (x) => eur(x.ivaSop), "iva"], ["Resultado IVA (303 / 390)", (x) => eur(x.iva303), "iva", "total"],
     ["Retenciones 111 (profesionales y nóminas)", (x) => eur(x.ret111), "ret"], ["Retenciones 115 (alquileres)", (x) => eur(x.ret115), "ret"],
     ["Banco: entradas", (x) => eur(x.entradas), "entradas"], ["Banco: salidas", (x) => eur(x.salidas), "salidas"],
@@ -162,11 +163,13 @@ export function ResumenPeriodo({ d, todos, pendientes, vinculados, r, cambiar, c
           <tr><td><strong>IVA</strong> · modelo {P.iva.modelo}</td><td>Repercutido {eur(c.ivaRep)} − soportado {eur(c.ivaSop)}</td><td className="num"><strong>{eur(c.iva303)}</strong> <small className="muted">{signoIVA(c.iva303)}</small></td><td>plazo {fechaBonita(P.iva.fecha)}</td></tr>
           <tr><td><strong>Retenciones</strong> · modelo 111</td><td>Profesionales (abogados, notarios, asesores…) y nóminas</td><td className="num"><strong>{eur(c.ret111)}</strong></td><td>plazo {fechaBonita(P.ret.fecha)}</td></tr>
           <tr><td><strong>Retenciones</strong> · modelo 115</td><td>Alquileres de locales y oficinas</td><td className="num"><strong>{eur(c.ret115)}</strong></td><td>plazo {fechaBonita(P.ret.fecha)}</td></tr>
-          {esfl
+          {autonomo
+            ? <tr><td><strong>IRPF</strong> · modelo 130</td><td>Rendimiento neto del 1 de enero al {fechaBonita(r.hasta)}: {eur(k130.rendimiento)}{k130.dificil ? ` (con ${eur(k130.dificil)} de gastos de difícil justificación)` : ""} · 20 % {eur(k130.c04)} − retenciones de tus facturas {eur(k130.retenciones)} − pagos anteriores {eur(k130.anteriores)}{opciones.exento130 ? ". Has marcado que no presentas el 130." : ""}</td><td className="num"><strong>{eur(k130.aIngresar)}</strong> <small className="muted">estimación</small></td><td>plazo {fechaBonita(P.iva.fecha)}</td></tr>
+            : esfl
             ? <tr><td><strong>Sociedades</strong> · modelo 200</td><td>Excedente acumulado: {eur(c.acumulado)}. Las cuotas, donativos y subvenciones están exentas; tributan las actividades económicas.</td><td className="num"><small className="muted">lo calcula la gestoría</small></td><td>anual (julio)</td></tr>
             : <tr><td><strong>Sociedades</strong>{P.is ? <> · modelo {P.is.modelo}</> : ""}</td><td>Resultado acumulado del 1 de enero al {fechaBonita(r.hasta)}: {eur(c.acumulado)}</td><td className="num"><strong>{eur(c.isEstimado)}</strong> <small className="muted">estimación al 25 %</small></td><td>{P.is ? `plazo ${fechaBonita(P.is.fecha)}` : "sin pago fraccionado este trimestre"}</td></tr>}
         </tbody></table>
-        <p className="muted pequeño">Cifras orientativas sacadas de la contabilidad; la gestoría confirma el tipo del Impuesto sobre Sociedades y si hay pagos fraccionados. Lo ya presentado y pagado está en la pestaña <button className="enlace" type="button" onClick={() => irA("impuestos")}>Impuestos</button>.{c.descuadrados > 0 && <span className="pend"> Hay {c.descuadrados} asientos descuadrados que pueden alterar estas cifras.</span>}</p>
+        <p className="muted pequeño">Cifras orientativas sacadas de la contabilidad; {autonomo ? "la gestoría confirma el 130 y la Renta." : "la gestoría confirma el tipo del Impuesto sobre Sociedades y si hay pagos fraccionados."} Lo ya presentado y pagado está en la pestaña <button className="enlace" type="button" onClick={() => irA("impuestos")}>Impuestos</button>.{c.descuadrados > 0 && <span className="pend"> Hay {c.descuadrados} asientos descuadrados que pueden alterar estas cifras.</span>}</p>
       </section>
 
       <section className="tarjeta" id="por-gestionar">

@@ -92,11 +92,43 @@ const ESFL = {
   ],
 };
 
-export default function Asistente({ plan = "pymes", onElegir, onCerrar, contexto }) {
+// Autónomo (persona física): no hay socios ni Sociedades; el dinero que pone o saca el titular va a la 550,
+// la cuota de autónomos es gasto (642) y el modelo 130 es un pago a cuenta de su Renta (473).
+const TITULAR = { c: "550", e: "Titular de la explotación: el dinero que pones o sacas de tu actividad para ti. No es ingreso ni gasto." };
+const AUTONOMO = {
+  inicio: { p: "¿El dinero entra o sale de tu cuenta de la actividad?", o: [["Sale: pago algo", "sale"], ["Entra: cobro o recibo dinero", "entra"]] },
+  sale: { p: "¿Qué estás pagando?", o: [
+    ["Mi cuota de autónomos (Seguridad Social)", { c: "642", e: "Cuota del Régimen de Autónomos (RETA): gasto deducible de tu actividad." }],
+    ["Un servicio o gasto del día a día", "gasto"],
+    ["Algo que voy a usar varios años (ordenador, muebles, coche…)", "inmov"],
+    ["Algo que compro para volver a venderlo (mercancía)", { c: "600", e: "Compras de mercaderías." }],
+    ["Sueldos o Seguridad Social de mis trabajadores", "personal"],
+    ["Devolver un préstamo o pagar intereses", "deuda"],
+    ["Dinero que me paso para mí (gastos personales)", TITULAR],
+    ["Impuestos a Hacienda (IVA, 130, retenciones, Renta)", "hacienda"],
+  ] },
+  hacienda: { p: "¿Qué impuesto?", o: [
+    ["El IVA del trimestre (modelo 303)", { c: "4750", e: "Hacienda Pública, acreedora por IVA." }],
+    ["El pago fraccionado del IRPF (modelo 130)", { c: "473", e: "Pago a cuenta de tu Renta: no es gasto, se descuenta en la declaración anual." }],
+    ["Las retenciones que he hecho a otros (modelos 111 o 115)", { c: "4751", e: "Hacienda Pública, acreedora por retenciones practicadas." }],
+    ["La declaración de la Renta (modelo 100)", { c: "550", e: "La Renta es un impuesto personal, no un gasto de la actividad: va a la cuenta del titular." }],
+  ] },
+  entra: { p: "¿Por qué entra ese dinero?", o: [
+    ["Cobro un trabajo o servicio que he hecho", { c: "705", e: "Prestaciones de servicios." }],
+    ["Vendo un producto", { c: "700", e: "Ventas de mercaderías." }],
+    ["Pongo dinero mío en la cuenta de la actividad", TITULAR],
+    ["Una ayuda o subvención (tarifa plana, ayuda autonómica…)", { c: "740", e: "Subvenciones a la explotación: es ingreso de la actividad." }],
+    ["Un banco o alguien me presta dinero", { c: "520", e: "Deudas a corto plazo con entidades de crédito (a más de un año, 170)." }],
+    ["Intereses del banco", { c: "769", e: "Otros ingresos financieros." }],
+    ["Una devolución de Hacienda", { c: "4700", e: "Hacienda Pública, deudora por devolución de impuestos (si es de la Renta, cuenta del titular 550)." }],
+  ] },
+};
+
+export default function Asistente({ plan = "pymes", onElegir, onCerrar, contexto, autonomo = false }) {
   const [camino, setCamino] = useState(["inicio"]);
   const [fin, setFin] = useState(null);
   const clave = camino[camino.length - 1];
-  const nodo = plan === "esfl" && clave === "entra" ? ESFL.entra : plan === "esfl" && clave === "sale" ? { ...ARBOL.sale, o: [...ESFL.saleExtra, ...ARBOL.sale.o.filter(([t]) => !/socio o administrador/.test(t))] } : ARBOL[clave];
+  const nodo = autonomo && AUTONOMO[clave] ? AUTONOMO[clave] : plan === "esfl" && clave === "entra" ? ESFL.entra : plan === "esfl" && clave === "sale" ? { ...ARBOL.sale, o: [...ESFL.saleExtra, ...ARBOL.sale.o.filter(([t]) => !/socio o administrador/.test(t))] } : ARBOL[clave];
   const elegir = (dest) => (typeof dest === "string" ? setCamino([...camino, dest]) : setFin(dest));
   const atras = () => (fin ? setFin(null) : camino.length > 1 && setCamino(camino.slice(0, -1)));
 

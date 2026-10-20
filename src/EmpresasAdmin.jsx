@@ -4,7 +4,7 @@ import { misEmpresas, empresasAdmin } from "./lib/cuentas.js";
 import { nifValido } from "./lib/empresa.js";
 
 const ROLES = { titular: "Titular", gestoria: "Gestoría", colaborador: "Colaborador" };
-const TIPOS = { empresa: "Empresa", gestoria: "Gestoría", despacho: "Despacho", asociacion: "Asociación" };
+const TIPOS = { empresa: "Empresa", autonomo: "Autónomo", gestoria: "Gestoría", despacho: "Despacho", asociacion: "Asociación" };
 
 export default function EmpresasAdmin({ usuarios }) {
   const [emps, setEmps] = useState([]);

@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { filtrarPeriodo, mayores, perdidasYGanancias, balance, exportarApuntes, exportarPlanCuentas, claveMov, adivinarTercero, claveTercero, PROGRAMAS } from "./motor.js";
 export { adivinarTercero };
-import { planPorDefecto } from "../../lib/entidad.js";
+import { planPorDefecto, esAutonomo } from "../../lib/entidad.js";
 import { eur, num, descargarTexto, fechaOrden } from "./datos.js";
 import { plan, comprobarBOE, descargarDelBOE, aplicarActualizacion, fechaBOE, a8 } from "./pgc.js";
 import Asistente from "./Asistente.jsx";
@@ -14,6 +14,9 @@ const e2 = (n) => (n ? eur(n) : "");
 
 export default function Libros({ datos, diario, extra, guardarExtra, r, sub, setSub, config, guardarConfig, aviso }) {
   const tipoPlan = planPorDefecto(config);
+  const auto = esAutonomo(config);
+  // Autónomo: libros registro (los obligatorios en estimación directa) en primer lugar; sin balance
+  const subs = auto ? [["registro", "Libros registro"], ...SUB.filter(([k]) => k !== "balance").map(([k, t]) => (k === "pyg" ? [k, "Rendimiento"] : [k, t]))] : SUB;
   const { asientos: todos, pendientes } = diario;
   const asientos = useMemo(() => filtrarPeriodo(todos, r.desde, r.hasta), [todos, r]);
   // El balance es una foto a una fecha: desde el 1 de enero del ejercicio hasta el final del periodo
@@ -25,16 +28,17 @@ export default function Libros({ datos, diario, extra, guardarExtra, r, sub, set
   return (
     <div>
       <div className="acciones cont-barra">
-        <nav className="sub-tabs">{SUB.map(([k, t]) => <button key={k} className={sub === k ? "on" : ""} onClick={() => setSub(k)}>{t}{k === "aplicar" && pendP.length > 0 && <span className="insignia">{pendP.length}</span>}</button>)}</nav>
+        <nav className="sub-tabs">{subs.map(([k, t]) => <button key={k} className={sub === k ? "on" : ""} onClick={() => setSub(k)}>{t}{k === "aplicar" && pendP.length > 0 && <span className="insignia">{pendP.length}</span>}</button>)}</nav>
       </div>
       <p className="muted pequeño">{r.etiqueta}. La contabilidad se genera sola con las facturas, el banco y las escrituras y contratos vinculados. Lo propuesto por la IA debe revisarlo una persona.{descuadrados > 0 && <span className="pend"> Hay {descuadrados} asientos descuadrados (diferencia {eur(Math.abs(asientos.filter((a) => !a.cuadra).reduce((t, a) => t + a.lineas.reduce((s, l) => s + l.debe - l.haber, 0), 0)))}): <button className="enlace" type="button" onClick={() => setSub("sumas")}>ver cuáles</button>.</span>}</p>
       {sub === "diario" && <Diario asientos={asientos} />}
       {sub === "mayor" && <Mayor asientos={asientos} />}
       {sub === "sumas" && <Sumas asientos={asientos} irDiario={() => setSub("diario")} />}
-      {sub === "pyg" && <PyG esfl={tipoPlan === "esfl"} asientos={asientos} anio={r.etiqueta} acumulado={r.tramo !== "anio" ? ejercicio : null} />}
+      {sub === "registro" && <LibrosRegistro datos={datos} r={r} config={config} />}
+      {sub === "pyg" && <PyG autonomo={auto} esfl={tipoPlan === "esfl"} asientos={asientos} anio={r.etiqueta} acumulado={r.tramo !== "anio" ? ejercicio : null} />}
       {sub === "balance" && <Balance esfl={tipoPlan === "esfl"} asientos={ejercicio} anio={fin} />}
-      {sub === "aplicar" && <Aplicar pendientes={pendP} total={pendientes.length} asig={extra.asig} plan={tipoPlan} guardar={async (n) => { await guardarExtra("asig", n); aviso?.("Movimiento contabilizado"); }} />}
-      {sub === "manual" && <Manual manuales={extra.manuales} plan={tipoPlan} guardar={async (n) => { await guardarExtra("manuales", n); aviso?.("Asiento guardado"); }} />}
+      {sub === "aplicar" && <Aplicar autonomo={auto} pendientes={pendP} total={pendientes.length} asig={extra.asig} plan={tipoPlan} guardar={async (n) => { await guardarExtra("asig", n); aviso?.("Movimiento contabilizado"); }} />}
+      {sub === "manual" && <Manual autonomo={auto} manuales={extra.manuales} plan={tipoPlan} guardar={async (n) => { await guardarExtra("manuales", n); aviso?.("Asiento guardado"); }} />}
       {sub === "exportar" && <Exportar asientos={asientos} anio={r.corta} config={config} />}
       {sub === "plan" && <PlanContable tipo={tipoPlan} cambiar={(p) => guardarConfig({ ...config, planContable: p })} aviso={aviso} />}
     </div>
@@ -100,13 +104,13 @@ function Sumas({ asientos, irDiario }) {
   );
 }
 
-function PyG({ asientos, anio, acumulado, esfl }) {
+function PyG({ asientos, anio, acumulado, esfl, autonomo }) {
   const p = perdidasYGanancias(asientos, esfl);
   const q = acumulado ? perdidasYGanancias(acumulado, esfl) : null;
   const fila = (t, v, w, fuerte) => <tr key={t} className={fuerte ? "total" : ""}><td>{t}</td><td className={"num " + (v < 0 ? "neg" : "")}>{eur(v)}</td>{q && <td className={"num " + (w < 0 ? "neg" : "")}>{eur(w)}</td>}</tr>;
   return (
     <div className="estado">
-      <h3>{esfl ? "Cuenta de resultados" : "Cuenta de pérdidas y ganancias"} · {anio} <span className="muted pequeño">({esfl ? "modelo abreviado de entidades sin fines lucrativos" : "modelo abreviado PGC PYMES"})</span></h3>
+      <h3>{autonomo ? "Rendimiento de la actividad" : esfl ? "Cuenta de resultados" : "Cuenta de pérdidas y ganancias"} · {anio} <span className="muted pequeño">({autonomo ? "ingresos y gastos de la actividad: el rendimiento neto va a tu Renta" : esfl ? "modelo abreviado de entidades sin fines lucrativos" : "modelo abreviado PGC PYMES"})</span></h3>
       <table className="tabla">
         {q && <thead><tr><th></th><th className="num">Trimestre</th><th className="num">Acumulado del año</th></tr></thead>}
         <tbody>
@@ -114,9 +118,9 @@ function PyG({ asientos, anio, acumulado, esfl }) {
         {fila(esfl ? "A) EXCEDENTE DE LA ACTIVIDAD" : "A) RESULTADO DE EXPLOTACIÓN", p.explotacion, q?.explotacion, true)}
         {p.financieras.map(([t, v], i) => fila(t, v, q?.financieras[i][1]))}
         {fila(esfl ? "B) EXCEDENTE DE LAS OPERACIONES FINANCIERAS" : "B) RESULTADO FINANCIERO", p.financiero, q?.financiero, true)}
-        {fila(esfl ? "C) EXCEDENTE ANTES DE IMPUESTOS" : "C) RESULTADO ANTES DE IMPUESTOS", p.antesImpuestos, q?.antesImpuestos, true)}
-        {fila("17. Impuesto sobre beneficios", p.impuesto, q?.impuesto)}
-        {fila(esfl ? "D) EXCEDENTE DEL EJERCICIO" : "D) RESULTADO DEL EJERCICIO", p.resultado, q?.resultado, true)}
+        {fila(autonomo ? "C) RENDIMIENTO NETO DE LA ACTIVIDAD" : esfl ? "C) EXCEDENTE ANTES DE IMPUESTOS" : "C) RESULTADO ANTES DE IMPUESTOS", p.antesImpuestos, q?.antesImpuestos, true)}
+        {!autonomo && fila("17. Impuesto sobre beneficios", p.impuesto, q?.impuesto)}
+        {!autonomo && fila(esfl ? "D) EXCEDENTE DEL EJERCICIO" : "D) RESULTADO DEL EJERCICIO", p.resultado, q?.resultado, true)}
       </tbody></table>
     </div>
   );
@@ -139,7 +143,7 @@ function Balance({ asientos, anio, esfl }) {
 // ¿Esta cuenta suele llevar factura de un tercero?
 const llevaFactura = (c) => /^(60|62[0-579]|21|20)/.test(c) || /^7[05]/.test(c);
 
-function Aplicar({ pendientes, total, asig, guardar, plan: tipo }) {
+function Aplicar({ pendientes, total, asig, guardar, plan: tipo, autonomo }) {
   const [elegir, setElegir] = useState(null); // { movs, nombre, regla }
   const [paso, setPaso] = useState(null);     // { movs, regla, cuenta, e, tercero, factura }
   const [abierto, setAbierto] = useState(null);
@@ -175,7 +179,7 @@ function Aplicar({ pendientes, total, asig, guardar, plan: tipo }) {
         </Fragment>))}</tbody>
       </table></div>
       {reglas.length > 0 && <details className="pequeño"><summary>Reglas por entidad ({reglas.length})</summary><ul>{reglas.map(([k, v]) => <li key={k}>{v.nombreBanco || v.tercero || k.slice(1)} → {a8(v.cuenta)}{v.esperaFactura ? " (subcuenta propia, espera factura)" : ""} <button className="enlace" type="button" onClick={() => { const n = { ...asig }; delete n[k]; guardar(n); }}>quitar</button></li>)}</ul></details>}
-      {elegir && <Asistente plan={tipo} contexto={`${elegir.nombre} · ${elegir.movs.length} movimiento${elegir.movs.length > 1 ? "s" : ""} · ${eur(elegir.movs.reduce((s, m) => s + m.importe, 0))}`} onCerrar={() => setElegir(null)}
+      {elegir && <Asistente plan={tipo} autonomo={autonomo} contexto={`${elegir.nombre} · ${elegir.movs.length} movimiento${elegir.movs.length > 1 ? "s" : ""} · ${eur(elegir.movs.reduce((s, m) => s + m.importe, 0))}`} onCerrar={() => setElegir(null)}
         onElegir={(cuenta, e) => { setPaso({ ...elegir, cuenta, e, tercero: elegir.nombre === "Sin nombre" ? "" : elegir.nombre, factura: llevaFactura(cuenta) }); setElegir(null); }} />}
       {paso && (
         <div className="mc-fondo" role="dialog" aria-modal="true" aria-labelledby="tr-t">
@@ -203,7 +207,7 @@ function Aplicar({ pendientes, total, asig, guardar, plan: tipo }) {
   );
 }
 
-function Manual({ manuales, guardar, plan: tipo }) {
+function Manual({ manuales, guardar, plan: tipo, autonomo }) {
   const vacio = { fecha: new Date().toLocaleDateString("es-ES"), concepto: "", lineas: [{ cuenta: "", debe: "", haber: "" }, { cuenta: "", debe: "", haber: "" }] };
   const [a, setA] = useState(vacio);
   const [asis, setAsis] = useState(null);
@@ -227,7 +231,7 @@ function Manual({ manuales, guardar, plan: tipo }) {
       </div>
       {manuales.length > 0 && <div className="tabla-scroll"><table className="tabla"><thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th><th></th></tr></thead>
         <tbody>{manuales.map((m) => <tr key={m.id}><td>{m.fecha}</td><td>{m.concepto}</td><td className="num">{eur(m.lineas.reduce((t, l) => t + num(l.debe), 0))}</td><td><button className="enlace" type="button" onClick={() => window.confirm("¿Borrar este asiento manual?") && guardar(manuales.filter((x) => x.id !== m.id))}>Borrar</button></td></tr>)}</tbody></table></div>}
-      {asis !== null && <Asistente plan={tipo} onCerrar={() => setAsis(null)} onElegir={(c) => { linea(asis, "cuenta", c); setAsis(null); }} />}
+      {asis !== null && <Asistente plan={tipo} autonomo={autonomo} onCerrar={() => setAsis(null)} onElegir={(c) => { linea(asis, "cuenta", c); setAsis(null); }} />}
     </div>
   );
 }
@@ -283,6 +287,45 @@ function PlanContable({ tipo, cambiar, aviso }) {
       <input className="buscar" placeholder="Buscar cuenta (número o nombre)…" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
       <div className="tabla-scroll"><table className="tabla"><thead><tr><th>Cuenta</th><th>Nombre</th><th>8 dígitos</th></tr></thead>
         <tbody>{lista.map(([k, v]) => <tr key={k} className={k.length === 2 ? "total" : ""}><td className="cta">{k}</td><td>{v}</td><td className="muted">{k.length >= 3 ? a8(k) : ""}</td></tr>)}</tbody></table></div>
+    </div>
+  );
+}
+
+
+// ---- Libros registro del autónomo (estimación directa): ventas e ingresos, compras y gastos, bienes de inversión ----
+// Son los libros que pide Hacienda a una persona física (no se legalizan). Se sacan de las facturas del periodo.
+const ES_INVERSION = (f) => /^2[0-1]/.test(String(f.cuenta_pgc || f.cuenta || ""));
+function LibrosRegistro({ datos, r, config }) {
+  const [libro, setLibro] = useState("ingresos");
+  const enR = (f) => { const o = fechaOrden(f.fecha); return o >= r.desde && o <= r.hasta; };
+  const ord = (a, b) => fechaOrden(a.fecha).localeCompare(fechaOrden(b.fecha));
+  const emit = (datos.emitidas || []).filter((f) => !f._duplicadoDe && !f.noFactura && enR(f)).sort(ord);
+  const rec = (datos.facturas || []).filter((f) => !f._duplicadoDe && !f.noFactura && enR(f)).sort(ord);
+  const gastos = rec.filter((f) => !ES_INVERSION(f)), inversion = rec.filter(ES_INVERSION);
+  const lista = libro === "ingresos" ? emit : libro === "gastos" ? gastos : inversion;
+  const tercero = (f) => (libro === "ingresos" ? f.cliente || f.proveedor : f.proveedor) || "";
+  const nif = (f) => (libro === "ingresos" ? f.nif_cliente || f.cif_cliente || f.nif_receptor : f.nif_proveedor || f.cif_proveedor || f.nif_emisor) || f.nif || "";
+  const tot = (k) => lista.reduce((s, f) => s + (num(f[k]) || 0), 0);
+  const cab = ["Nº", "Fecha", "Nº factura", "NIF", libro === "ingresos" ? "Cliente" : "Proveedor", "Base imponible", "% IVA", "Cuota IVA", "Retención IRPF", "Total"];
+  const filas = lista.map((f, i) => [i + 1, f.fecha || "", f.numero || "", nif(f), tercero(f), num(f.base) || 0, num(f.iva_pct) || 0, num(f.iva_importe) || 0, num(f.retencion_importe) || 0, num(f.total) || 0]);
+  const exportar = () => {
+    const nombre = { ingresos: "Libro registro de ventas e ingresos", gastos: "Libro registro de compras y gastos", inversion: "Libro registro de bienes de inversión" }[libro];
+    const t = [[nombre], [`Titular: ${config?.empresa?.razon_social || config?.nombre || ""}`, `NIF: ${config?.empresa?.cif || ""}`, `Periodo: ${r.etiqueta}`], [], cab, ...filas, [], ["", "", "", "", "TOTAL", tot("base"), "", tot("iva_importe"), tot("retencion_importe"), tot("total")]];
+    descargarTexto(t.map((f) => f.map((v) => (typeof v === "number" ? String(Math.round(v * 100) / 100).replace(".", ",") : `"${String(v).replace(/"/g, '""')}"`)).join(";")).join("\r\n"), `${nombre} ${r.corta}.csv`);
+  };
+  return (
+    <div>
+      <div className="acciones cont-barra">
+        <nav className="sub-tabs">{[["ingresos", "Ventas e ingresos"], ["gastos", "Compras y gastos"], ["inversion", "Bienes de inversión"]].map(([k, t]) => <button key={k} className={libro === k ? "on" : ""} onClick={() => setLibro(k)}>{t}</button>)}</nav>
+        <button className="btn ghost" type="button" onClick={exportar}>Descargar (Excel)</button>
+      </div>
+      <p className="muted pequeño">Los libros que tiene que llevar un autónomo en estimación directa. Se rellenan solos con las facturas emitidas y recibidas de {r.etiqueta}. Los bienes de inversión son las compras que se usan varios años (ordenador, vehículo, mobiliario: cuentas 20 y 21). Guarda una copia al cerrar cada año.</p>
+      {!lista.length ? <p className="muted">No hay facturas en este periodo.</p> : (
+        <div className="tabla-scroll"><table className="tabla">
+          <thead><tr>{cab.map((c) => <th key={c} className={/Base|IVA|Retención|Total/.test(c) && c !== "% IVA" ? "num" : ""}>{c}</th>)}</tr></thead>
+          <tbody>{filas.map((f) => <tr key={f[0]}>{f.map((v, i) => <td key={i} className={i >= 5 && i !== 6 ? "num" : ""}>{i >= 5 && i !== 6 ? e2(v) : i === 6 ? (v ? v + " %" : "") : v}</td>)}</tr>)}
+            <tr className="total"><td colSpan={5}>Total</td><td className="num">{eur(tot("base"))}</td><td></td><td className="num">{eur(tot("iva_importe"))}</td><td className="num">{eur(tot("retencion_importe"))}</td><td className="num">{eur(tot("total"))}</td></tr></tbody>
+        </table></div>)}
     </div>
   );
 }
