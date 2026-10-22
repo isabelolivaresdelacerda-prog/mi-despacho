@@ -67,6 +67,7 @@ function construir(d) {
   p("Ninguna de las partes podrá ceder su posición en este contrato sin el consentimiento previo y por escrito de la otra.", "Undécima. Cesión.");
   p("Las partes guardarán confidencialidad sobre el contenido de este contrato y sobre la información del Negocio, salvo obligación legal o requerimiento de autoridad.", "Duodécima. Confidencialidad.");
   p("Este contrato se rige por la ley española. Para cualquier controversia, las partes se someten a los juzgados y tribunales de " + or(d.trib, "ciudad") + ".", "Decimotercera. Ley aplicable y jurisdicción.");
+  p("Los datos personales de los firmantes y, en su caso, de los representantes de las Partes que figuran en el presente Contrato serán tratados por cada una de las Partes, en calidad de responsable del tratamiento, con la finalidad de gestionar la relación contractual, cumplir las obligaciones legales aplicables, incluidas las fiscales y las derivadas de la normativa de prevención del blanqueo de capitales y de la financiación del terrorismo, y, en su caso, formular, ejercer o defender reclamaciones. La base jurídica del tratamiento es la ejecución del presente Contrato y el cumplimiento de obligaciones legales, de conformidad con el artículo 6.1.b) y c) del Reglamento (UE) 2016/679 y con la Ley Orgánica 3/2018, de 5 de diciembre. Los datos se conservarán durante la vigencia del Contrato y, tras su extinción, durante los plazos de prescripción legalmente aplicables, y no se comunicarán a terceros salvo obligación legal o cuando resulte necesario para la ejecución del Contrato, en particular a asesores, notarios, registros y Administraciones Públicas. Los interesados podrán ejercitar sus derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento y portabilidad dirigiéndose por escrito a la otra Parte en el domicilio indicado en el encabezamiento, así como presentar una reclamación ante la Agencia Española de Protección de Datos (www.aepd.es).", "Decimocuarta. Protección de datos.");
   p("Y en prueba de conformidad, las partes firman el presente contrato por duplicado y a un solo efecto en el lugar y fecha indicados en el encabezamiento.");
   B.push({ t: "sig", a: "El Gestor\n" + or(d.g_nombre, "GESTOR") + (d.g_rep ? "\np.p. " + d.g_rep : ""), b: "El Partícipe\n" + or(d.p_nombre, "PARTÍCIPE") + (d.p_rep ? "\np.p. " + d.p_rep : "") });
   const anexo = anexoNegocio(neg);
@@ -209,7 +210,7 @@ export default function ContratoCEP({ config, irAAjustes }) {
         <VistaDocumento bloques={bloques} />
       </div>
 
-      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Decimocuarta. Título de la cláusula." bloqueado={!!exp} />
+      <EditorClausulas base={base} cambios={cambios} setCambios={setCambios} aviso={aviso} clave={CLAVE_CAMBIOS} ejemploTitulo="Decimoquinta. Título de la cláusula." bloqueado={!!exp} />
       <FirmaContrato clave="md-cep-expediente" titulo="Contrato de cuentas en participación" nombreBase={"Contrato cuentas en participacion - " + ((d.p_nombre || "participe").trim())} bloques={bloquesVivos} partes={partesCEP(d)} expediente={exp} setExpediente={setExp} aviso={aviso} />
 
       <AvisoSinIA />
